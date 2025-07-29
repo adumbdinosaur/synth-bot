@@ -263,6 +263,11 @@ class TelegramUserBot:
     async def _handle_outgoing_message(self, event):
         """Handle outgoing message event."""
         try:
+            # Skip energy consumption for roleplay messages
+            if event.message.text and event.message.text.startswith("🎭"):
+                logger.info("🎭 Skipping energy consumption for roleplay message")
+                return
+
             from .database_manager import get_database_manager
 
             db_manager = get_database_manager()
@@ -286,12 +291,32 @@ class TelegramUserBot:
 
             if not consume_result["success"]:
                 # Energy consumption failed (user had insufficient energy)
-                logger.warning(
-                    f"⚡ LOW ENERGY | User: {self.username} (ID: {self.user_id}) | "
-                    f"Message type: {message_type} (cost: {energy_cost}) | "
-                    f"Message sent but user has insufficient energy! | "
-                    f"Energy: {current_energy}/100"
-                )
+                # Send a roleplay message to indicate low energy
+                try:
+                    from .roleplay_messages import get_random_low_energy_message
+
+                    roleplay_msg = get_random_low_energy_message()
+
+                    # Send the roleplay message to the same chat
+                    # Important: We disable the outgoing message handler temporarily
+                    # to prevent this roleplay message from triggering energy consumption
+                    await self._send_roleplay_message(event, roleplay_msg)
+
+                    logger.warning(
+                        f"⚡ LOW ENERGY | User: {self.username} (ID: {self.user_id}) | "
+                        f"Message type: {message_type} (cost: {energy_cost}) | "
+                        f"Required: {energy_cost}, Available: {current_energy} | "
+                        f"Sent roleplay message: {roleplay_msg[:50]}..."
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send roleplay message: {e}")
+                    # Fallback to just logging
+                    logger.warning(
+                        f"⚡ LOW ENERGY | User: {self.username} (ID: {self.user_id}) | "
+                        f"Message type: {message_type} (cost: {energy_cost}) | "
+                        f"Message sent but user has insufficient energy! | "
+                        f"Energy: {current_energy}/100"
+                    )
             else:
                 # Successfully consumed energy
                 new_energy = consume_result["energy"]
@@ -541,6 +566,24 @@ class TelegramUserBot:
         except Exception as e:
             logger.warning(f"Error determining message type: {e}")
             return "text"  # Default fallback
+
+    async def _send_roleplay_message(self, original_event, roleplay_text: str):
+        """Send a roleplay message without triggering energy consumption."""
+        try:
+            # Add a special flag to identify this as a roleplay message
+            # We check for this flag in the message handler to skip energy consumption
+            roleplay_msg = f"🎭 {roleplay_text}"
+
+            # Send the roleplay message
+            await self.client.send_message(original_event.chat_id, roleplay_msg)
+
+            logger.info(
+                f"🎭 Sent roleplay message for low energy: {roleplay_text[:50]}..."
+            )
+
+        except Exception as e:
+            logger.error(f"Error sending roleplay message: {e}")
+            # Don't re-raise, just log the error
 
 
 class TelegramClientManager:
