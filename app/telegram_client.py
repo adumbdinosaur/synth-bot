@@ -957,10 +957,20 @@ class TelegramUserBot:
             if not me:
                 return None
 
+            # For basic user info, we don't have access to 'about' field
+            # That requires getting the full user info with GetFullUserRequest
+            try:
+                from telethon.tl.functions.users import GetFullUserRequest
+
+                full_user = await self.client(GetFullUserRequest(me.id))
+                bio = full_user.full_user.about or ""
+            except Exception:
+                bio = ""
+
             return {
                 "first_name": me.first_name or "",
                 "last_name": me.last_name or "",
-                "bio": me.about or "",
+                "bio": bio,
                 "username": me.username or "",
                 "phone": me.phone or "",
                 "photo_id": me.photo.photo_id if me.photo else None,
@@ -1089,6 +1099,23 @@ class TelegramUserBot:
         except Exception as e:
             logger.error(f"Error sending message for user {self.user_id}: {e}")
             return False
+
+    async def setup_handlers(self):
+        """Setup event handlers for the Telegram client."""
+        try:
+            if not self.client or not self.client.is_connected():
+                logger.warning(
+                    f"Cannot setup handlers - client not connected for user {self.user_id}"
+                )
+                return
+
+            # Add any message handlers or event listeners here if needed
+            logger.info(f"Event handlers setup completed for user {self.user_id}")
+
+        except Exception as e:
+            logger.error(f"Error setting up handlers for user {self.user_id}: {e}")
+
+    # ...existing code...
 
 
 class TelegramClientManager:
@@ -1257,9 +1284,13 @@ class TelegramClientManager:
         for file in os.listdir(self.session_dir):
             if file.startswith("user_") and file.endswith(".session"):
                 try:
-                    user_id = int(file.replace("user_", "").replace(".session", ""))
-                    session_files.append((user_id, file))
-                except ValueError:
+                    # Handle format: user_{user_id}_{phone}.session
+                    parts = file.replace("user_", "").replace(".session", "").split("_")
+                    if len(parts) >= 1:
+                        user_id = int(parts[0])  # First part is always user_id
+                        session_files.append((user_id, file))
+                except ValueError as e:
+                    logger.warning(f"Could not parse session file {file}: {e}")
                     continue
 
         if not session_files:
@@ -1267,6 +1298,8 @@ class TelegramClientManager:
             return
 
         logger.info(f"Found {len(session_files)} session files to process")
+        for user_id, filename in session_files:
+            logger.info(f"  - Session file: {filename} -> User ID: {user_id}")
 
         successful_recoveries = 0
         for user_id, session_file in session_files:
@@ -1299,18 +1332,13 @@ class TelegramClientManager:
                 )
 
                 # Create client with existing session
-                session_path = os.path.join(self.session_dir, f"user_{user_id}")
-                client = TelegramClient(
-                    user_id, username, self.api_id, self.api_hash, session_path
+                client = TelegramUserBot(
+                    self.api_id, self.api_hash, phone, user_id, username
                 )
 
-                # Try to connect
-                success = await client.connect()
-                if (
-                    success
-                    and client.client
-                    and await client.client.is_user_authorized()
-                ):
+                # Try to restore from session
+                success = await client.restore_from_session()
+                if success and await client.is_fully_authenticated():
                     # Store the client
                     self.clients[user_id] = client
 
@@ -1350,12 +1378,13 @@ class TelegramClientManager:
                         logger.error(
                             f"Could not get user info for {user_id} after connection"
                         )
-                        await client.disconnect()
+                        await client.stop()
                 else:
                     logger.warning(
                         f"Could not restore session for user {user_id} - session may be expired"
                     )
-                    await client.disconnect()
+                    if client.client:
+                        await client.stop()
 
             except Exception as e:
                 logger.error(f"Error recovering session for user {user_id}: {e}")
