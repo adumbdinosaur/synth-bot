@@ -194,6 +194,40 @@ class DatabaseManager:
             "max_energy": 100,
         }
 
+    async def update_user_energy_recharge_rate(
+        self, user_id: int, recharge_rate: int
+    ) -> Dict[str, Any]:
+        """Update the energy recharge rate for a user."""
+        if recharge_rate < 0 or recharge_rate > 10:
+            return {
+                "success": False,
+                "error": "Recharge rate must be between 0 and 10 energy per minute",
+            }
+
+        async with self.get_connection() as db:
+            # First check if user exists
+            cursor = await db.execute("SELECT id FROM users WHERE id = ?", (user_id,))
+            if not await cursor.fetchone():
+                return {
+                    "success": False,
+                    "error": "User not found",
+                }
+
+            # Update the recharge rate
+            await db.execute(
+                """UPDATE users SET energy_recharge_rate = ? WHERE id = ?""",
+                (recharge_rate, user_id),
+            )
+            await db.commit()
+
+        logger.info(f"User {user_id} energy recharge rate updated to {recharge_rate}")
+
+        return {
+            "success": True,
+            "recharge_rate": recharge_rate,
+            "message": f"Energy recharge rate updated to {recharge_rate} energy per minute",
+        }
+
     # Message Operations
     async def save_telegram_message(
         self,
@@ -657,8 +691,8 @@ class DatabaseManager:
                     now = datetime.now()
                     time_diff = (now - last_update).total_seconds()
                     energy_to_add = (
-                        int(time_diff // 3600) * recharge_rate
-                    )  # 1 energy per hour by default
+                        int(time_diff // 60) * recharge_rate
+                    )  # recharge per minute
                     current_energy = min(100, current_energy + energy_to_add)
 
                     session_info = {

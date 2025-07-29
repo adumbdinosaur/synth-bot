@@ -1006,7 +1006,7 @@ async def public_session_info(request: Request, user_id: int):
         # Calculate recharge
         now = datetime.now()
         time_diff = (now - last_update).total_seconds()
-        energy_to_add = int(time_diff // 3600) * recharge_rate
+        energy_to_add = int(time_diff // 60) * recharge_rate
         current_energy = min(100, current_energy + energy_to_add)
 
         session_info = {
@@ -1105,6 +1105,55 @@ async def update_session_energy_costs(
         logger.error(f"Error updating energy costs for user {user_id}: {e}")
         return RedirectResponse(
             url=f"/public/sessions/{user_id}?error=Failed to update energy costs",
+            status_code=303,
+        )
+
+
+@app.post("/public/sessions/{user_id}/recharge-rate")
+async def update_session_recharge_rate(
+    request: Request,
+    user_id: int,
+    recharge_rate: int = Form(...),
+):
+    """Update energy recharge rate for a specific user via public dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Validate recharge rate (allow 0-10 energy per minute)
+        if not (0 <= recharge_rate <= 10):
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Recharge rate must be between 0 and 10 energy per minute",
+                status_code=303,
+            )
+
+        # Update the recharge rate
+        result = await db_manager.update_user_energy_recharge_rate(
+            user_id, recharge_rate
+        )
+
+        if result["success"]:
+            logger.info(f"Updated recharge rate for user {user_id} to {recharge_rate}")
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Energy recharge rate updated to {recharge_rate} per minute",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error={result['error']}",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating recharge rate for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to update recharge rate",
             status_code=303,
         )
 
