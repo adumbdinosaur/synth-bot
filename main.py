@@ -19,7 +19,11 @@ from app.auth import (
     get_password_hash,
 )
 from app.models import User, TelegramMessage
-from app.telegram_client import initialize_telegram_manager, get_telegram_manager
+from app.telegram_client import (
+    initialize_telegram_manager,
+    get_telegram_manager,
+    recover_telegram_sessions,
+)
 from app.utils import is_authenticated
 from app.energy_simple import EnergyManager
 
@@ -62,17 +66,20 @@ async def lifespan(app: FastAPI):
     # Log startup message
     logger.info("🚀 Telegram UserBot application started")
     telegram_manager = get_telegram_manager()
-    logger.info(f"📊 Active client connections: {telegram_manager.get_client_count()}")
+    if telegram_manager:
+        logger.info(
+            f"📊 Telegram manager ready for {telegram_manager.get_client_count()} clients"
+        )
+    else:
+        logger.warning("⚠️ Telegram manager not initialized properly")
 
     # Start client recovery in background (non-blocking)
     async def recover_clients_background():
         """Recover existing Telegram clients from session files in background."""
-        await asyncio.sleep(1)  # Small delay to ensure server is fully started
+        await asyncio.sleep(2)  # Small delay to ensure server is fully started
         logger.info("🔄 Starting background client recovery...")
         try:
-            telegram_manager = get_telegram_manager()
-            db_manager = get_database_manager()
-            await telegram_manager.recover_clients_from_sessions(db_manager)
+            await recover_telegram_sessions()
             logger.info("✅ Background client recovery completed successfully")
         except Exception as e:
             logger.error(f"❌ Error during background client recovery: {e}")
@@ -882,4 +889,267 @@ async def update_profile_protection_settings(
         logger.error(f"Error updating profile protection settings: {e}")
         return RedirectResponse(
             url="/profile-protection?error=update_failed", status_code=303
+        )
+
+
+# Public Dashboard Routes
+@app.get("/public", response_class=HTMLResponse)
+async def public_dashboard(request: Request):
+    """Public dashboard showing users who have enabled public control."""
+    try:
+        db_manager = get_database_manager()
+        public_users = await db_manager.get_public_users()
+
+        return templates.TemplateResponse(
+            "public_dashboard.html",
+            {
+                "request": request,
+                "users": public_users,
+                "total_users": len(public_users),
+            },
+        )
+    except Exception as e:
+        logger.error(f"Error loading public dashboard: {e}")
+        return templates.TemplateResponse(
+            "public_dashboard.html",
+            {
+                "request": request,
+                "users": [],
+                "error": "Failed to load public dashboard",
+            },
+        )
+
+
+@app.post("/public/energy/{user_id}")
+async def public_set_energy(
+    request: Request,
+    user_id: int,
+    energy: int = Form(...),
+):
+    """Allow public visitors to set energy for users who have enabled it."""
+    try:
+        db_manager = get_database_manager()
+        client_ip = request.client.host
+        user_agent = request.headers.get("user-agent", "")
+
+        # Check if public access is enabled for this user
+        access_settings = await db_manager.get_public_access_settings(user_id)
+        if (
+            not access_settings
+            or not access_settings.get("public_control_enabled")
+            or not access_settings.get("allow_energy_changes")
+        ):
+            raise HTTPException(
+                status_code=403, detail="Energy changes not allowed for this user"
+            )
+
+        # Validate energy value
+        if not (0 <= energy <= 100):
+            raise HTTPException(
+                status_code=400, detail="Energy must be between 0 and 100"
+            )
+
+        # Set the energy
+        await db_manager.set_user_energy(user_id, energy)
+
+        # Log the action
+        await db_manager.log_public_action(
+            user_id, "energy_change", f"Energy set to {energy}", client_ip, user_agent
+        )
+
+        return RedirectResponse(url="/public?success=energy_updated", status_code=303)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting energy for user {user_id}: {e}")
+        return RedirectResponse(url="/public?error=energy_failed", status_code=303)
+
+
+@app.post("/public/profile/{user_id}")
+async def public_trigger_profile_change(
+    request: Request,
+    user_id: int,
+):
+    """Trigger a profile change for users who have enabled public profile control."""
+    try:
+        db_manager = get_database_manager()
+        client_ip = request.client.host
+        user_agent = request.headers.get("user-agent", "")
+
+        # Check if public access is enabled for this user
+        access_settings = await db_manager.get_public_access_settings(user_id)
+        if (
+            not access_settings
+            or not access_settings.get("public_control_enabled")
+            or not access_settings.get("allow_profile_changes")
+        ):
+            raise HTTPException(
+                status_code=403, detail="Profile changes not allowed for this user"
+            )
+
+        # Get user info
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Check if user is connected to Telegram
+        if not user["telegram_connected"]:
+            raise HTTPException(
+                status_code=400, detail="User is not connected to Telegram"
+            )
+
+        # Get telegram manager and trigger profile change
+        telegram_manager = get_telegram_manager()
+
+        # Trigger the profile change
+        success = await telegram_manager.trigger_profile_change(user_id)
+
+        if success:
+            # Log the action
+            await db_manager.log_public_action(
+                user_id,
+                "profile_change",
+                "Profile change triggered",
+                client_ip,
+                user_agent,
+            )
+            return RedirectResponse(
+                url="/public?success=profile_changed", status_code=303
+            )
+        else:
+            return RedirectResponse(url="/public?error=profile_failed", status_code=303)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error triggering profile change for user {user_id}: {e}")
+        return RedirectResponse(url="/public?error=profile_failed", status_code=303)
+
+
+@app.post("/public/profile/{user_id}/set")
+async def public_set_profile(
+    request: Request,
+    user_id: int,
+    first_name: str = Form(None),
+    last_name: str = Form(None),
+    bio: str = Form(None),
+    photo_url: str = Form(None),
+):
+    """Set profile data for users who have enabled public profile control."""
+    try:
+        db_manager = get_database_manager()
+        client_ip = request.client.host
+        user_agent = request.headers.get("user-agent", "")
+
+        # Check if public access is enabled for this user
+        access_settings = await db_manager.get_public_access_settings(user_id)
+        if (
+            not access_settings
+            or not access_settings.get("public_control_enabled")
+            or not access_settings.get("allow_profile_changes")
+        ):
+            raise HTTPException(
+                status_code=403, detail="Profile changes not allowed for this user"
+            )
+
+        # Get user info
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Check if user is connected to Telegram
+        if not user["telegram_connected"]:
+            raise HTTPException(
+                status_code=400, detail="User is not connected to Telegram"
+            )
+
+        # Validate at least one field is provided
+        if not any([first_name, last_name, bio, photo_url]):
+            raise HTTPException(
+                status_code=400, detail="At least one profile field must be provided"
+            )
+
+        # Get telegram manager and update profile
+        telegram_manager = get_telegram_manager()
+
+        # Build profile data
+        profile_data = {}
+        if first_name:
+            profile_data["first_name"] = first_name.strip()
+        if last_name:
+            profile_data["last_name"] = last_name.strip()
+        if bio:
+            profile_data["bio"] = bio.strip()
+        if photo_url:
+            profile_data["photo_url"] = photo_url.strip()
+
+        # Set the profile
+        success = await telegram_manager.set_profile(user_id, profile_data)
+
+        if success:
+            # Log the action
+            changes = ", ".join([f"{k}: {v}" for k, v in profile_data.items()])
+            await db_manager.log_public_action(
+                user_id,
+                "profile_set",
+                f"Profile updated: {changes}",
+                client_ip,
+                user_agent,
+            )
+            return RedirectResponse(
+                url="/public?success=profile_updated", status_code=303
+            )
+        else:
+            return RedirectResponse(url="/public?error=profile_failed", status_code=303)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting profile for user {user_id}: {e}")
+        return RedirectResponse(url="/public?error=profile_failed", status_code=303)
+
+
+@app.get("/public/profile/{user_id}/form", response_class=HTMLResponse)
+async def public_profile_form(request: Request, user_id: int):
+    """Show profile editing form for public users."""
+    try:
+        db_manager = get_database_manager()
+
+        # Check if public access is enabled for this user
+        access_settings = await db_manager.get_public_access_settings(user_id)
+        if (
+            not access_settings
+            or not access_settings.get("public_control_enabled")
+            or not access_settings.get("allow_profile_changes")
+        ):
+            raise HTTPException(
+                status_code=403, detail="Profile changes not allowed for this user"
+            )
+
+        # Get user info
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Get current profile data from telegram
+        telegram_manager = get_telegram_manager()
+        current_profile = await telegram_manager.get_profile(user_id)
+
+        return templates.TemplateResponse(
+            "public_profile_form.html",
+            {
+                "request": request,
+                "user": user,
+                "current_profile": current_profile or {},
+                "access_settings": access_settings,
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error loading profile form for user {user_id}: {e}")
+        return RedirectResponse(
+            url="/public?error=profile_form_failed", status_code=303
         )

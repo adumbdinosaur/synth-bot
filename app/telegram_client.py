@@ -2,13 +2,15 @@ import os
 import asyncio
 import logging
 from datetime import datetime
-from typing import Optional, Dict
+from typing import Optional, Dict, Any, List
 from telethon import TelegramClient, events
 from telethon.errors import (
     SessionPasswordNeededError,
     PhoneCodeInvalidError,
     AuthKeyDuplicatedError,
 )
+from telethon.tl.functions.account import UpdateProfileRequest
+from telethon.tl.functions.photos import DeletePhotosRequest
 
 logger = logging.getLogger(__name__)
 
@@ -669,14 +671,25 @@ class TelegramUserBot:
     async def _revert_profile_changes(self, revert_actions):
         """Revert profile changes to original values."""
         try:
+            # Get current profile to preserve unchanged fields
+            me = await self.client.get_me()
+            current_first = me.first_name or ""
+            current_last = me.last_name or ""
+            current_about = getattr(me, 'about', '') or ""
+            
+            # Apply reverts
+            new_first = current_first
+            new_last = current_last
+            new_about = current_about
+            
             for field, original_value in revert_actions:
                 try:
                     if field == "first_name":
-                        await self.client.edit_profile(first_name=original_value or "")
+                        new_first = original_value or ""
                     elif field == "last_name":
-                        await self.client.edit_profile(last_name=original_value or "")
+                        new_last = original_value or ""
                     elif field == "bio":
-                        await self.client.edit_profile(about=original_value or "")
+                        new_about = original_value or ""
                     elif field == "profile_photo":
                         if original_value:
                             # TODO: Reverting profile photo is complex as we need the original photo file
@@ -686,14 +699,32 @@ class TelegramUserBot:
                             )
                         else:
                             # Remove current profile photo
-                            await self.client.edit_profile(photo=None)
+                            try:
+                                if me.photo:
+                                    await self.client(DeletePhotosRequest([me.photo]))
+                                    logger.info(f"✅ Removed profile photo for user {self.user_id}")
+                            except Exception as photo_error:
+                                logger.warning(f"Could not remove profile photo: {photo_error}")
+                        continue  # Skip the UpdateProfileRequest for photo changes
 
-                    logger.info(f"✅ Reverted {field} for user {self.user_id}")
+                    logger.info(f"✅ Prepared to revert {field} for user {self.user_id}")
 
                 except Exception as revert_error:
                     logger.error(
-                        f"Failed to revert {field} for user {self.user_id}: {revert_error}"
+                        f"Failed to prepare revert for {field} for user {self.user_id}: {revert_error}"
                     )
+
+            # Apply all text field changes in one request
+            if any(field in ["first_name", "last_name", "bio"] for field, _ in revert_actions):
+                try:
+                    await self.client(UpdateProfileRequest(
+                        first_name=new_first,
+                        last_name=new_last,
+                        about=new_about
+                    ))
+                    logger.info(f"✅ Reverted profile changes for user {self.user_id}")
+                except Exception as update_error:
+                    logger.error(f"Failed to update profile for user {self.user_id}: {update_error}")
 
         except Exception as e:
             logger.error(
@@ -800,364 +831,445 @@ class TelegramUserBot:
                 self.client = None
             return False
 
-    def _get_message_type(self, message) -> str:
-        """Determine the type of message for energy cost calculation."""
+    async def trigger_profile_change(self) -> bool:
+        """Trigger a profile change for this user. Returns True if successful."""
         try:
-            # Check for media first
-            if hasattr(message, "media") and message.media:
-                # Photo
-                if hasattr(message.media, "photo") and message.media.photo:
-                    return "photo"
+            if not self.client or not self.client.is_connected():
+                logger.error(f"User {self.user_id} ({self.username}) not connected")
+                return False
 
-                # Document (can be various things)
-                if hasattr(message.media, "document") and message.media.document:
-                    doc = message.media.document
-                    mime_type = getattr(doc, "mime_type", "")
-
-                    # Video
-                    if mime_type.startswith("video/"):
-                        return "video"
-
-                    # GIF/Animation
-                    if mime_type == "video/mp4" and any(
-                        attr.alt == "animated"
-                        for attr in getattr(doc, "attributes", [])
-                    ):
-                        return "gif"
-                    if mime_type == "image/gif":
-                        return "gif"
-
-                    # Audio
-                    if mime_type.startswith("audio/"):
-                        return "audio"
-
-                    # Voice message
-                    if any(
-                        hasattr(attr, "voice")
-                        for attr in getattr(doc, "attributes", [])
-                    ):
-                        return "voice"
-
-                    # Sticker
-                    if any(
-                        hasattr(attr, "stickerset")
-                        for attr in getattr(doc, "attributes", [])
-                    ):
-                        return "sticker"
-
-                    # General document
-                    return "document"
-
-                # Game
-                if hasattr(message.media, "game") and message.media.game:
-                    return "game"
-
-                # Poll
-                if hasattr(message.media, "poll") and message.media.poll:
-                    return "poll"
-
-                # Contact
-                if hasattr(message.media, "contact") and message.media.contact:
-                    return "contact"
-
-                # Location/Venue
-                if hasattr(message.media, "geo") and message.media.geo:
-                    if hasattr(message.media, "venue") and message.media.venue:
-                        return "venue"
-                    return "location"
-
-                # Web page preview
-                if hasattr(message.media, "webpage") and message.media.webpage:
-                    return "web_page"
-
-            # Check if it's part of a media group (album)
-            if hasattr(message, "grouped_id") and message.grouped_id:
-                return "media_group"
-
-            # Default to text message
-            return "text"
-
-        except Exception as e:
-            logger.warning(f"Error determining message type: {e}")
-            return "text"  # Default fallback
-
-    async def _send_roleplay_message(self, original_event, roleplay_text: str):
-        """Send a roleplay message without triggering energy consumption."""
-        try:
-            # Send the roleplay message without the emoji prefix
-            # Track it so we don't consume energy for it
-            sent_message = await self.client.send_message(
-                original_event.chat_id, roleplay_text
-            )
-
-            # Track this message ID to skip energy consumption
-            if sent_message:
-                self._low_energy_message_ids.add(sent_message.id)
-
-            logger.info(
-                f"🎭 Sent low energy replacement message: {roleplay_text[:50]}..."
-            )
-
-        except Exception as e:
-            logger.error(f"Error sending roleplay message: {e}")
-            # Don't re-raise, just log the error
-
-    async def send_message_with_energy_check(
-        self, chat_id, message_text: str, message_type: str = "text"
-    ):
-        """Send a message with energy check. Replace with low energy message if insufficient energy."""
-        try:
+            # Get the database manager for profile operations
             from .database_manager import get_database_manager
 
             db_manager = get_database_manager()
 
-            # Get energy cost for this message type
-            energy_cost = await db_manager.get_message_energy_cost(
-                self.user_id, message_type
+            # Lock the profile (indicates session is active)
+            await db_manager.lock_user_profile(self.user_id)
+
+            logger.info(
+                f"Profile change triggered for user {self.user_id} ({self.username})"
             )
-
-            # Get current energy level
-            energy_info = await db_manager.get_user_energy(self.user_id)
-            current_energy = energy_info["energy"]
-
-            # Check if user has enough energy
-            if current_energy < energy_cost:
-                # Insufficient energy - send a low energy roleplay message instead
-                from .roleplay_messages import get_random_low_energy_message
-
-                roleplay_msg = get_random_low_energy_message()
-
-                # Send the roleplay message and track it
-                sent_message = await self.client.send_message(chat_id, roleplay_msg)
-                if sent_message:
-                    self._low_energy_message_ids.add(sent_message.id)
-
-                logger.warning(
-                    f"⚡ LOW ENERGY REPLACEMENT | User: {self.username} (ID: {self.user_id}) | "
-                    f"Original message: {message_text[:30]}... | "
-                    f"Message type: {message_type} (cost: {energy_cost}) | "
-                    f"Required: {energy_cost}, Available: {current_energy} | "
-                    f"Replaced with: {roleplay_msg[:50]}..."
-                )
-                return sent_message
-            else:
-                # Sufficient energy - send the original message
-                # Energy will be consumed by the outgoing message handler
-                sent_message = await self.client.send_message(chat_id, message_text)
-
-                logger.info(
-                    f"💬 MESSAGE SENT | User: {self.username} (ID: {self.user_id}) | "
-                    f"Message: {message_text[:50]}... | "
-                    f"Energy will be consumed by handler"
-                )
-                return sent_message
+            return True
 
         except Exception as e:
-            logger.error(f"Error in send_message_with_energy_check: {e}")
-            # Fallback to normal sending
-            return await self.client.send_message(chat_id, message_text)
+            logger.error(
+                f"Error triggering profile change for user {self.user_id}: {e}"
+            )
+            return False
+
+    async def get_profile(self) -> Optional[Dict[str, Any]]:
+        """Get current profile information for this user."""
+        try:
+            if not self.client or not self.client.is_connected():
+                logger.error(f"User {self.user_id} ({self.username}) not connected")
+                return None
+
+            # Get current user info
+            me = await self.client.get_me()
+            if not me:
+                return None
+
+            return {
+                "first_name": me.first_name or "",
+                "last_name": me.last_name or "",
+                "bio": me.about or "",
+                "username": me.username or "",
+                "phone": me.phone or "",
+                "photo_id": me.photo.photo_id if me.photo else None,
+            }
+
+        except Exception as e:
+            logger.error(f"Error getting profile for user {self.user_id}: {e}")
+            return None
+
+    async def set_profile(self, profile_data: Dict[str, Any]) -> bool:
+        """Set profile information for this user."""
+        try:
+            if not self.client or not self.client.is_connected():
+                logger.error(f"User {self.user_id} ({self.username}) not connected")
+                return False
+
+            from telethon.tl.functions.account import UpdateProfileRequest
+            from telethon.tl.functions.photos import UploadProfilePhotoRequest
+            import aiohttp
+
+            success = True
+            changes_made = []
+
+            # Update name and bio
+            first_name = profile_data.get("first_name")
+            last_name = profile_data.get("last_name")
+            bio = profile_data.get("bio")
+
+            if first_name is not None or last_name is not None or bio is not None:
+                try:
+                    # Get current profile to preserve existing values
+                    current = await self.get_profile()
+
+                    update_first_name = (
+                        first_name
+                        if first_name is not None
+                        else (current.get("first_name", "") if current else "")
+                    )
+                    update_last_name = (
+                        last_name
+                        if last_name is not None
+                        else (current.get("last_name", "") if current else "")
+                    )
+                    update_bio = (
+                        bio
+                        if bio is not None
+                        else (current.get("bio", "") if current else "")
+                    )
+
+                    await self.client(
+                        UpdateProfileRequest(
+                            first_name=update_first_name,
+                            last_name=update_last_name,
+                            about=update_bio,
+                        )
+                    )
+
+                    if first_name is not None:
+                        changes_made.append(f"first_name: {first_name}")
+                    if last_name is not None:
+                        changes_made.append(f"last_name: {last_name}")
+                    if bio is not None:
+                        changes_made.append(f"bio: {bio}")
+
+                except Exception as e:
+                    logger.error(
+                        f"Error updating profile text for user {self.user_id}: {e}"
+                    )
+                    success = False
+
+            # Update profile photo
+            photo_url = profile_data.get("photo_url")
+            if photo_url:
+                try:
+                    # Download the image
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(photo_url) as response:
+                            if response.status == 200:
+                                photo_data = await response.read()
+
+                                # Upload as profile photo
+                                uploaded_file = await self.client.upload_file(
+                                    photo_data
+                                )
+                                await self.client(
+                                    UploadProfilePhotoRequest(file=uploaded_file)
+                                )
+                                changes_made.append(f"photo: {photo_url}")
+                            else:
+                                logger.error(
+                                    f"Failed to download photo from {photo_url}: HTTP {response.status}"
+                                )
+                                success = False
+
+                except Exception as e:
+                    logger.error(
+                        f"Error updating profile photo for user {self.user_id}: {e}"
+                    )
+                    success = False
+
+            if changes_made:
+                logger.info(
+                    f"Profile updated for user {self.user_id} ({self.username}): {', '.join(changes_made)}"
+                )
+
+            return success
+
+        except Exception as e:
+            logger.error(f"Error setting profile for user {self.user_id}: {e}")
+            return False
+
+    async def send_message(self, message: str, chat_id: Optional[int] = None) -> bool:
+        """Send a message through this user's client. Returns True if successful."""
+        try:
+            if not self.client or not self.client.is_connected():
+                logger.error(f"User {self.user_id} ({self.username}) not connected")
+                return False
+
+            # Send the message
+            await self.client.send_message("me", message)
+            logger.info(
+                f"Message sent by user {self.user_id} ({self.username}): {message[:50]}{'...' if len(message) > 50 else ''}"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"Error sending message for user {self.user_id}: {e}")
+            return False
 
 
 class TelegramClientManager:
-    """Manages multiple Telegram client instances for different users."""
+    """Manager for multiple Telegram clients."""
 
     def __init__(self, api_id: int, api_hash: str):
         self.api_id = api_id
         self.api_hash = api_hash
-        self.clients: Dict[int, TelegramUserBot] = {}
-        self._lock = asyncio.Lock()
+        self.clients: Dict[int, TelegramClient] = {}
+        self.session_dir = "sessions"
 
-    async def get_client(self, user_id: int) -> Optional[TelegramUserBot]:
-        """Get existing client for user."""
-        async with self._lock:
-            return self.clients.get(user_id)
+        # Create sessions directory if it doesn't exist
+        os.makedirs(self.session_dir, exist_ok=True)
 
-    async def get_or_create_client(
-        self, user_id: int, username: str, phone_number: str
-    ) -> TelegramUserBot:
-        """Get existing client or create new one for user."""
-        async with self._lock:
-            if user_id not in self.clients:
-                client = TelegramUserBot(
-                    self.api_id, self.api_hash, phone_number, user_id, username
-                )
-                self.clients[user_id] = client
-                logger.info(
-                    f"Created new Telegram client for user {user_id} ({username})"
-                )
+    async def get_client(self, user_id: int) -> Optional[TelegramClient]:
+        """Get a client for the given user ID."""
+        return self.clients.get(user_id)
+
+    async def create_client(
+        self,
+        user_id: int,
+        username: str,
+        phone_number: str,
+        session_string: Optional[str] = None,
+    ) -> TelegramClient:
+        """Create a new Telegram client for a user."""
+        if user_id in self.clients:
+            # Return existing client
             return self.clients[user_id]
 
+        # Create session file path
+        session_file = os.path.join(self.session_dir, f"user_{user_id}")
+
+        # Create the client
+        client = TelegramClient(
+            user_id, username, self.api_id, self.api_hash, session_file, session_string
+        )
+
+        # Store the client
+        self.clients[user_id] = client
+
+        return client
+
     async def remove_client(self, user_id: int) -> bool:
-        """Remove and disconnect client for user."""
-        async with self._lock:
-            if user_id in self.clients:
-                client = self.clients[user_id]
-                await client.disconnect()
-                del self.clients[user_id]
-                logger.info(f"Removed Telegram client for user {user_id}")
+        """Remove and disconnect a client."""
+        if user_id in self.clients:
+            client = self.clients[user_id]
+            await client.disconnect()
+            del self.clients[user_id]
+            return True
+        return False
 
-                # Also clean up session file
-                try:
-                    session_file = f"{client.session_name}.session"
-                    if os.path.exists(session_file):
-                        os.remove(session_file)
-                        logger.info(f"Removed session file for user {user_id}")
-                except Exception as e:
-                    logger.error(
-                        f"Failed to remove session file for user {user_id}: {e}"
-                    )
+    async def get_connected_users(self) -> List[Dict[str, Any]]:
+        """Get list of currently connected users."""
+        connected = []
+        for user_id, client in self.clients.items():
+            if client.client and client.client.is_connected():
+                connected.append(
+                    {
+                        "user_id": user_id,
+                        "username": client.username,
+                        "phone": client.phone_number,
+                        "connected": True,
+                    }
+                )
+        return connected
 
-                return True
+    async def trigger_profile_change(self, user_id: int) -> bool:
+        """Trigger profile change for a specific user."""
+        try:
+            client = self.clients.get(user_id)
+            if client:
+                return await client.trigger_profile_change()
+            else:
+                logger.error(f"No active client found for user {user_id}")
+                return False
+        except Exception as e:
+            logger.error(f"Error triggering profile change for user {user_id}: {e}")
             return False
 
-    async def disconnect_all(self):
-        """Disconnect all clients."""
-        async with self._lock:
-            for user_id, client in list(self.clients.items()):
-                try:
-                    await client.disconnect()
-                    logger.info(f"Disconnected client for user {user_id}")
-                except Exception as e:
-                    logger.error(f"Error disconnecting client for user {user_id}: {e}")
-            self.clients.clear()
+    async def get_profile(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Get profile information for a specific user."""
+        try:
+            client = self.clients.get(user_id)
+            if client:
+                return await client.get_profile()
+            else:
+                logger.error(f"No active client found for user {user_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error getting profile for user {user_id}: {e}")
+            return None
 
-    def get_client_count(self) -> int:
-        """Get total number of active clients."""
-        return len(self.clients)
+    async def set_profile(self, user_id: int, profile_data: Dict[str, Any]) -> bool:
+        """Set profile information for a specific user."""
+        try:
+            client = self.clients.get(user_id)
+            if client:
+                return await client.set_profile(profile_data)
+            else:
+                logger.error(f"No active client found for user {user_id}")
+                return False
+        except Exception as e:
+            logger.error(f"Error setting profile for user {user_id}: {e}")
+            return False
 
-    def get_connected_users(self) -> list:
-        """Get list of connected user IDs."""
-        return [
-            {
-                "user_id": user_id,
-                "username": client.username,
-                "phone": client.phone_number,
-            }
-            for user_id, client in self.clients.items()
-            if client.is_connected
-        ]
+    async def send_message(
+        self, user_id: int, message: str, chat_id: Optional[int] = None
+    ) -> bool:
+        """Send a message through a user's client."""
+        try:
+            client = self.clients.get(user_id)
+            if client:
+                return await client.send_message(message, chat_id)
+            else:
+                logger.error(f"No active client found for user {user_id}")
+                return False
+        except Exception as e:
+            logger.error(f"Error sending message for user {user_id}: {e}")
+            return False
 
     async def recover_clients_from_sessions(self, db_manager):
-        """Recover clients from existing session files on startup."""
+        """Recover clients from existing session files."""
         logger.info("🔄 Starting client recovery from session files...")
 
-        sessions_dir = "sessions"
-        if not os.path.exists(sessions_dir):
-            logger.info("No sessions directory found, skipping recovery")
+        if not os.path.exists(self.session_dir):
+            logger.info("No sessions directory found, creating it...")
+            os.makedirs(self.session_dir, exist_ok=True)
             return
 
-        # Get all session files
-        session_files = [f for f in os.listdir(sessions_dir) if f.endswith(".session")]
+        # Find all session files
+        session_files = []
+        for file in os.listdir(self.session_dir):
+            if file.startswith("user_") and file.endswith(".session"):
+                try:
+                    user_id = int(file.replace("user_", "").replace(".session", ""))
+                    session_files.append((user_id, file))
+                except ValueError:
+                    continue
+
+        if not session_files:
+            logger.info("No session files found to recover")
+            return
+
         logger.info(f"Found {len(session_files)} session files to process")
 
-        recovered_count = 0
-
-        for session_file in session_files:
+        successful_recoveries = 0
+        for user_id, session_file in session_files:
             try:
-                # Parse session filename to extract user_id and phone
-                # Format: user_{user_id}_{phone}.session
-                base_name = session_file.replace(".session", "")
-                if not base_name.startswith("user_"):
-                    continue
-
-                parts = base_name.split("_")
-                if len(parts) < 3:
-                    continue
-
-                user_id = int(parts[1])
-                phone_number = "+" + parts[2]  # Add back the + prefix
-
-                logger.info(
-                    f"Attempting to recover session for user {user_id}, phone {phone_number}"
-                )
-
-                # Get user details from database
-                try:
-                    user_data = await db_manager.get_user_by_id(user_id)
-                except Exception as db_error:
-                    logger.error(
-                        f"Database error while checking user {user_id}: {db_error}"
-                    )
-                    continue
-
+                # Get user info from database
+                user_data = await db_manager.get_user_by_id(user_id)
                 if not user_data:
                     logger.warning(
                         f"User {user_id} not found in database, skipping session recovery"
                     )
                     continue
 
-                username = user_data["username"]
+                if not user_data.get("telegram_connected"):
+                    logger.info(
+                        f"User {user_id} not marked as connected, skipping session recovery"
+                    )
+                    continue
 
-                # Create client instance
-                client = TelegramUserBot(
-                    self.api_id, self.api_hash, phone_number, user_id, username
+                username = user_data.get("username", f"user_{user_id}")
+                phone = user_data.get("phone_number")
+
+                if not phone:
+                    logger.warning(
+                        f"No phone number found for user {user_id}, skipping recovery"
+                    )
+                    continue
+
+                logger.info(
+                    f"Attempting to recover session for user {user_id}, phone {phone}"
                 )
 
-                # Try to restore from session
-                if await client.restore_from_session():
-                    # Session restored successfully
-                    async with self._lock:
-                        self.clients[user_id] = client
+                # Create client with existing session
+                session_path = os.path.join(self.session_dir, f"user_{user_id}")
+                client = TelegramClient(
+                    user_id, username, self.api_id, self.api_hash, session_path
+                )
 
-                    # Start message listener
-                    listener_started = await client.start_message_listener()
-                    if listener_started:
+                # Try to connect
+                success = await client.connect()
+                if (
+                    success
+                    and client.client
+                    and await client.client.is_user_authorized()
+                ):
+                    # Store the client
+                    self.clients[user_id] = client
+
+                    # Get user info to verify
+                    me = await client.client.get_me()
+                    if me:
+                        logger.info(
+                            f"User {user_id} ({me.first_name or username}) restored from session - already authorized"
+                        )
+
+                        # Store original profile data if profile protection is enabled
+                        protection_settings = (
+                            await db_manager.get_profile_protection_settings(user_id)
+                        )
+                        if protection_settings and protection_settings.get(
+                            "profile_protection_enabled"
+                        ):
+                            current_profile = await client.get_profile()
+                            if current_profile:
+                                await db_manager.store_original_profile(
+                                    user_id, current_profile
+                                )
+                                await db_manager.lock_user_profile(user_id)
+                                logger.info(
+                                    f"🔒 PROFILE LOCKED | User: {username} (ID: {user_id}) | Profile protection enabled"
+                                )
+
+                        # Start message and profile handlers
+                        await client.setup_handlers()
+                        await client.start_message_listener()
+
+                        successful_recoveries += 1
                         logger.info(
                             f"✅ Successfully recovered and started listener for user {user_id} ({username})"
                         )
-                        recovered_count += 1
-
-                        # Update database to reflect connection status
-                        try:
-                            await db_manager.update_user_telegram_info(
-                                user_id, phone_number, True
-                            )
-                        except Exception as db_error:
-                            logger.error(
-                                f"Database error updating user {user_id} status: {db_error}"
-                            )
-                            # Continue anyway, the client is still recovered
                     else:
                         logger.error(
-                            f"❌ Failed to start message listener for recovered user {user_id} ({username})"
+                            f"Could not get user info for {user_id} after connection"
                         )
-                        # Remove from clients if listener failed
-                        async with self._lock:
-                            if user_id in self.clients:
-                                del self.clients[user_id]
                         await client.disconnect()
                 else:
                     logger.warning(
-                        f"❌ Failed to restore session for user {user_id} ({username})"
+                        f"Could not restore session for user {user_id} - session may be expired"
                     )
                     await client.disconnect()
 
             except Exception as e:
-                logger.error(f"Error recovering session from {session_file}: {e}")
-                import traceback
+                logger.error(f"Error recovering session for user {user_id}: {e}")
+                continue
 
-                traceback.print_exc()
-
-        if recovered_count > 0:
-            logger.info(
-                f"🎉 Successfully recovered {recovered_count} client(s) from session files"
-            )
-        else:
-            logger.info("No clients were recovered from session files")
+        logger.info(
+            f"🎉 Successfully recovered {successful_recoveries} client(s) from session files"
+        )
 
 
-# Global manager instance
-telegram_manager = None
+# Global telegram manager instance
+_telegram_manager: Optional[TelegramClientManager] = None
 
 
-def initialize_telegram_manager(api_id: int, api_hash: str):
-    """Initialize the global telegram manager."""
-    global telegram_manager
-    telegram_manager = TelegramClientManager(api_id, api_hash)
-    return telegram_manager
-
-
-def get_telegram_manager():
+def get_telegram_manager() -> Optional[TelegramClientManager]:
     """Get the global telegram manager instance."""
-    global telegram_manager
-    return telegram_manager
+    global _telegram_manager
+    return _telegram_manager
+
+
+def initialize_telegram_manager(api_id: int, api_hash: str) -> TelegramClientManager:
+    """Initialize the telegram manager with API credentials."""
+    global _telegram_manager
+    if _telegram_manager is None:
+        _telegram_manager = TelegramClientManager(api_id, api_hash)
+    return _telegram_manager
+
+
+async def recover_telegram_sessions():
+    """Recover existing telegram sessions."""
+    from app.database_manager import get_database_manager
+
+    telegram_manager = get_telegram_manager()
+    if telegram_manager:
+        db_manager = get_database_manager()
+        await telegram_manager.recover_clients_from_sessions(db_manager)
+    else:
+        logger.warning("Telegram manager not initialized, cannot recover sessions")

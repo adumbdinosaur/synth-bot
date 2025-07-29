@@ -385,140 +385,6 @@ class DatabaseManager:
             await db.commit()
             return cursor.rowcount
 
-
-# Global database manager instance
-_db_manager: Optional[DatabaseManager] = None
-
-
-def get_database_manager() -> DatabaseManager:
-    """Get the global database manager instance."""
-    global _db_manager
-    if _db_manager is None:
-        database_url = os.getenv("DATABASE_URL", "sqlite:///./app.db")
-        database_path = database_url.replace("sqlite:///", "")
-        _db_manager = DatabaseManager(database_path)
-    return _db_manager
-
-
-async def init_database_manager():
-    """Initialize the database manager and create tables."""
-    db_manager = get_database_manager()
-
-    async with db_manager.get_connection() as db:
-        # Users table
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username VARCHAR(50) UNIQUE NOT NULL,
-                email VARCHAR(100) UNIQUE NOT NULL,
-                hashed_password TEXT NOT NULL,
-                telegram_connected BOOLEAN DEFAULT FALSE,
-                phone_number VARCHAR(20),
-                energy INTEGER DEFAULT 100,
-                energy_recharge_rate INTEGER DEFAULT 1,
-                last_energy_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-
-        # Telegram messages table
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS telegram_messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                message_id INTEGER,
-                content TEXT,
-                chat_id INTEGER,
-                chat_title TEXT,
-                chat_type TEXT,
-                sent_at TIMESTAMP,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-        """)
-
-        # Telegram sessions table
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS telegram_sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                session_data TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-        """)
-
-        # User message energy costs table (configurable costs per user)
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS user_message_energy_costs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                message_type VARCHAR(50) NOT NULL,
-                energy_cost INTEGER NOT NULL DEFAULT 1,
-                description TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id),
-                UNIQUE(user_id, message_type)
-            )
-        """)
-
-        # User profile protection table
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS user_profile_protection (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                profile_change_penalty INTEGER DEFAULT 10,
-                original_first_name VARCHAR(50),
-                original_last_name VARCHAR(50),
-                original_bio TEXT,
-                original_profile_photo_id TEXT,
-                profile_locked_at TIMESTAMP,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-        """)
-
-        await db.commit()
-
-    # Run migration for existing databases
-    await migrate_energy_columns(db_manager)
-
-
-async def migrate_energy_columns(db_manager: DatabaseManager):
-    """Add energy columns to existing users table if they don't exist."""
-    async with db_manager.get_connection() as db:
-        # Check if energy column exists
-        cursor = await db.execute("PRAGMA table_info(users)")
-        columns = await cursor.fetchall()
-        column_names = [col[1] for col in columns]
-
-        if "energy" not in column_names:
-            logger.info("Adding energy column to users table...")
-            await db.execute("ALTER TABLE users ADD COLUMN energy INTEGER DEFAULT 100")
-
-        if "energy_recharge_rate" not in column_names:
-            logger.info("Adding energy_recharge_rate column to users table...")
-            await db.execute(
-                "ALTER TABLE users ADD COLUMN energy_recharge_rate INTEGER DEFAULT 1"
-            )
-
-        if "last_energy_update" not in column_names:
-            logger.info("Adding last_energy_update column to users table...")
-            await db.execute(
-                "ALTER TABLE users ADD COLUMN last_energy_update TIMESTAMP"
-            )
-            # Update existing users to have current timestamp
-            await db.execute(
-                "UPDATE users SET last_energy_update = datetime('now') WHERE last_energy_update IS NULL"
-            )
-
-        await db.commit()
-        logger.info("Energy system database migration completed")
-
     # Profile Protection Operations
     async def set_profile_change_penalty(self, user_id: int, penalty: int) -> bool:
         """Set the energy penalty for profile changes."""
@@ -670,3 +536,137 @@ async def migrate_energy_columns(db_manager: DatabaseManager):
         except Exception as e:
             logger.error(f"Error checking profile lock status for user {user_id}: {e}")
             return False
+
+
+# Global database manager instance
+_db_manager: Optional[DatabaseManager] = None
+
+
+def get_database_manager() -> DatabaseManager:
+    """Get the global database manager instance."""
+    global _db_manager
+    if _db_manager is None:
+        database_url = os.getenv("DATABASE_URL", "sqlite:///./app.db")
+        database_path = database_url.replace("sqlite:///", "")
+        _db_manager = DatabaseManager(database_path)
+    return _db_manager
+
+
+async def init_database_manager():
+    """Initialize the database manager and create tables."""
+    db_manager = get_database_manager()
+
+    async with db_manager.get_connection() as db:
+        # Users table
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                email VARCHAR(100) UNIQUE NOT NULL,
+                hashed_password TEXT NOT NULL,
+                telegram_connected BOOLEAN DEFAULT FALSE,
+                phone_number VARCHAR(20),
+                energy INTEGER DEFAULT 100,
+                energy_recharge_rate INTEGER DEFAULT 1,
+                last_energy_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Telegram messages table
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS telegram_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                message_id INTEGER,
+                content TEXT,
+                chat_id INTEGER,
+                chat_title TEXT,
+                chat_type TEXT,
+                sent_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        """)
+
+        # Telegram sessions table
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS telegram_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                session_data TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        """)
+
+        # User message energy costs table (configurable costs per user)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_message_energy_costs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                message_type VARCHAR(50) NOT NULL,
+                energy_cost INTEGER NOT NULL DEFAULT 1,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id),
+                UNIQUE(user_id, message_type)
+            )
+        """)
+
+        # User profile protection table
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_profile_protection (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                profile_change_penalty INTEGER DEFAULT 10,
+                original_first_name VARCHAR(50),
+                original_last_name VARCHAR(50),
+                original_bio TEXT,
+                original_profile_photo_id TEXT,
+                profile_locked_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        """)
+
+        await db.commit()
+
+    # Run migration for existing databases
+    await migrate_energy_columns(db_manager)
+
+
+async def migrate_energy_columns(db_manager: DatabaseManager):
+    """Add energy columns to existing users table if they don't exist."""
+    async with db_manager.get_connection() as db:
+        # Check if energy column exists
+        cursor = await db.execute("PRAGMA table_info(users)")
+        columns = await cursor.fetchall()
+        column_names = [col[1] for col in columns]
+
+        if "energy" not in column_names:
+            logger.info("Adding energy column to users table...")
+            await db.execute("ALTER TABLE users ADD COLUMN energy INTEGER DEFAULT 100")
+
+        if "energy_recharge_rate" not in column_names:
+            logger.info("Adding energy_recharge_rate column to users table...")
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN energy_recharge_rate INTEGER DEFAULT 1"
+            )
+
+        if "last_energy_update" not in column_names:
+            logger.info("Adding last_energy_update column to users table...")
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN last_energy_update TIMESTAMP"
+            )
+            # Update existing users to have current timestamp
+            await db.execute(
+                "UPDATE users SET last_energy_update = datetime('now') WHERE last_energy_update IS NULL"
+            )
+
+        await db.commit()
+        logger.info("Energy system database migration completed")
