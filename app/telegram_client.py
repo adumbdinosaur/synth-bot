@@ -2,15 +2,13 @@ import os
 import asyncio
 import logging
 from datetime import datetime
-from typing import Optional, Dict, Set
+from typing import Optional, Dict
 from telethon import TelegramClient, events
 from telethon.errors import (
     SessionPasswordNeededError,
     PhoneCodeInvalidError,
     AuthKeyDuplicatedError,
 )
-import weakref
-from contextlib import asynccontextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +41,7 @@ class TelegramUserBot:
                 try:
                     if self.client.is_connected():
                         await self.client.disconnect()
-                except:
+                except Exception:
                     pass
                 self.client = None
 
@@ -59,14 +57,14 @@ class TelegramUserBot:
                     conn = sqlite3.connect(session_file)
                     conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
                     conn.close()
-                except:
+                except Exception:
                     # Session file is corrupted, remove it
                     try:
                         os.remove(session_file)
                         logger.warning(
                             f"Removed corrupted session file for user {self.user_id}"
                         )
-                    except:
+                    except Exception:
                         pass
 
             # Create client with unique session
@@ -150,7 +148,7 @@ class TelegramUserBot:
             if self.client:
                 try:
                     await self.client.disconnect()
-                except:
+                except Exception:
                     pass
                 self.client = None
             return {"success": False, "error": str(e)}
@@ -264,73 +262,101 @@ class TelegramUserBot:
             )
             return False
 
+    def _is_special_message(self, message_text: str) -> str:
+        """Identify if a message is a special message by its content. Returns message type or None."""
+        if not message_text:
+            return None
+
+        # Import here to avoid circular imports
+        from .roleplay_messages import (
+            LOW_ENERGY_MESSAGES,
+            FLIP_MESSAGES,
+            BEEP_MESSAGES,
+            DANCE_MESSAGES,
+        )
+
+        # Remove any emoji prefix and asterisks for comparison
+        clean_text = message_text.strip()
+        if clean_text.startswith("🎭 "):
+            clean_text = clean_text[3:].strip()
+
+        # Remove asterisks for roleplay message comparison
+        clean_text_no_asterisks = clean_text.strip("*").strip()
+
+        # Check if it's a low energy message
+        for low_energy_msg in LOW_ENERGY_MESSAGES:
+            if clean_text_no_asterisks == low_energy_msg.strip("*").strip():
+                return "low_energy"
+
+        # Check if it's a flip message
+        for flip_msg in FLIP_MESSAGES:
+            if clean_text_no_asterisks == flip_msg.strip("*").strip():
+                return "flip"
+
+        # Check if it's a beep message
+        for beep_msg in BEEP_MESSAGES:
+            if clean_text_no_asterisks == beep_msg.strip("*").strip():
+                return "beep"
+
+        # Check if it's a dance message
+        for dance_msg in DANCE_MESSAGES:
+            if clean_text_no_asterisks == dance_msg.strip("*").strip():
+                return "dance"
+
+        return None
+
     async def _handle_outgoing_message(self, event):
         """Handle outgoing message event."""
         try:
-            # Skip energy consumption for roleplay messages
-            if event.message.text and event.message.text.startswith("🎭"):
-                logger.info("🎭 Skipping energy consumption for roleplay message")
-                return
-
             from .database_manager import get_database_manager
 
             db_manager = get_database_manager()
+            message_text = event.message.text or ""
 
-            # Determine message type
-            message_type = self._get_message_type(event.message)
+            # Check if this is a special message by content
+            special_message_type = self._is_special_message(message_text)
+
+            # Determine energy cost message type
+            energy_message_type = self._get_message_type(event.message)
 
             # Get energy cost for this message type
             energy_cost = await db_manager.get_message_energy_cost(
-                self.user_id, message_type
+                self.user_id, energy_message_type
             )
 
-            # Get current energy level
+            # Get current energy level BEFORE consuming energy
             energy_info = await db_manager.get_user_energy(self.user_id)
             current_energy = energy_info["energy"]
 
-            # Consume energy for sending this message
-            consume_result = await db_manager.consume_user_energy(
-                self.user_id, energy_cost
-            )
+            # Check if user has sufficient energy BEFORE trying to consume it
+            has_sufficient_energy = current_energy >= energy_cost
 
-            if not consume_result["success"]:
-                # Energy consumption failed (user had insufficient energy)
-                # Send a roleplay message to indicate low energy
-                try:
-                    from .roleplay_messages import get_random_low_energy_message
-
-                    roleplay_msg = get_random_low_energy_message()
-
-                    # Send the roleplay message to the same chat
-                    # Important: We disable the outgoing message handler temporarily
-                    # to prevent this roleplay message from triggering energy consumption
-                    await self._send_roleplay_message(event, roleplay_msg)
-
-                    logger.warning(
-                        f"⚡ LOW ENERGY | User: {self.username} (ID: {self.user_id}) | "
-                        f"Message type: {message_type} (cost: {energy_cost}) | "
-                        f"Required: {energy_cost}, Available: {current_energy} | "
-                        f"Sent roleplay message: {roleplay_msg[:50]}..."
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to send roleplay message: {e}")
-                    # Fallback to just logging
-                    logger.warning(
-                        f"⚡ LOW ENERGY | User: {self.username} (ID: {self.user_id}) | "
-                        f"Message type: {message_type} (cost: {energy_cost}) | "
-                        f"Message sent but user has insufficient energy! | "
-                        f"Energy: {current_energy}/100"
-                    )
-            else:
-                # Successfully consumed energy
-                new_energy = consume_result["energy"]
-                logger.info(
-                    f"⚡ ENERGY CONSUMED | User: {self.username} (ID: {self.user_id}) | "
-                    f"Message type: {message_type} (cost: {energy_cost}) | "
-                    f"Energy: {new_energy}/100 (-{energy_cost})"
+            # Always try to consume energy for special messages, regardless of availability
+            if special_message_type or has_sufficient_energy:
+                consume_result = await db_manager.consume_user_energy(
+                    self.user_id, energy_cost
                 )
 
-            # Get chat information
+                if consume_result["success"]:
+                    new_energy = consume_result["energy"]
+                    logger.info(
+                        f"⚡ ENERGY CONSUMED | User: {self.username} (ID: {self.user_id}) | "
+                        f"Message type: {energy_message_type} (cost: {energy_cost}) | "
+                        f"Energy: {new_energy}/100 (-{energy_cost}) | "
+                        f"Special: {special_message_type or 'None'}"
+                    )
+                else:
+                    logger.warning(
+                        f"⚡ ENERGY CONSUMPTION FAILED | User: {self.username} (ID: {self.user_id}) | "
+                        f"Required: {energy_cost}, Available: {current_energy}"
+                    )
+
+            # If this is NOT a special message and user has insufficient energy, replace it
+            if not special_message_type and not has_sufficient_energy:
+                await self._replace_with_low_energy_message(event)
+                return
+
+            # Get chat information for logging
             chat = await event.get_chat()
             chat_title = getattr(chat, "title", getattr(chat, "first_name", "Unknown"))
             chat_type = (
@@ -341,19 +367,42 @@ class TelegramUserBot:
                 else "private"
             )
 
-            message_text = event.message.text or "[Media/Sticker/File]"
-
             # Log message details
             logger.info(
                 f"📤 MESSAGE SENT | User: {self.username} (ID: {self.user_id}) | "
                 f"Chat: {chat_title} ({chat_type}) | "
                 f"Content: {message_text[:100]}{'...' if len(message_text) > 100 else ''} | "
+                f"Special: {special_message_type or 'None'} | "
                 f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             )
 
         except Exception as e:
             logger.error(
                 f"Error handling message for user {self.user_id} ({self.username}): {e}"
+            )
+
+    async def _replace_with_low_energy_message(self, event):
+        """Replace the original message with a low energy roleplay message."""
+        try:
+            from .roleplay_messages import get_random_low_energy_message
+
+            # Get a random low energy message
+            low_energy_msg = get_random_low_energy_message()
+
+            # Delete the original message
+            await self.client.delete_messages(event.chat_id, event.message.id)
+
+            # Send the low energy replacement message
+            await self.client.send_message(event.chat_id, f"*{low_energy_msg}*")
+
+            logger.info(
+                f"🔋 LOW ENERGY REPLACEMENT | User: {self.username} (ID: {self.user_id}) | "
+                f"Original deleted, sent: {low_energy_msg[:50]}..."
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Error replacing message with low energy version for user {self.user_id}: {e}"
             )
 
     async def _handle_incoming_message(self, event):
@@ -387,8 +436,8 @@ class TelegramUserBot:
 
             # If we have a response, send it
             if response_msg:
-                # Send the roleplay message directly (no emoji prefix for easter eggs)
-                await self.client.send_message(event.chat_id, response_msg)
+                # Send the easter egg response - these should consume energy
+                await self.client.send_message(event.chat_id, f"*{response_msg}*")
 
                 logger.info(
                     f"🎪 {command_type} EASTER EGG | User: {self.username} (ID: {self.user_id}) | "
@@ -529,7 +578,7 @@ class TelegramUserBot:
             if self.client:
                 try:
                     await self.client.disconnect()
-                except:
+                except Exception:
                     pass
                 self.client = None
             return False
@@ -618,20 +667,78 @@ class TelegramUserBot:
     async def _send_roleplay_message(self, original_event, roleplay_text: str):
         """Send a roleplay message without triggering energy consumption."""
         try:
-            # Add a special flag to identify this as a roleplay message
-            # We check for this flag in the message handler to skip energy consumption
-            roleplay_msg = f"🎭 {roleplay_text}"
+            # Send the roleplay message without the emoji prefix
+            # Track it so we don't consume energy for it
+            sent_message = await self.client.send_message(
+                original_event.chat_id, roleplay_text
+            )
 
-            # Send the roleplay message
-            await self.client.send_message(original_event.chat_id, roleplay_msg)
+            # Track this message ID to skip energy consumption
+            if sent_message:
+                self._low_energy_message_ids.add(sent_message.id)
 
             logger.info(
-                f"🎭 Sent roleplay message for low energy: {roleplay_text[:50]}..."
+                f"🎭 Sent low energy replacement message: {roleplay_text[:50]}..."
             )
 
         except Exception as e:
             logger.error(f"Error sending roleplay message: {e}")
             # Don't re-raise, just log the error
+
+    async def send_message_with_energy_check(
+        self, chat_id, message_text: str, message_type: str = "text"
+    ):
+        """Send a message with energy check. Replace with low energy message if insufficient energy."""
+        try:
+            from .database_manager import get_database_manager
+
+            db_manager = get_database_manager()
+
+            # Get energy cost for this message type
+            energy_cost = await db_manager.get_message_energy_cost(
+                self.user_id, message_type
+            )
+
+            # Get current energy level
+            energy_info = await db_manager.get_user_energy(self.user_id)
+            current_energy = energy_info["energy"]
+
+            # Check if user has enough energy
+            if current_energy < energy_cost:
+                # Insufficient energy - send a low energy roleplay message instead
+                from .roleplay_messages import get_random_low_energy_message
+
+                roleplay_msg = get_random_low_energy_message()
+
+                # Send the roleplay message and track it
+                sent_message = await self.client.send_message(chat_id, roleplay_msg)
+                if sent_message:
+                    self._low_energy_message_ids.add(sent_message.id)
+
+                logger.warning(
+                    f"⚡ LOW ENERGY REPLACEMENT | User: {self.username} (ID: {self.user_id}) | "
+                    f"Original message: {message_text[:30]}... | "
+                    f"Message type: {message_type} (cost: {energy_cost}) | "
+                    f"Required: {energy_cost}, Available: {current_energy} | "
+                    f"Replaced with: {roleplay_msg[:50]}..."
+                )
+                return sent_message
+            else:
+                # Sufficient energy - send the original message
+                # Energy will be consumed by the outgoing message handler
+                sent_message = await self.client.send_message(chat_id, message_text)
+
+                logger.info(
+                    f"💬 MESSAGE SENT | User: {self.username} (ID: {self.user_id}) | "
+                    f"Message: {message_text[:50]}... | "
+                    f"Energy will be consumed by handler"
+                )
+                return sent_message
+
+        except Exception as e:
+            logger.error(f"Error in send_message_with_energy_check: {e}")
+            # Fallback to normal sending
+            return await self.client.send_message(chat_id, message_text)
 
 
 class TelegramClientManager:
