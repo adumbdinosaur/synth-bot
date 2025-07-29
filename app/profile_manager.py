@@ -197,10 +197,13 @@ class ProfileManager:
             if self.db_manager:
                 penalty = await self.db_manager.get_profile_change_penalty(self.user_id)
                 if penalty > 0:
-                    await self.db_manager.deduct_energy(
-                        self.user_id, penalty, "Profile change detected"
+                    result = await self.db_manager.consume_user_energy(
+                        self.user_id, penalty
                     )
-                    logger.info(f"⚡ Applied energy penalty: -{penalty}")
+                    if result["success"]:
+                        logger.info(f"⚡ Applied energy penalty: -{penalty} (Energy: {result['energy']}/100)")
+                    else:
+                        logger.warning(f"⚡ Energy penalty failed: {result.get('error', 'Unknown error')}")
 
             # Revert profile changes
             await self.revert_to_original_profile()

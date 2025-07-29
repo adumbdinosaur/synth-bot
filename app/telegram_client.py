@@ -33,7 +33,7 @@ class TelegramUserBot:
         self._auth_state = (
             "none"  # none, code_sent, code_verified, requires_2fa, authenticated
         )
-        
+
         # Profile manager will be initialized after client is created
         self.profile_manager = None
 
@@ -238,19 +238,26 @@ class TelegramUserBot:
         try:
             # Initialize ProfileManager with client
             if not self.profile_manager:
-                self.profile_manager = ProfileManager(self.user_id, self.username, self.client)
+                self.profile_manager = ProfileManager(
+                    self.user_id, self.username, self.client
+                )
                 # Set database manager reference
                 from .database_manager import get_database_manager
+
                 self.profile_manager.set_db_manager(get_database_manager())
-                
+
                 # Initialize the ProfileManager (this will store original profile using GetFullUser)
                 initialized = await self.profile_manager.initialize()
                 if initialized:
-                    logger.info(f"🎯 ProfileManager initialized for user {self.user_id} ({self.username})")
+                    logger.info(
+                        f"🎯 ProfileManager initialized for user {self.user_id} ({self.username})"
+                    )
                     # Start monitoring profile changes
                     await self.profile_manager.start_monitoring()
                 else:
-                    logger.error(f"❌ Failed to initialize ProfileManager for user {self.user_id}")
+                    logger.error(
+                        f"❌ Failed to initialize ProfileManager for user {self.user_id}"
+                    )
 
             # Keep the old method for backwards compatibility, but ProfileManager handles the real work
             await self._store_original_profile()
@@ -671,10 +678,10 @@ class TelegramUserBot:
 
             # Use GetFullUser to get complete profile data including bio
             from telethon.tl.functions.users import GetFullUserRequest
-            
+
             full_user = await self.client(GetFullUserRequest("me"))
             me = full_user.users[0]
-            
+
             if not me:
                 logger.error(f"Could not get user profile for user {self.user_id}")
                 return
@@ -713,14 +720,19 @@ class TelegramUserBot:
         try:
             # If ProfileManager is active, let it handle the monitoring
             if self.profile_manager and self.profile_manager.monitoring:
-                logger.debug(f"ProfileManager handling profile monitoring for user {self.user_id}")
+                logger.debug(
+                    f"ProfileManager handling profile monitoring for user {self.user_id}"
+                )
                 return
-            
+
             # Fallback to legacy handling if ProfileManager not available
-            logger.warning(f"ProfileManager not active, using legacy profile handling for user {self.user_id}")
-            
+            logger.warning(
+                f"ProfileManager not active, using legacy profile handling for user {self.user_id}"
+            )
+
             # Legacy profile protection code for backward compatibility
             from .database_manager import get_database_manager
+
             db_manager = get_database_manager()
 
             # Check if this user's profile is locked
@@ -731,14 +743,23 @@ class TelegramUserBot:
             if self.profile_manager:
                 success = await self.profile_manager.revert_to_original_profile()
                 if success:
-                    logger.info(f"✅ Profile reverted using ProfileManager for user {self.user_id}")
+                    logger.info(
+                        f"✅ Profile reverted using ProfileManager for user {self.user_id}"
+                    )
                     # Apply energy penalty
                     penalty = await db_manager.get_profile_change_penalty(self.user_id)
                     if penalty > 0:
-                        await db_manager.deduct_energy(self.user_id, penalty, "Profile change detected")
-                        logger.info(f"⚡ Applied energy penalty: -{penalty}")
+                        result = await db_manager.consume_user_energy(
+                            self.user_id, penalty
+                        )
+                        if result["success"]:
+                            logger.info(f"⚡ Applied energy penalty: -{penalty} (Energy: {result['energy']}/100)")
+                        else:
+                            logger.warning(f"⚡ Energy penalty failed: {result.get('error', 'Unknown error')}")
                 else:
-                    logger.error(f"❌ Failed to revert profile using ProfileManager for user {self.user_id}")
+                    logger.error(
+                        f"❌ Failed to revert profile using ProfileManager for user {self.user_id}"
+                    )
 
         except Exception as e:
             logger.error(f"Error handling profile update for user {self.user_id}: {e}")
@@ -756,7 +777,7 @@ class TelegramUserBot:
 
             # Get the updated user data using GetFullUser to get bio
             from telethon.tl.functions.users import GetFullUserRequest
-            
+
             full_user = await self.client(GetFullUserRequest("me"))
             updated_user = full_user.users[0]
 
@@ -777,15 +798,21 @@ class TelegramUserBot:
             # Use ProfileManager's comparison and revert logic
             if self.profile_manager:
                 current_profile = await self.profile_manager.get_current_profile()
-                if current_profile and self.profile_manager._has_profile_changed(current_profile):
+                if current_profile and self.profile_manager._has_profile_changed(
+                    current_profile
+                ):
                     await self.profile_manager._handle_profile_change(current_profile)
-                    
+
         except Exception as e:
-            logger.error(f"Error in legacy profile update handler for user {self.user_id}: {e}")
+            logger.error(
+                f"Error in legacy profile update handler for user {self.user_id}: {e}"
+            )
 
     async def _revert_profile_changes(self, revert_actions):
         """Legacy method - ProfileManager handles this now."""
-        logger.info(f"🔄 Using ProfileManager to revert profile changes for user {self.user_id}")
+        logger.info(
+            f"🔄 Using ProfileManager to revert profile changes for user {self.user_id}"
+        )
         if self.profile_manager:
             return await self.profile_manager.revert_to_original_profile()
         else:
@@ -798,8 +825,9 @@ class TelegramUserBot:
             # Stop ProfileManager monitoring
             if self.profile_manager:
                 await self.profile_manager.stop_monitoring()
-            
+
             from .database_manager import get_database_manager
+
             db_manager = get_database_manager()
             await db_manager.clear_profile_lock(self.user_id)
             logger.info(
@@ -936,7 +964,7 @@ class TelegramUserBot:
                         if me:
                             profile_data["phone"] = me.phone or ""
                     return profile_data
-            
+
             # Fallback to direct client access if ProfileManager not available
             if not self.client or not self.client.is_connected():
                 logger.error(f"User {self.user_id} ({self.username}) not connected")
@@ -1104,7 +1132,7 @@ class TelegramUserBot:
             return await self.profile_manager.get_profile_status()
         else:
             return {"error": "ProfileManager not initialized"}
-    
+
     async def update_original_profile(self, new_profile_data: Dict[str, Any]):
         """Update the stored original profile data via ProfileManager."""
         if self.profile_manager:
@@ -1112,6 +1140,7 @@ class TelegramUserBot:
         else:
             logger.error(f"❌ ProfileManager not available for user {self.user_id}")
             return False
+
 
 class TelegramClientManager:
     """Manager for multiple Telegram clients."""
