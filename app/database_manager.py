@@ -92,8 +92,8 @@ class DatabaseManager:
                     "max_energy": 100,
                 }
 
-            current_energy = row[0] or 100
-            recharge_rate = row[1] or 1
+            current_energy = row[0] if row[0] is not None else 100
+            recharge_rate = row[1] if row[1] is not None else 1
             last_update = datetime.fromisoformat(row[2]) if row[2] else datetime.now()
 
             # Calculate recharge
