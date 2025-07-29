@@ -463,10 +463,14 @@ class DatabaseManager:
                     (user_id, 10),  # Default penalty of 10 energy points
                 )
                 await db.commit()
-                logger.info(f"Initialized default profile protection for new user {user_id}")
+                logger.info(
+                    f"Initialized default profile protection for new user {user_id}"
+                )
                 return True
         except Exception as e:
-            logger.error(f"Error initializing profile protection for user {user_id}: {e}")
+            logger.error(
+                f"Error initializing profile protection for user {user_id}: {e}"
+            )
             return False
 
     async def set_profile_change_penalty(self, user_id: int, penalty: int) -> bool:
