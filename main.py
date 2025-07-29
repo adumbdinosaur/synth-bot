@@ -68,7 +68,7 @@ async def lifespan(app: FastAPI):
     telegram_manager = get_telegram_manager()
     if telegram_manager:
         logger.info(
-            f"📊 Telegram manager ready for {len(telegram_manager.clients)} clients"
+            f"📊 Telegram manager ready for {await telegram_manager.get_client_count()} clients"
         )
     else:
         logger.warning("⚠️ Telegram manager not initialized properly")
@@ -269,8 +269,8 @@ async def dashboard(
 
         # Get system statistics
         telegram_manager = get_telegram_manager()
-        connected_users = telegram_manager.get_connected_users()
-        total_active_clients = telegram_manager.get_client_count()
+        connected_users = await telegram_manager.get_connected_users()
+        total_active_clients = await telegram_manager.get_client_count()
 
         # Check for session files for this user
         user_id = current_user["id"]
@@ -670,8 +670,8 @@ async def logout():
 async def get_system_stats(current_user: dict = Depends(get_current_user)):
     """Get system statistics for connected users."""
     telegram_manager = get_telegram_manager()
-    connected_users = telegram_manager.get_connected_users()
-    total_clients = telegram_manager.get_client_count()
+    connected_users = await telegram_manager.get_connected_users()
+    total_clients = await telegram_manager.get_client_count()
 
     return {
         "total_active_clients": total_clients,

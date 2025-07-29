@@ -537,7 +537,9 @@ class DatabaseManager:
             logger.error(f"Error checking profile lock status for user {user_id}: {e}")
             return False
 
-    async def get_profile_protection_settings(self, user_id: int) -> Optional[Dict[str, Any]]:
+    async def get_profile_protection_settings(
+        self, user_id: int
+    ) -> Optional[Dict[str, Any]]:
         """Get profile protection settings for a user."""
         try:
             async with self.get_connection() as db:
@@ -568,7 +570,9 @@ class DatabaseManager:
                         "profile_change_penalty": 10,
                     }
         except Exception as e:
-            logger.error(f"Error getting profile protection settings for user {user_id}: {e}")
+            logger.error(
+                f"Error getting profile protection settings for user {user_id}: {e}"
+            )
             return {
                 "profile_protection_enabled": False,
                 "profile_change_penalty": 10,

@@ -1026,6 +1026,14 @@ class TelegramClientManager:
         # Create sessions directory if it doesn't exist
         os.makedirs(self.session_dir, exist_ok=True)
 
+    async def get_client_count(self) -> int:
+        """Get the number of currently connected Telegram clients."""
+        count = 0
+        for client in self.clients.values():
+            if await client.is_connected():  # Await here!
+                count += 1
+        return count
+
     async def get_client(self, user_id: int) -> Optional[TelegramClient]:
         """Get a client for the given user ID."""
         return self.clients.get(user_id)
