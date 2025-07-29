@@ -1,3 +1,15 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - updates2
+  pull_request:
+    branches:
+      - main
+
 env:
   REGISTRY: registry.rptr.dev
   IMAGE_NAME: synth-bot
@@ -20,7 +32,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
-          registry: registry.rptr.dev  # ✅ Ensure no scheme or path
+          registry: ${{ env.REGISTRY }}
           username: ${{ secrets.REGISTRY_USER }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
