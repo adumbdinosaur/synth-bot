@@ -1,0 +1,72 @@
+.env
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# Session files
+*.session
+sessions/
+
+# Database
+*.db
+*.sqlite
+
+# Nix
+result
+result-*
+.direnv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Testing files
+test_*.py
+*_test.py
+verify_fix.py
+test_structure.py
+test_manager_fix.py
+test_db_connection_fix.py
+demo_recovery.py
+fix_telegram_manager.py
+
+# Cookies and sensitive data
+cookies.txt
+new_cookies.txt
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/

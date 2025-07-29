@@ -1,0 +1,55 @@
+from pydantic import BaseModel
+from datetime import datetime
+from typing import Optional
+
+class UserBase(BaseModel):
+    username: str
+    email: str
+
+class UserCreate(UserBase):
+    password: str
+
+class User(UserBase):
+    id: int
+    telegram_connected: bool = False
+    phone_number: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class TelegramMessageBase(BaseModel):
+    content: str
+    chat_id: int
+    chat_title: Optional[str] = None
+    chat_type: Optional[str] = None
+    sent_at: datetime
+
+class TelegramMessageCreate(TelegramMessageBase):
+    user_id: int
+    message_id: int
+
+class TelegramMessage(TelegramMessageBase):
+    id: int
+    user_id: int
+    message_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class TelegramSessionBase(BaseModel):
+    session_data: str
+
+class TelegramSessionCreate(TelegramSessionBase):
+    user_id: int
+
+class TelegramSession(TelegramSessionBase):
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

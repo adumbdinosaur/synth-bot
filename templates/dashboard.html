@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Telegram UserBot{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Welcome Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h2 mb-1">Welcome back, {{ user.username }}!</h1>
+                    <p class="text-muted mb-0">Manage your Telegram userbot and monitor your messages</p>
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-cog me-2"></i>Settings
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#"><i class="fas fa-user me-2"></i>Profile</a></li>
+                        <li><a class="dropdown-item" href="#"><i class="fas fa-bell me-2"></i>Notifications</a></li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li>
+                            <form action="/logout" method="post" class="d-inline">
+                                <button type="submit" class="dropdown-item">
+                                    <i class="fas fa-sign-out-alt me-2"></i>Logout
+                                </button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Messages -->
+    {% if message %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-{{ 'success' if message_type == 'success' else 'danger' if message_type == 'error' else 'info' }} alert-dismissible fade show"
+                role="alert">
+                <i
+                    class="fas fa-{{ 'check-circle' if message_type == 'success' else 'exclamation-circle' if message_type == 'error' else 'info-circle' }} me-2"></i>
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Status Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-primary">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            {% if telegram_connected %}
+                            <i class="fas fa-check-circle text-success" style="font-size: 2rem;"></i>
+                            {% else %}
+                            <i class="fas fa-times-circle text-danger" style="font-size: 2rem;"></i>
+                            {% endif %}
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="card-title mb-1">Telegram Status</h6>
+                            {% if telegram_connected %}
+                            <p class="card-text text-success mb-0">
+                                <strong>Connected</strong><br>
+                                <small class="text-muted">{{ phone_number }}</small>
+                            </p>
+                            {% else %}
+                            <p class="card-text text-danger mb-0">
+                                <strong>Disconnected</strong><br>
+                                <small class="text-muted">No active connection</small>
+                            </p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-info">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-users text-info" style="font-size: 2rem;"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="card-title mb-1">Active Users</h6>
+                            <p class="card-text mb-0">
+                                <strong>{{ total_active_users }}</strong><br>
+                                <small class="text-muted">Currently connected</small>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border-warning">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-server text-warning" style="font-size: 2rem;"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="card-title mb-1">Client Status</h6>
+                            <p class="card-text mb-0">
+                                {% if client_connected %}
+                                <strong class="text-success">Listening</strong><br>
+                                <small class="text-muted">Monitoring messages</small>
+                                {% else %}
+                                <strong class="text-danger">Inactive</strong><br>
+                                <small class="text-muted">Not monitoring</small>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Telegram Connection Section -->
+    {% if not telegram_connected %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-warning">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h5 class="card-title text-warning mb-2">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                Telegram Not Connected
+                            </h5>
+                            <p class="card-text mb-0">
+                                Connect your Telegram account to start monitoring your messages.
+                                This will require phone verification and optional 2FA authentication.
+                            </p>
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            <a href="/telegram/connect" class="btn btn-warning">
+                                <i class="fas fa-link me-2"></i>Connect Telegram
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-success">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <h5 class="card-title text-success mb-2">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Telegram Connected
+                            </h5>
+                            <p class="card-text mb-1">
+                                Your Telegram account ({{ phone_number }}) is connected and monitoring messages.
+                            </p>
+                            {% if has_session_files %}
+                            <small class="text-muted">
+                                <i class="fas fa-file me-1"></i>{{ session_files_count }} session file(s) active
+                            </small>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 text-md-end">
+                            <div class="btn-group-vertical btn-group-sm" role="group">
+                                <form action="/telegram/delete-session" method="post" class="d-inline mb-1">
+                                    <button type="submit" class="btn btn-outline-warning btn-sm"
+                                        onclick="return confirm('This will delete your Telegram session files and disconnect your account. You will need to re-verify with a new code. Continue?')"
+                                        title="Clear session data and force re-authentication">
+                                        <i class="fas fa-trash me-1"></i>Delete Session & Re-verify
+                                    </button>
+                                </form>
+                                <form action="/telegram/disconnect" method="post" class="d-inline">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm"
+                                        onclick="return confirm('Are you sure you want to disconnect Telegram? This will stop message monitoring.')"
+                                        title="Disconnect from Telegram (keeps session files)">
+                                        <i class="fas fa-unlink me-1"></i>Disconnect
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Messages Section -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-comments me-2"></i>Recent Messages
+                    </h5>
+                    <button class="btn btn-sm btn-outline-primary" onclick="refreshMessages()">
+                        <i class="fas fa-sync-alt me-1"></i>Refresh
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Message</th>
+                                    <th>Chat</th>
+                                    <th>Sent At</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="4" class="text-center py-4">
+                                        <i class="fas fa-info-circle text-muted me-2"></i>
+                                        Messages are logged to console only (not stored in database)
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Information Section -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>System Information
+                    </h5>
+                    <button class="btn btn-sm btn-outline-primary" onclick="refreshStats()">
+                        <i class="fas fa-sync-alt me-1"></i>Refresh
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Connection Status</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Your Status:</strong>
+                                    {% if telegram_connected %}
+                                    <span class="badge bg-success">Connected</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Disconnected</span>
+                                    {% endif %}
+                                </li>
+                                <li><strong>Client Active:</strong>
+                                    {% if client_connected %}
+                                    <span class="badge bg-success">Yes</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">No</span>
+                                    {% endif %}
+                                </li>
+                                {% if phone_number %}
+                                <li><strong>Phone:</strong> {{ phone_number }}</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>System Statistics</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Total Active Users:</strong> {{ total_active_users }}</li>
+                                <li><strong>Total Clients:</strong> {{ total_clients }}</li>
+                                <li><strong>Your User ID:</strong> {{ user.id }}</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    {% if telegram_connected and client_connected %}
+                    <div class="alert alert-info mt-3">
+                        <h6 class="alert-heading">
+                            <i class="fas fa-info-circle me-2"></i>Message Monitoring Active
+                        </h6>
+                        <p class="mb-0">
+                            Your outgoing messages are being monitored and logged to the console.
+                            Check the application logs to see your message activity in real-time.
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function refreshStats() {
+        fetch('/api/stats')
+            .then(response => response.json())
+            .then data => {
+                console.log('System stats:', data);
+                // Could update the page with new stats if needed
+                location.reload();
+            })
+            .catch (error => {
+            console.error('Error fetching stats:', error);
+        });
+    }
+
+    // Auto-refresh every 30 seconds if connected
+    {% if client_connected %}
+    setInterval(refreshStats, 30000);
+    {% endif %}
+</script>
+{% endblock %}

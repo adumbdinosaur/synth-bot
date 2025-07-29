@@ -1,0 +1,612 @@
+import os
+import asyncio
+import logging
+import logging.config
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request, Depends, HTTPException, status, Form
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from dotenv import load_dotenv
+
+from app.database import init_db, get_db, get_db_connection
+from app.auth import (
+    create_access_token, verify_token, get_current_user,
+    verify_password, get_password_hash
+)
+from app.models import User, TelegramMessage
+from app.telegram_client import initialize_telegram_manager, get_telegram_manager
+from app.utils import is_authenticated
+
+# Load environment variables
+load_dotenv()
+
+# Configure logging
+if os.path.exists('logging.conf'):
+    logging.config.fileConfig('logging.conf')
+else:
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+
+logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize Telegram manager
+    logger.info("Initializing Telegram manager...")
+    api_id = os.getenv("TELEGRAM_API_ID")
+    api_hash = os.getenv("TELEGRAM_API_HASH")
+    
+    if not api_id or not api_hash:
+        logger.error("TELEGRAM_API_ID and TELEGRAM_API_HASH environment variables are required")
+        raise RuntimeError("Missing Telegram API credentials")
+    
+    initialize_telegram_manager(int(api_id), api_hash)
+    logger.info("Telegram manager initialized successfully")
+    
+    # Initialize database
+    logger.info("Initializing database...")
+    await init_db()
+    logger.info("Database initialized successfully")
+    
+    # Recover existing Telegram clients from session files
+    logger.info("🔄 Attempting to recover existing Telegram clients...")
+    try:
+        # Get database connection for recovery
+        telegram_manager = get_telegram_manager()
+        async with get_db_connection() as db:
+            await telegram_manager.recover_clients_from_sessions(db)
+    except Exception as e:
+        logger.error(f"Error during client recovery: {e}")
+    
+    # Log startup message
+    logger.info("🚀 Telegram UserBot application started")
+    telegram_manager = get_telegram_manager()
+    logger.info(f"📊 Active client connections: {telegram_manager.get_client_count()}")
+    
+    yield
+    
+    # Cleanup telegram clients
+    logger.info("Cleaning up Telegram clients...")
+    try:
+        telegram_manager = get_telegram_manager()
+        telegram_manager = get_telegram_manager()
+        await telegram_manager.disconnect_all()
+        logger.info("All Telegram clients disconnected successfully")
+    except Exception as e:
+        logger.error(f"Error during cleanup: {e}")
+    
+    logger.info("Application shutdown complete")
+
+app = FastAPI(
+    title="Telegram UserBot Web Interface",
+    description="Secure web application for Telegram userbot management",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# Mount static files and templates
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
+@app.get("/health")
+async def debug_telegram_config():
+    """Debug endpoint to check Telegram API configuration."""
+    api_id = os.getenv("TELEGRAM_API_ID")
+    api_hash = os.getenv("TELEGRAM_API_HASH")
+    
+    return {
+        "telegram_api_id_exists": bool(api_id),
+        "telegram_api_id_value": api_id[:8] + "..." if api_id else None,
+        "telegram_api_hash_exists": bool(api_hash),
+        "telegram_api_hash_value": api_hash[:8] + "..." if api_hash else None
+    }
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+@app.get("/register", response_class=HTMLResponse)
+async def register_page(request: Request):
+    return templates.TemplateResponse("register.html", {"request": request})
+
+@app.post("/register")
+async def register(
+    request: Request,
+    username: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    db=Depends(get_db)
+):
+    try:
+        # Check if user already exists
+        existing_user = await db.execute(
+            "SELECT id FROM users WHERE username = ? OR email = ?",
+            (username, email)
+        )
+        if await existing_user.fetchone():
+            return templates.TemplateResponse(
+                "register.html",
+                {"request": request, "error": "Username or email already exists"}
+            )
+        
+        # Create new user
+        hashed_password = get_password_hash(password)
+        await db.execute(
+            "INSERT INTO users (username, email, hashed_password) VALUES (?, ?, ?)",
+            (username, email, hashed_password)
+        )
+        await db.commit()
+        
+        return RedirectResponse(url="/login", status_code=302)
+    except Exception as e:
+        return templates.TemplateResponse(
+            "register.html",
+            {"request": request, "error": "Registration failed"}
+        )
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.post("/login")
+async def login(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+    db=Depends(get_db)
+):
+    try:
+        # Verify user credentials
+        cursor = await db.execute(
+            "SELECT id, username, hashed_password FROM users WHERE username = ?",
+            (username,)
+        )
+        user_data = await cursor.fetchone()
+        
+        if not user_data or not verify_password(password, user_data[2]):
+            return templates.TemplateResponse(
+                "login.html",
+                {"request": request, "error": "Invalid credentials"}
+            )
+        
+        # Create access token
+        access_token = create_access_token(data={"sub": str(user_data[0])})
+        
+        # Redirect to dashboard with token in cookie
+        response = RedirectResponse(url="/dashboard", status_code=302)
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=False,  # Set to True in production with HTTPS
+            samesite="lax"
+        )
+        return response
+    except Exception as e:
+        return templates.TemplateResponse(
+            "login.html",
+            {"request": request, "error": "Login failed"}
+        )
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(
+    request: Request, 
+    current_user: dict = Depends(get_current_user), 
+    db=Depends(get_db),
+    message: str = None,
+    type: str = None
+):
+    try:
+        # Get user's Telegram connection status
+        cursor = await db.execute(
+            "SELECT telegram_connected, phone_number FROM users WHERE id = ?",
+            (current_user["id"],)
+        )
+        user_data = await cursor.fetchone()
+        
+        # Get client connection status from manager
+        telegram_manager = get_telegram_manager()
+        telegram_manager = get_telegram_manager()
+        client = await telegram_manager.get_client(current_user["id"])
+        
+        is_client_connected = False
+        if client is not None:
+            try:
+                if client.client is not None:
+                    is_connected = client.client.is_connected()
+                    is_auth = await client.is_fully_authenticated()
+                    is_client_connected = is_connected and is_auth
+            except Exception as e:
+                logger.error(f"Error checking client status: {e}")
+        
+        # Get system statistics
+        telegram_manager = get_telegram_manager()
+        connected_users = telegram_manager.get_connected_users()
+        total_active_clients = telegram_manager.get_client_count()
+        
+        # Check for session files for this user
+        user_id = current_user["id"]
+        session_files = []
+        if os.path.exists("sessions"):
+            for filename in os.listdir("sessions"):
+                if filename.startswith(f"user_{user_id}_") and filename.endswith(".session"):
+                    session_files.append(filename)
+        
+        return templates.TemplateResponse("dashboard.html", {
+            "request": request,
+            "user": current_user,
+            "telegram_connected": user_data[0] if user_data else False,
+            "phone_number": user_data[1] if user_data else None,
+            "client_connected": is_client_connected,
+            "total_active_users": len(connected_users),
+            "total_clients": total_active_clients,
+            "user_in_connected": current_user["id"] in connected_users,
+            "session_files_count": len(session_files),
+            "has_session_files": len(session_files) > 0,
+            "message": message,
+            "message_type": type or "info"
+        })
+    except Exception as e:
+        logger.error(f"Dashboard error: {e}")
+        raise
+
+@app.get("/telegram/connect", response_class=HTMLResponse)
+async def telegram_connect_page(
+    request: Request, 
+    current_user: dict = Depends(get_current_user),
+    error: str = None
+):
+    # Handle specific error messages
+    error_message = None
+    if error == "session_expired":
+        error_message = "Your session expired. Please reconnect your Telegram account."
+    elif error == "invalid_state":
+        error_message = "Authentication state is invalid. Please start the connection process again."
+    elif error:
+        error_message = error
+    
+    return templates.TemplateResponse("telegram_connect.html", {
+        "request": request,
+        "user": current_user,
+        "error": error_message
+    })
+
+@app.post("/telegram/connect")
+async def telegram_connect(
+    request: Request,
+    phone_number: str = Form(...),
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_db)
+):
+    try:
+        # Get or create Telegram client using manager
+        telegram_manager = get_telegram_manager()
+        client = await telegram_manager.get_or_create_client(
+            user_id=current_user["id"],
+            username=current_user["username"],
+            phone_number=phone_number
+        )
+        
+        # Send code request
+        result = await client.send_code_request()
+        if result.get("success"):
+            logger.info(f"Code sent successfully for user {current_user['id']} ({current_user['username']})")
+            
+            # Check if already authorized
+            if result.get("already_authorized"):
+                return RedirectResponse(url="/dashboard?message=already_connected", status_code=302)
+            
+            # Prepare template context with delivery information
+            template_context = {
+                "request": request,
+                "user": current_user,
+                "phone_number": phone_number
+            }
+            
+            # Add delivery method information
+            delivery_method = result.get("delivery_method", "unknown")
+            if delivery_method == "telegram_app":
+                template_context["delivery_info"] = "Check your Telegram app for the verification code"
+                template_context["delivery_icon"] = "fab fa-telegram-plane"
+            elif delivery_method == "sms":
+                template_context["delivery_info"] = "Check your SMS messages for the verification code"
+                template_context["delivery_icon"] = "fas fa-sms"
+            elif delivery_method == "phone_call":
+                template_context["delivery_info"] = "You will receive a phone call with the verification code"
+                template_context["delivery_icon"] = "fas fa-phone"
+            else:
+                template_context["delivery_info"] = "Check your phone for the verification code"
+                template_context["delivery_icon"] = "fas fa-mobile-alt"
+            
+            template_context["code_length"] = result.get("code_length", 5)
+            
+            return templates.TemplateResponse("telegram_verify.html", template_context)
+        else:
+            return templates.TemplateResponse("telegram_connect.html", {
+                "request": request,
+                "user": current_user,
+                "error": "Failed to send verification code"
+            })
+    except Exception as e:
+        logger.error(f"Error in telegram connect for user {current_user['id']}: {e}")
+        return templates.TemplateResponse("telegram_connect.html", {
+            "request": request,
+            "user": current_user,
+            "error": f"Connection failed: {str(e)}"
+        })
+
+@app.post("/telegram/verify")
+async def telegram_verify(
+    request: Request,
+    code: str = Form(...),
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_db)
+):
+    try:
+        # Get client from manager
+        telegram_manager = get_telegram_manager()
+        client = await telegram_manager.get_client(current_user["id"])
+        if not client:
+            logger.warning(f"No client found for user {current_user['id']} during verification - attempting to recreate")
+            
+            # Try to get the phone number from the database or session
+            cursor = await db.execute(
+                "SELECT phone_number FROM users WHERE id = ?",
+                (current_user["id"],)
+            )
+            user_data = await cursor.fetchone()
+            phone_number = user_data[0] if user_data and user_data[0] else None
+            
+            if not phone_number:
+                logger.error(f"No phone number found for user {current_user['id']} - redirecting to connect")
+                return RedirectResponse(url="/telegram/connect?error=session_expired", status_code=302)
+            
+            # Recreate client with existing session
+            telegram_manager = get_telegram_manager()
+            client = await telegram_manager.get_or_create_client(
+                user_id=current_user["id"],
+                username=current_user["username"],
+                phone_number=phone_number
+            )
+            logger.info(f"Recreated client for user {current_user['id']} with phone {phone_number}")
+        
+        # Log the verification attempt
+        logger.info(f"Attempting code verification for user {current_user['id']} ({current_user['username']})")
+        
+        # Verify code only (first step)
+        result = await client.verify_code(code)
+        
+        logger.info(f"Code verification result for user {current_user['id']}: success={result.get('success')}, requires_2fa={result.get('requires_2fa')}")
+        
+        if result["success"] and not result.get("requires_2fa"):
+            # Code verified successfully and no 2FA required - complete authentication
+            logger.info(f"Code verification complete for user {current_user['id']} - no 2FA required")
+            await db.execute(
+                "UPDATE users SET telegram_connected = ?, phone_number = ? WHERE id = ?",
+                (True, client.phone_number, current_user["id"])
+            )
+            await db.commit()
+            
+            # Start message listener in background
+            listener_started = await client.start_message_listener()
+            if listener_started:
+                logger.info(f"Message listener started for user {current_user['id']} ({current_user['username']})")
+            else:
+                logger.error(f"Failed to start message listener for user {current_user['id']} ({current_user['username']})")
+            
+            return RedirectResponse(url="/dashboard?message=Telegram connected successfully&type=success", status_code=302)
+            
+        elif result["success"] and result.get("requires_2fa"):
+            # Code verified but 2FA is required - redirect to 2FA form
+            logger.info(f"Code verified for user {current_user['id']} - redirecting to 2FA verification")
+            return templates.TemplateResponse("telegram_2fa.html", {
+                "request": request,
+                "user": current_user,
+                "phone_number": client.phone_number
+            })
+            
+        else:
+            # Code verification failed
+            logger.warning(f"Code verification failed for user {current_user['id']}: {result.get('error')}")
+            return templates.TemplateResponse("telegram_verify.html", {
+                "request": request,
+                "user": current_user,
+                "phone_number": client.phone_number,
+                "error": result.get("error", "Invalid verification code")
+            })
+            
+    except Exception as e:
+        logger.error(f"Error during code verification for user {current_user['id']}: {e}")
+        import traceback
+        traceback.print_exc()
+        return templates.TemplateResponse("telegram_verify.html", {
+            "request": request,
+            "user": current_user,
+            "error": f"Verification failed: {str(e)}"
+        })
+
+@app.post("/telegram/verify-2fa")
+async def telegram_verify_2fa(
+    request: Request,
+    password: str = Form(...),
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_db)
+):
+    try:
+        # Get client from manager
+        telegram_manager = get_telegram_manager()
+        client = await telegram_manager.get_client(current_user["id"])
+        if not client:
+            logger.warning(f"No client found for user {current_user['id']} during 2FA verification")
+            return RedirectResponse(url="/telegram/connect?error=session_expired", status_code=302)
+        
+        # Check if client is in the correct state for 2FA
+        auth_state = client.get_auth_state()
+        logger.info(f"2FA verification attempt for user {current_user['id']} - auth state: {auth_state}")
+        
+        if auth_state != "requires_2fa":
+            logger.warning(f"Invalid auth state for 2FA verification for user {current_user['id']}: {auth_state}")
+            # Try to reconnect and check state
+            if auth_state == "authenticated":
+                # Already authenticated, redirect to dashboard
+                return RedirectResponse(url="/dashboard?message=Already authenticated&type=info", status_code=302)
+            else:
+                # Need to restart authentication
+                return RedirectResponse(url="/telegram/connect?error=invalid_state", status_code=302)
+        
+        # Verify 2FA password
+        logger.info(f"Attempting 2FA password verification for user {current_user['id']}")
+        success = await client.verify_2fa_password(password)
+        
+        if success:
+            # 2FA verified successfully - complete authentication
+            logger.info(f"2FA verification successful for user {current_user['id']}")
+            await db.execute(
+                "UPDATE users SET telegram_connected = ?, phone_number = ? WHERE id = ?",
+                (True, client.phone_number, current_user["id"])
+            )
+            await db.commit()
+            
+            # Start message listener in background
+            listener_started = await client.start_message_listener()
+            if listener_started:
+                logger.info(f"Message listener started for user {current_user['id']} ({current_user['username']})")
+            else:
+                logger.error(f"Failed to start message listener for user {current_user['id']} ({current_user['username']})")
+            
+            return RedirectResponse(url="/dashboard?message=Telegram connected successfully with 2FA&type=success", status_code=302)
+        else:
+            # 2FA verification failed
+            logger.warning(f"2FA verification failed for user {current_user['id']}")
+            return templates.TemplateResponse("telegram_2fa.html", {
+                "request": request,
+                "user": current_user,
+                "phone_number": client.phone_number,
+                "error": "Invalid password. Please try again."
+            })            
+    except Exception as e:
+        logger.error(f"Error during 2FA verification for user {current_user['id']}: {e}")
+        import traceback
+        traceback.print_exc()
+        return templates.TemplateResponse("telegram_2fa.html", {
+            "request": request,
+            "user": current_user,
+            "error": f"2FA verification failed: {str(e)}"
+        })
+
+
+@app.post("/telegram/disconnect")
+async def telegram_disconnect(current_user: dict = Depends(get_current_user), db=Depends(get_db)):
+    try:
+        # Remove client from manager
+        telegram_manager = get_telegram_manager()
+        await telegram_manager.remove_client(current_user["id"])
+        logger.info(f"Disconnected Telegram client for user {current_user['id']} ({current_user['username']})")
+        
+        # Update user record
+        await db.execute(
+            "UPDATE users SET telegram_connected = ?, phone_number = ? WHERE id = ?",
+            (False, None, current_user["id"])
+        )
+        await db.commit()
+        
+        return RedirectResponse(url="/dashboard", status_code=302)
+    except Exception as e:
+        logger.error(f"Error disconnecting user {current_user['id']}: {e}")
+        raise HTTPException(status_code=500, detail="Disconnection failed")
+
+@app.post("/logout")
+async def logout():
+    response = RedirectResponse(url="/", status_code=302)
+    response.delete_cookie("access_token")
+    return response
+
+@app.get("/api/stats")
+async def get_system_stats(current_user: dict = Depends(get_current_user)):
+    """Get system statistics for connected users."""
+    telegram_manager = get_telegram_manager()
+    connected_users = telegram_manager.get_connected_users()
+    total_clients = telegram_manager.get_client_count()
+    
+    return {
+        "total_active_clients": total_clients,
+        "connected_user_count": len(connected_users),
+        "current_user_connected": current_user["id"] in connected_users,
+        "connected_users": list(connected_users)  # Only return IDs for privacy
+    }
+
+@app.post("/telegram/delete-session")
+async def telegram_delete_session(
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete Telegram session files for the current user."""
+    try:
+        user_id = current_user["id"]
+        username = current_user["username"]
+        
+        # Find and delete session files for this user
+        sessions_dir = "sessions"
+        deleted_files = []
+        
+        if os.path.exists(sessions_dir):
+            for filename in os.listdir(sessions_dir):
+                if filename.startswith(f"user_{user_id}_") and filename.endswith(".session"):
+                    file_path = os.path.join(sessions_dir, filename)
+                    try:
+                        os.remove(file_path)
+                        deleted_files.append(filename)
+                        logger.info(f"Deleted session file: {filename} for user {user_id} ({username})")
+                    except Exception as e:
+                        logger.error(f"Failed to delete session file {filename}: {e}")
+        
+        # Disconnect any active Telegram client for this user
+        try:
+            telegram_manager = get_telegram_manager()
+            if telegram_manager and user_id in telegram_manager.clients:
+                client = telegram_manager.clients[user_id]
+                if client.client and client.client.is_connected():
+                    await client.client.disconnect()
+                    logger.info(f"Disconnected active Telegram client for user {user_id} ({username})")
+                
+                # Remove from manager
+                del telegram_manager.clients[user_id]
+                logger.info(f"Removed client from manager for user {user_id} ({username})")
+        except Exception as e:
+            logger.error(f"Error disconnecting client for user {user_id}: {e}")
+        
+        if deleted_files:
+            message = f"Successfully deleted {len(deleted_files)} session file(s). You can now reconnect to Telegram."
+            logger.info(f"Session cleanup completed for user {user_id} ({username}): {deleted_files}")
+        else:
+            message = "No session files found to delete."
+            logger.info(f"No session files found for user {user_id} ({username})")
+        
+        return RedirectResponse(
+            url=f"/dashboard?message={message}&type=success", 
+            status_code=302
+        )
+        
+    except Exception as e:
+        logger.error(f"Error deleting session for user {current_user['id']}: {e}")
+        return RedirectResponse(
+            url=f"/dashboard?message=Failed to delete session: {str(e)}&type=error", 
+            status_code=302
+        )
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "main:app",
+        host=os.getenv("HOST", "0.0.0.0"),
+        port=int(os.getenv("PORT", 8000)),
+        reload=os.getenv("DEBUG", "False").lower() == "true"
+    )

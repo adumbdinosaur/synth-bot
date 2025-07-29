@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Telegram UserBot{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <h1 class="display-4 fw-bold mb-4">
+                    Secure Telegram UserBot Management
+                </h1>
+                <p class="lead mb-4">
+                    Connect your personal Telegram account and monitor your messages in real-time with our secure web
+                    interface.
+                </p>
+                <div class="d-flex gap-3">
+                    <a href="/register" class="btn btn-light btn-lg">
+                        <i class="fas fa-user-plus me-2"></i>Get Started
+                    </a>
+                    <a href="/login" class="btn btn-outline-light btn-lg">
+                        <i class="fas fa-sign-in-alt me-2"></i>Login
+                    </a>
+                </div>
+            </div>
+            <div class="col-lg-6 text-center">
+                <i class="fas fa-paper-plane" style="font-size: 200px; opacity: 0.3;"></i>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row text-center mb-5">
+            <div class="col-lg-8 mx-auto">
+                <h2 class="display-5 fw-bold mb-3">Why Choose Our Platform?</h2>
+                <p class="lead text-muted">
+                    Built with security and privacy in mind, our platform offers comprehensive Telegram userbot
+                    management.
+                </p>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card feature-card h-100 text-center p-4">
+                    <div class="card-body">
+                        <i class="fas fa-shield-alt text-primary mb-3" style="font-size: 3rem;"></i>
+                        <h5 class="card-title">Secure Authentication</h5>
+                        <p class="card-text">
+                            Multi-layer security with JWT tokens, bcrypt password hashing, and secure session
+                            management.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card feature-card h-100 text-center p-4">
+                    <div class="card-body">
+                        <i class="fas fa-eye text-success mb-3" style="font-size: 3rem;"></i>
+                        <h5 class="card-title">Real-time Monitoring</h5>
+                        <p class="card-text">
+                            Track and log your outgoing Telegram messages in real-time with detailed chat information.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card feature-card h-100 text-center p-4">
+                    <div class="card-body">
+                        <i class="fas fa-user-lock text-warning mb-3" style="font-size: 3rem;"></i>
+                        <h5 class="card-title">2FA Support</h5>
+                        <p class="card-text">
+                            Full support for Telegram's two-factor authentication to keep your account secure.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card feature-card h-100 text-center p-4">
+                    <div class="card-body">
+                        <i class="fas fa-database text-info mb-3" style="font-size: 3rem;"></i>
+                        <h5 class="card-title">SQLite Storage</h5>
+                        <p class="card-text">
+                            Efficient local data storage with SQLite for fast access to your message history.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card feature-card h-100 text-center p-4">
+                    <div class="card-body">
+                        <i class="fab fa-docker text-primary mb-3" style="font-size: 3rem;"></i>
+                        <h5 class="card-title">Docker Ready</h5>
+                        <p class="card-text">
+                            Fully containerized with Docker for easy deployment and scalability.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card feature-card h-100 text-center p-4">
+                    <div class="card-body">
+                        <i class="fas fa-tachometer-alt text-danger mb-3" style="font-size: 3rem;"></i>
+                        <h5 class="card-title">Fast & Responsive</h5>
+                        <p class="card-text">
+                            Built with FastAPI for high performance and responsive user experience.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- How It Works Section -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row text-center mb-5">
+            <div class="col-lg-8 mx-auto">
+                <h2 class="display-5 fw-bold mb-3">How It Works</h2>
+                <p class="lead text-muted">
+                    Get started in just a few simple steps.
+                </p>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-md-3 text-center">
+                <div class="badge bg-primary rounded-circle p-3 mb-3" style="font-size: 1.5rem;">
+                    1
+                </div>
+                <h5>Create Account</h5>
+                <p class="text-muted">Register with your email and create a secure password.</p>
+            </div>
+
+            <div class="col-md-3 text-center">
+                <div class="badge bg-primary rounded-circle p-3 mb-3" style="font-size: 1.5rem;">
+                    2
+                </div>
+                <h5>Connect Telegram</h5>
+                <p class="text-muted">Link your Telegram account using phone verification.</p>
+            </div>
+
+            <div class="col-md-3 text-center">
+                <div class="badge bg-primary rounded-circle p-3 mb-3" style="font-size: 1.5rem;">
+                    3
+                </div>
+                <h5>Verify & Authenticate</h5>
+                <p class="text-muted">Complete 2FA verification if enabled on your account.</p>
+            </div>
+
+            <div class="col-md-3 text-center">
+                <div class="badge bg-primary rounded-circle p-3 mb-3" style="font-size: 1.5rem;">
+                    4
+                </div>
+                <h5>Monitor Messages</h5>
+                <p class="text-muted">View and track your outgoing messages in real-time.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row text-center">
+            <div class="col-lg-8 mx-auto">
+                <h2 class="display-5 fw-bold mb-3">Ready to Get Started?</h2>
+                <p class="lead text-muted mb-4">
+                    Join our platform and take control of your Telegram messaging today.
+                </p>
+                <a href="/register" class="btn btn-gradient btn-lg px-5">
+                    <i class="fas fa-rocket me-2"></i>Start Your Journey
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

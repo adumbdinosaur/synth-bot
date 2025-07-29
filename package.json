@@ -1,0 +1,35 @@
+{
+    "name": "Telegram UserBot",
+    "version": "1.0.0",
+    "description": "Secure web application for Telegram userbot management",
+    "main": "main.py",
+    "scripts": {
+        "start": "python main.py",
+        "dev": "python main.py",
+        "docker:build": "docker-compose build",
+        "docker:up": "docker-compose up -d",
+        "docker:down": "docker-compose down",
+        "docker:logs": "docker-compose logs -f",
+        "setup": "./setup.sh"
+    },
+    "dependencies": {
+        "python": ">=3.11",
+        "fastapi": "0.104.1",
+        "uvicorn": "0.24.0",
+        "telethon": "1.32.1"
+    },
+    "author": "Telegram UserBot Team",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/yourusername/telegram-userbot"
+    },
+    "keywords": [
+        "telegram",
+        "userbot",
+        "fastapi",
+        "telethon",
+        "monitoring",
+        "messages"
+    ]
+}

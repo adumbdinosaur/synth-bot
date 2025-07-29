@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Connect Telegram - Telegram UserBot{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-body p-5">
+                    <div class="text-center mb-4">
+                        <i class="fab fa-telegram text-primary mb-3" style="font-size: 3rem;"></i>
+                        <h2 class="card-title fw-bold">Connect Telegram</h2>
+                        <p class="text-muted">Link your Telegram account to start monitoring</p>
+                    </div>
+
+                    {% if error %}
+                    <div class="alert alert-danger" role="alert">
+                        <i class="fas fa-exclamation-circle me-2"></i>{{ error }}
+                    </div>
+                    {% endif %}
+
+                    <div class="alert alert-info" role="alert">
+                        <h6 class="alert-heading">
+                            <i class="fas fa-info-circle me-2"></i>Before You Connect
+                        </h6>
+                        <ul class="mb-0">
+                            <li>Make sure you have access to your phone for SMS verification</li>
+                            <li>If you have 2FA enabled, keep your password ready</li>
+                            <li>Your session will be securely stored and encrypted</li>
+                        </ul>
+                    </div>
+
+                    <form id="connectForm" action="/telegram/connect" method="post">
+                        <div class="mb-4">
+                            <label for="phone_number" class="form-label">Phone Number</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-phone"></i>
+                                </span>
+                                <input type="tel" class="form-control" id="phone_number" name="phone_number" required
+                                    placeholder="+1234567890" pattern="^\+[1-9]\d{1,14}$">
+                            </div>
+                            <div class="form-text">
+                                Include country code (e.g., +1 for US, +44 for UK)
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="consent" required>
+                                <label class="form-check-label" for="consent">
+                                    I understand that this will create a userbot session and monitor my outgoing
+                                    messages
+                                </label>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 py-2 mb-3">
+                            <i class="fas fa-paper-plane me-2"></i>Send Verification Code
+                        </button>
+                    </form>
+
+                    <div class="text-center">
+                        <a href="/dashboard" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('connectForm');
+        const phoneInput = document.getElementById('phone_number');
+
+        // Format phone number input
+        phoneInput.addEventListener('input', function (e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value && !value.startsWith('1') && value.length >= 10) {
+                value = '+' + value;
+            } else if (value && value.length >= 1) {
+                value = '+' + value;
+            }
+            e.target.value = value;
+        });
+
+        // Form submission
+        form.addEventListener('submit', function (e) {
+            const phone = phoneInput.value;
+            if (!phone.match(/^\+[1-9]\d{1,14}$/)) {
+                e.preventDefault();
+                showAlert('Please enter a valid phone number with country code', 'danger');
+                return;
+            }
+            setLoading('connectForm');
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Two-Factor Authentication - Telegram UserBot{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-body p-5">
+                    <div class="text-center mb-4">
+                        <i class="fas fa-shield-alt text-warning mb-3" style="font-size: 3rem;"></i>
+                        <h2 class="card-title fw-bold">Two-Factor Authentication</h2>
+                        <p class="text-muted">Enter your cloud password to complete authentication</p>
+                    </div>
+
+                    {% if error %}
+                    <div class="alert alert-danger" role="alert">
+                        <i class="fas fa-exclamation-circle me-2"></i>{{ error }}
+                    </div>
+                    {% endif %}
+
+                    <div class="alert alert-info" role="alert">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Your verification code was accepted! Now please enter your Telegram cloud password to complete
+                        the authentication process.
+                    </div>
+
+                    <form id="tfaForm" action="/telegram/verify-2fa" method="post">
+                        <div class="mb-4">
+                            <label for="password" class="form-label fw-bold">Cloud Password</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-lock"></i>
+                                </span>
+                                <input type="password" class="form-control" id="password" name="password" required
+                                    placeholder="Enter your Telegram cloud password" autocomplete="current-password">
+                                <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            <div class="form-text">
+                                This is the password you set for two-factor authentication in Telegram settings
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-warning w-100 py-2 mb-3">
+                            <i class="fas fa-unlock me-2"></i>Verify Password & Complete
+                        </button>
+                    </form>
+
+                    <div class="text-center">
+                        <p class="text-muted mb-2">Having trouble?</p>
+                        <a href="/telegram/connect" class="btn btn-outline-primary btn-sm me-2">
+                            <i class="fas fa-redo me-1"></i>Start Over
+                        </a>
+                        <a href="/dashboard" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-times me-1"></i>Cancel
+                        </a>
+                    </div>
+
+                    <div class="mt-4 p-3 bg-light rounded">
+                        <h6 class="fw-bold mb-2">
+                            <i class="fas fa-question-circle me-2"></i>Don't remember your cloud password?
+                        </h6>
+                        <p class="mb-2 small">You can reset it in your Telegram app:</p>
+                        <ol class="small mb-0">
+                            <li>Open Telegram on your phone</li>
+                            <li>Go to Settings → Privacy and Security</li>
+                            <li>Select "Two-Step Verification"</li>
+                            <li>Choose "Change Password" or "Turn Off"</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('tfaForm');
+        const passwordInput = document.getElementById('password');
+        const togglePassword = document.getElementById('togglePassword');
+
+        // Toggle password visibility
+        togglePassword.addEventListener('click', function () {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            this.querySelector('i').classList.toggle('fa-eye');
+            this.querySelector('i').classList.toggle('fa-eye-slash');
+        });
+
+        // Form submission
+        form.addEventListener('submit', function (e) {
+            const password = passwordInput.value.trim();
+            if (password.length === 0) {
+                e.preventDefault();
+                showAlert('Please enter your cloud password', 'danger');
+                return;
+            }
+            setLoading('tfaForm');
+        });
+
+        // Auto-focus password input
+        passwordInput.focus();
+    });
+</script>
+{% endblock %}
