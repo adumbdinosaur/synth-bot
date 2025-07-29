@@ -12,7 +12,7 @@ on:
 
 env:
   REGISTRY: registry.rptr.dev
-  IMAGE_NAME: synth-bot
+  IMAGE_NAME: synth/bot
 
 jobs:
   build-and-push:
