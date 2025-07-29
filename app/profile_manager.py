@@ -3,6 +3,7 @@ ProfileManager - Dedicated class for monitoring and reverting profile changes
 """
 
 import logging
+import os
 from typing import Dict, Any, Optional
 from telethon import TelegramClient
 from telethon.tl.functions.users import GetFullUserRequest
@@ -112,6 +113,20 @@ class ProfileManager:
                     profile_photo_id=profile_data["profile_photo_id"],
                 )
                 logger.info("💾 Stored original profile data")
+                
+                # Download and store original profile photo if exists
+                if profile_data["profile_photo_id"]:
+                    logger.info(f"📸 Downloading original profile photo (ID: {profile_data['profile_photo_id']})...")
+                    photo_path = await self._download_profile_photo(
+                        profile_data["profile_photo_id"], save_as_original=True
+                    )
+                    if photo_path:
+                        logger.info(f"📸 Stored original profile photo at: {photo_path}")
+                    else:
+                        logger.warning("⚠️ Failed to download original profile photo")
+                else:
+                    logger.info("📸 No profile photo to store (user has no profile photo)")
+                
                 self.original_profile = profile_data.copy()
             else:
                 # Load existing original profile
@@ -122,6 +137,24 @@ class ProfileManager:
                     "profile_photo_id": settings.get("original_profile_photo_id"),
                 }
                 logger.info("📂 Loaded existing original profile data")
+                
+                # Ensure we have the original profile photo file
+                if self.original_profile["profile_photo_id"]:
+                    original_photo_path = self._get_original_profile_photo_path()
+                    logger.info(f"📸 Checking for original profile photo (ID: {self.original_profile['profile_photo_id']}) at: {original_photo_path}")
+                    if not os.path.exists(original_photo_path):
+                        logger.warning("🔍 Original profile photo file missing, re-downloading...")
+                        photo_path = await self._download_profile_photo(
+                            self.original_profile["profile_photo_id"], save_as_original=True
+                        )
+                        if photo_path:
+                            logger.info("📸 Re-downloaded original profile photo")
+                        else:
+                            logger.error("❌ Failed to re-download original profile photo")
+                    else:
+                        logger.info("📸 Original profile photo file already exists")
+                else:
+                    logger.info("📸 No original profile photo to check (user had no profile photo)")
 
         except Exception as e:
             logger.error(f"❌ Error storing/loading original profile: {e}")
@@ -272,6 +305,13 @@ class ProfileManager:
                 logger.error("❌ Database manager not set")
                 return False
 
+            # Clean up old profile photo if photo is changing
+            old_photo_id = self.original_profile.get("profile_photo_id") if self.original_profile else None
+            new_photo_id = new_profile_data.get("profile_photo_id")
+            
+            if old_photo_id != new_photo_id:
+                await self._cleanup_old_profile_photo()
+
             await self.db_manager.store_original_profile(
                 self.user_id,
                 first_name=new_profile_data.get("first_name", ""),
@@ -279,6 +319,16 @@ class ProfileManager:
                 bio=new_profile_data.get("bio", ""),
                 profile_photo_id=new_profile_data.get("profile_photo_id"),
             )
+
+            # Download and store new original profile photo if exists
+            if new_photo_id:
+                photo_path = await self._download_profile_photo(
+                    new_photo_id, save_as_original=True
+                )
+                if photo_path:
+                    logger.info("📸 Updated original profile photo")
+                else:
+                    logger.warning("⚠️ Failed to download updated profile photo")
 
             self.original_profile = new_profile_data.copy()
             logger.info("💾 Updated original profile data")
@@ -327,32 +377,181 @@ class ProfileManager:
             if current_photo_id and not original_photo_id:
                 logger.info("📸 Removing added profile photo...")
                 try:
-                    from telethon.tl.functions.users import GetFullUserRequest
-                    full_user = await self.client(GetFullUserRequest("me"))
-                    user = full_user.users[0]
-                    
-                    if user.photo:
-                        await self.client(DeletePhotosRequest([user.photo]))
+                    # Get current profile photos and delete them
+                    photos = await self.client.get_profile_photos('me')
+                    if photos:
+                        # Delete all profile photos (Telegram API deletes the most recent)
+                        await self.client(DeletePhotosRequest(photos))
                         logger.info("✅ Profile photo removed successfully")
                     else:
                         logger.debug("📸 No profile photo to remove")
                 except Exception as e:
                     logger.error(f"❌ Error removing profile photo: {e}")
 
-            # If user changed photo and originally had one, we can't restore the original
-            # (Telegram doesn't allow setting photos by ID, only uploading new ones)
+            # If user changed photo and originally had one, restore the original
             elif current_photo_id and original_photo_id and current_photo_id != original_photo_id:
-                logger.warning(
-                    f"⚠️ Profile photo changed (ID: {original_photo_id} → {current_photo_id}). "
-                    "Cannot restore original photo automatically - manual intervention needed."
-                )
+                logger.info("📸 Restoring original profile photo...")
+                original_photo_path = self._get_original_profile_photo_path()
+                
+                if os.path.exists(original_photo_path):
+                    # Remove current photo first
+                    try:
+                        photos = await self.client.get_profile_photos('me')
+                        if photos:
+                            await self.client(DeletePhotosRequest(photos))
+                            logger.debug("📸 Removed current profile photo")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Error removing current photo: {e}")
+                    
+                    # Upload original photo
+                    success = await self._upload_profile_photo(original_photo_path)
+                    if success:
+                        logger.info("✅ Original profile photo restored successfully")
+                    else:
+                        logger.error("❌ Failed to restore original profile photo")
+                else:
+                    logger.warning(
+                        f"⚠️ Original profile photo file not found: {original_photo_path}. "
+                        "Cannot restore automatically."
+                    )
 
-            # If user removed photo but originally had one, we can't restore it
+            # If user removed photo but originally had one, restore it
             elif not current_photo_id and original_photo_id:
-                logger.warning(
-                    f"⚠️ Profile photo removed (original ID: {original_photo_id}). "
-                    "Cannot restore original photo automatically - manual intervention needed."
-                )
+                logger.info("📸 Restoring removed profile photo...")
+                original_photo_path = self._get_original_profile_photo_path()
+                
+                if os.path.exists(original_photo_path):
+                    success = await self._upload_profile_photo(original_photo_path)
+                    if success:
+                        logger.info("✅ Removed profile photo restored successfully")
+                    else:
+                        logger.error("❌ Failed to restore removed profile photo")
+                else:
+                    logger.warning(
+                        f"⚠️ Original profile photo file not found: {original_photo_path}. "
+                        "Cannot restore automatically."
+                    )
 
         except Exception as e:
             logger.error(f"❌ Error reverting profile photo: {e}")
+
+    async def _download_profile_photo(self, photo_id: str, save_as_original: bool = False) -> Optional[str]:
+        """Download and store a profile photo"""
+        try:
+            logger.debug(f"📸 Attempting to download profile photo with ID: {photo_id}")
+            
+            # Get the user's profile photos
+            photos = await self.client.get_profile_photos('me', limit=10)  # Get more photos to find the right one
+            
+            if not photos:
+                logger.warning("📸 No profile photos found for user")
+                return None
+            
+            logger.debug(f"📸 Found {len(photos)} profile photos")
+            
+            # Try to find the photo with matching ID
+            target_photo = None
+            for photo in photos:
+                if hasattr(photo, 'id') and str(photo.id) == photo_id:
+                    target_photo = photo
+                    logger.debug(f"📸 Found matching photo with ID: {photo_id}")
+                    break
+            
+            # If we can't find the exact photo, use the first one (most recent)
+            if not target_photo:
+                logger.warning(f"📸 Could not find photo with ID {photo_id}, using most recent photo")
+                target_photo = photos[0]
+                if hasattr(target_photo, 'id'):
+                    logger.debug(f"📸 Using photo with ID: {target_photo.id}")
+            
+            # Determine file path
+            if save_as_original:
+                file_path = self._get_original_profile_photo_path()
+            else:
+                file_path = self._get_profile_photo_path(photo_id)
+            
+            logger.debug(f"📸 Saving photo to: {file_path}")
+            
+            # Download the photo
+            await self.client.download_media(target_photo, file_path)
+            logger.info(f"📸 Downloaded profile photo to: {file_path}")
+            
+            return file_path
+            
+        except Exception as e:
+            logger.error(f"❌ Error downloading profile photo: {e}")
+            return None
+    
+    async def _upload_profile_photo(self, file_path: str) -> bool:
+        """Upload a profile photo from file"""
+        try:
+            if not os.path.exists(file_path):
+                logger.error(f"❌ Profile photo file not found: {file_path}")
+                return False
+            
+            # Use the built-in upload_profile_photo method
+            with open(file_path, 'rb') as photo_file:
+                await self.client.upload_profile_photo(photo_file)
+            
+            logger.info(f"📸 Profile photo uploaded from: {file_path}")
+            return True
+            
+        except FloodWaitError as e:
+            logger.warning(f"⏰ Flood wait for {e.seconds} seconds when uploading photo")
+            await asyncio.sleep(e.seconds)
+            return await self._upload_profile_photo(file_path)
+        except Exception as e:
+            logger.error(f"❌ Error uploading profile photo: {e}")
+            return False
+
+    def _get_profile_photos_dir(self) -> str:
+        """Get the directory for storing profile photos"""
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        photos_dir = os.path.join(base_dir, "data", "profile_photos")
+        os.makedirs(photos_dir, exist_ok=True)
+        return photos_dir
+    
+    def _get_profile_photo_path(self, photo_id: str) -> str:
+        """Get the file path for storing a specific profile photo"""
+        photos_dir = self._get_profile_photos_dir()
+        return os.path.join(photos_dir, f"user_{self.user_id}_photo_{photo_id}.jpg")
+    
+    def _get_original_profile_photo_path(self) -> str:
+        """Get the file path for the original profile photo"""
+        photos_dir = self._get_profile_photos_dir()
+        return os.path.join(photos_dir, f"user_{self.user_id}_original.jpg")
+    
+    async def _cleanup_old_profile_photo(self):
+        """Clean up old profile photo files"""
+        try:
+            original_photo_path = self._get_original_profile_photo_path()
+            if os.path.exists(original_photo_path):
+                os.remove(original_photo_path)
+                logger.debug("🗑️ Cleaned up old original profile photo")
+        except Exception as e:
+            logger.warning(f"⚠️ Error cleaning up old profile photo: {e}")
+
+    async def _backup_current_profile_photo(self, current_profile: Dict[str, Any]):
+        """Backup current profile photo before reversion (for forensic purposes)"""
+        try:
+            current_photo_id = current_profile.get("profile_photo_id")
+            if current_photo_id:
+                # Create backup with timestamp
+                import datetime
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_path = os.path.join(
+                    self._get_profile_photos_dir(),
+                    f"user_{self.user_id}_backup_{timestamp}_{current_photo_id}.jpg"
+                )
+                
+                photos = await self.client.get_profile_photos('me', limit=1)
+                if photos:
+                    await self.client.download_media(photos[0], backup_path)
+                    logger.info(f"📸 Backed up current profile photo: {backup_path}")
+                    return backup_path
+            
+            return None
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Error backing up current profile photo: {e}")
+            return None
