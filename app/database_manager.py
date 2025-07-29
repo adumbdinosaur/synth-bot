@@ -1240,11 +1240,17 @@ class DatabaseManager:
 
     @retry_db_operation()
     async def log_autocorrect_usage(
-        self, user_id: int, original_text: str, corrected_text: str, corrections_count: int
+        self,
+        user_id: int,
+        original_text: str,
+        corrected_text: str,
+        corrections_count: int,
     ):
         """Log autocorrect usage for analytics (optional)."""
         # For now, we'll just log this to the logger, but we could add a table for this later
-        logger.info(f"Autocorrect used for user {user_id}: {corrections_count} corrections made")
+        logger.info(
+            f"Autocorrect used for user {user_id}: {corrections_count} corrections made"
+        )
 
 
 # Global database manager instance
@@ -1458,11 +1464,17 @@ async def migrate_energy_columns(db_manager: DatabaseManager):
 
     @retry_db_operation()
     async def log_autocorrect_usage(
-        self, user_id: int, original_text: str, corrected_text: str, corrections_count: int
+        self,
+        user_id: int,
+        original_text: str,
+        corrected_text: str,
+        corrections_count: int,
     ):
         """Log autocorrect usage for analytics (optional)."""
         # For now, we'll just log this to the logger, but we could add a table for this later
-        logger.info(f"Autocorrect used for user {user_id}: {corrections_count} corrections made")
+        logger.info(
+            f"Autocorrect used for user {user_id}: {corrections_count} corrections made"
+        )
 
 
 # Standalone functions for backward compatibility

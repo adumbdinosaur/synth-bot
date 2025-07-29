@@ -29,10 +29,10 @@ class AutocorrectManager:
     async def correct_spelling(self, text: str) -> Dict[str, Any]:
         """
         Correct spelling in the given text using OpenAI API.
-        
+
         Args:
             text: The text to correct
-            
+
         Returns:
             Dict with keys 'sentence' (corrected text) and 'count' (number of corrections)
         """
@@ -57,22 +57,26 @@ class AutocorrectManager:
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": prompt},
-                    {"role": "user", "content": text}
+                    {"role": "user", "content": text},
                 ],
                 max_tokens=500,
-                temperature=0.1
+                temperature=0.1,
             )
 
             # Parse the response
             content = response.choices[0].message.content.strip()
-            
+
             # Try to parse JSON response
             try:
                 result = json.loads(content)
-                if isinstance(result, dict) and "sentence" in result and "count" in result:
+                if (
+                    isinstance(result, dict)
+                    and "sentence" in result
+                    and "count" in result
+                ):
                     return {
                         "sentence": result["sentence"],
-                        "count": int(result["count"])
+                        "count": int(result["count"]),
                     }
             except json.JSONDecodeError:
                 logger.warning(f"Failed to parse OpenAI JSON response: {content}")

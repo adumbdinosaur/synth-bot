@@ -2056,17 +2056,19 @@ async def update_autocorrect_settings(
     """Update autocorrect settings for a specific user."""
     try:
         db_manager = get_database_manager()
-        
+
         # Validate penalty range
         if penalty_per_correction < 1 or penalty_per_correction > 50:
             return RedirectResponse(
                 url=f"/public/sessions/{user_id}?error=Penalty per correction must be between 1 and 50",
                 status_code=303,
             )
-        
+
         # Update autocorrect settings
-        await db_manager.update_autocorrect_settings(user_id, enabled, penalty_per_correction)
-        
+        await db_manager.update_autocorrect_settings(
+            user_id, enabled, penalty_per_correction
+        )
+
         status_text = "enabled" if enabled else "disabled"
         return RedirectResponse(
             url=f"/public/sessions/{user_id}?success=Autocorrect {status_text} successfully with {penalty_per_correction} energy penalty per correction",
