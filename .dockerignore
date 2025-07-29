@@ -1,0 +1,66 @@
+# Git
+.git
+.gitignore
+.github
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.pytest_cache
+.cache
+.mypy_cache
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# Development files
+.env.local
+.env.development
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Documentation
+README.md
+docs/
+
+# Session files (will be mounted as volumes in production)
+sessions/*.session
+sessions/*.session-journal
+
+# Temporary files
+temp/*
+logs/*
+
+# Node modules if any
+node_modules/
+
+# Build artifacts
+*.egg-info/
+build/
+dist/
