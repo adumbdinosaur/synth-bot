@@ -11,7 +11,6 @@ from telethon.errors import (
 )
 import weakref
 from contextlib import asynccontextmanager
-from .energy_simple import EnergyManager
 
 logger = logging.getLogger(__name__)
 
@@ -264,21 +263,33 @@ class TelegramUserBot:
     async def _handle_outgoing_message(self, event):
         """Handle outgoing message event."""
         try:
-            # Energy consumption with new DatabaseManager
-            energy_manager = EnergyManager()
+            from .database_manager import get_database_manager
+
+            db_manager = get_database_manager()
+
+            # Determine message type
+            message_type = self._get_message_type(event.message)
+
+            # Get energy cost for this message type
+            energy_cost = await db_manager.get_message_energy_cost(
+                self.user_id, message_type
+            )
 
             # Get current energy level
-            energy_info = await energy_manager.get_user_energy(self.user_id)
+            energy_info = await db_manager.get_user_energy(self.user_id)
             current_energy = energy_info["energy"]
 
-            # Consume 1 energy for sending this message
-            consume_result = await energy_manager.consume_energy(self.user_id, 1)
+            # Consume energy for sending this message
+            consume_result = await db_manager.consume_user_energy(
+                self.user_id, energy_cost
+            )
 
             if not consume_result["success"]:
-                # Energy consumption failed (user had 0 energy)
+                # Energy consumption failed (user had insufficient energy)
                 logger.warning(
                     f"⚡ LOW ENERGY | User: {self.username} (ID: {self.user_id}) | "
-                    f"Message sent but user has no energy remaining! | "
+                    f"Message type: {message_type} (cost: {energy_cost}) | "
+                    f"Message sent but user has insufficient energy! | "
                     f"Energy: {current_energy}/100"
                 )
             else:
@@ -286,7 +297,8 @@ class TelegramUserBot:
                 new_energy = consume_result["energy"]
                 logger.info(
                     f"⚡ ENERGY CONSUMED | User: {self.username} (ID: {self.user_id}) | "
-                    f"Energy: {new_energy}/100 (-1)"
+                    f"Message type: {message_type} (cost: {energy_cost}) | "
+                    f"Energy: {new_energy}/100 (-{energy_cost})"
                 )
 
             # Get chat information
@@ -448,6 +460,87 @@ class TelegramUserBot:
                     pass
                 self.client = None
             return False
+
+    def _get_message_type(self, message) -> str:
+        """Determine the type of message for energy cost calculation."""
+        try:
+            # Check for media first
+            if hasattr(message, "media") and message.media:
+                # Photo
+                if hasattr(message.media, "photo") and message.media.photo:
+                    return "photo"
+
+                # Document (can be various things)
+                if hasattr(message.media, "document") and message.media.document:
+                    doc = message.media.document
+                    mime_type = getattr(doc, "mime_type", "")
+
+                    # Video
+                    if mime_type.startswith("video/"):
+                        return "video"
+
+                    # GIF/Animation
+                    if mime_type == "video/mp4" and any(
+                        attr.alt == "animated"
+                        for attr in getattr(doc, "attributes", [])
+                    ):
+                        return "gif"
+                    if mime_type == "image/gif":
+                        return "gif"
+
+                    # Audio
+                    if mime_type.startswith("audio/"):
+                        return "audio"
+
+                    # Voice message
+                    if any(
+                        hasattr(attr, "voice")
+                        for attr in getattr(doc, "attributes", [])
+                    ):
+                        return "voice"
+
+                    # Sticker
+                    if any(
+                        hasattr(attr, "stickerset")
+                        for attr in getattr(doc, "attributes", [])
+                    ):
+                        return "sticker"
+
+                    # General document
+                    return "document"
+
+                # Game
+                if hasattr(message.media, "game") and message.media.game:
+                    return "game"
+
+                # Poll
+                if hasattr(message.media, "poll") and message.media.poll:
+                    return "poll"
+
+                # Contact
+                if hasattr(message.media, "contact") and message.media.contact:
+                    return "contact"
+
+                # Location/Venue
+                if hasattr(message.media, "geo") and message.media.geo:
+                    if hasattr(message.media, "venue") and message.media.venue:
+                        return "venue"
+                    return "location"
+
+                # Web page preview
+                if hasattr(message.media, "webpage") and message.media.webpage:
+                    return "web_page"
+
+            # Check if it's part of a media group (album)
+            if hasattr(message, "grouped_id") and message.grouped_id:
+                return "media_group"
+
+            # Default to text message
+            return "text"
+
+        except Exception as e:
+            logger.warning(f"Error determining message type: {e}")
+            return "text"  # Default fallback
 
 
 class TelegramClientManager:

@@ -18,6 +18,8 @@
                     </button>
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item" href="#"><i class="fas fa-user me-2"></i>Profile</a></li>
+                        <li><a class="dropdown-item" href="/energy-settings"><i class="fas fa-bolt me-2"></i>Energy
+                                Settings</a></li>
                         <li><a class="dropdown-item" href="#"><i class="fas fa-bell me-2"></i>Notifications</a></li>
                         <li>
                             <hr class="dropdown-divider">
@@ -150,12 +152,9 @@
                                 <div class="progress-bar 
                                     {% if energy_level >= 50 %}bg-success
                                     {% elif energy_level >= 25 %}bg-warning
-                                    {% else %}bg-danger{% endif %}" 
-                                    role="progressbar" 
-                                    style="width: {{ energy_level }}%"
-                                    aria-valuenow="{{ energy_level }}" 
-                                    aria-valuemin="0" 
-                                    aria-valuemax="100">
+                                    {% else %}bg-danger{% endif %}" role="progressbar"
+                                    style="width: {{ energy_level }}%" aria-valuenow="{{ energy_level }}"
+                                    aria-valuemin="0" aria-valuemax="100">
                                 </div>
                             </div>
                         </div>

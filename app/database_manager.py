@@ -280,6 +280,94 @@ class DatabaseManager:
             )
             await db.commit()
 
+    # Energy Costs Operations
+    async def get_user_energy_costs(self, user_id: int) -> List[Dict[str, Any]]:
+        """Get all energy costs for a user."""
+        async with self.get_connection() as db:
+            cursor = await db.execute(
+                """SELECT message_type, energy_cost, description 
+                   FROM user_message_energy_costs 
+                   WHERE user_id = ? 
+                   ORDER BY message_type""",
+                (user_id,),
+            )
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    async def get_message_energy_cost(self, user_id: int, message_type: str) -> int:
+        """Get energy cost for a specific message type for a user."""
+        async with self.get_connection() as db:
+            cursor = await db.execute(
+                """SELECT energy_cost FROM user_message_energy_costs 
+                   WHERE user_id = ? AND message_type = ?""",
+                (user_id, message_type),
+            )
+            row = await cursor.fetchone()
+            # Return configured cost or default to 1 if not found
+            return row[0] if row else 1
+
+    async def update_user_energy_cost(
+        self, user_id: int, message_type: str, energy_cost: int, description: str = None
+    ):
+        """Update or insert energy cost for a user and message type."""
+        async with self.get_connection() as db:
+            await db.execute(
+                """INSERT OR REPLACE INTO user_message_energy_costs 
+                   (user_id, message_type, energy_cost, description, updated_at)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (
+                    user_id,
+                    message_type,
+                    energy_cost,
+                    description,
+                    datetime.now().isoformat(),
+                ),
+            )
+            await db.commit()
+
+    async def init_user_energy_costs(self, user_id: int):
+        """Initialize default energy costs for a new user."""
+        default_costs = [
+            ("text", 1, "Regular text messages"),
+            ("sticker", 2, "Sticker messages"),
+            ("photo", 2, "Photo messages"),
+            ("video", 4, "Video messages"),
+            ("gif", 4, "GIF/animation messages"),
+            ("audio", 3, "Audio messages"),
+            ("voice", 3, "Voice messages"),
+            ("document", 3, "Document/file messages"),
+            ("location", 2, "Location sharing"),
+            ("contact", 2, "Contact sharing"),
+            ("poll", 3, "Poll messages"),
+            ("game", 3, "Game messages"),
+            ("venue", 2, "Venue sharing"),
+            ("web_page", 2, "Messages with web page preview"),
+            ("media_group", 5, "Media group (multiple photos/videos)"),
+        ]
+
+        async with self.get_connection() as db:
+            # Check if user already has energy costs
+            cursor = await db.execute(
+                "SELECT COUNT(*) FROM user_message_energy_costs WHERE user_id = ?",
+                (user_id,),
+            )
+            count = await cursor.fetchone()
+
+            if count[0] == 0:  # No energy costs configured for this user
+                # Insert default costs for this user
+                for message_type, energy_cost, description in default_costs:
+                    await db.execute(
+                        """
+                        INSERT INTO user_message_energy_costs 
+                        (user_id, message_type, energy_cost, description)
+                        VALUES (?, ?, ?, ?)
+                    """,
+                        (user_id, message_type, energy_cost, description),
+                    )
+
+                await db.commit()
+                logger.info(f"Initialized default energy costs for user {user_id}")
+
     # Utility Operations
     async def execute_query(
         self, query: str, params: Tuple = ()
@@ -359,6 +447,21 @@ async def init_database_manager():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        """)
+
+        # User message energy costs table (configurable costs per user)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_message_energy_costs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                message_type VARCHAR(50) NOT NULL,
+                energy_cost INTEGER NOT NULL DEFAULT 1,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id),
+                UNIQUE(user_id, message_type)
             )
         """)
 
