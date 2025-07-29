@@ -1372,9 +1372,7 @@ async def update_user_profile(
             import os
 
             # Create temp directory if it doesn't exist
-            temp_dir = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "temp"
-            )
+            temp_dir = os.path.join(os.getcwd(), "temp")
             os.makedirs(temp_dir, exist_ok=True)
 
             # Save file with original extension
