@@ -459,6 +459,194 @@ class DatabaseManager:
             )
             return 10  # Default penalty
 
+    async def get_profile_protection_settings(self, user_id: int) -> Dict[str, Any]:
+        """Get profile protection settings for a user."""
+        try:
+            async with self.get_connection() as db:
+                cursor = await db.execute(
+                    """SELECT profile_change_penalty, original_first_name, original_last_name, 
+                              original_bio, original_profile_photo_id, profile_locked_at
+                       FROM user_profile_protection WHERE user_id = ?""",
+                    (user_id,),
+                )
+                row = await cursor.fetchone()
+                if row:
+                    return {
+                        "profile_protection_enabled": True,
+                        "profile_change_penalty": row[0],
+                        "original_first_name": row[1],
+                        "original_last_name": row[2],
+                        "original_bio": row[3],
+                        "original_profile_photo_id": row[4],
+                        "profile_locked_at": row[5],
+                    }
+                else:
+                    return {
+                        "profile_protection_enabled": False,
+                        "profile_change_penalty": 10,
+                    }
+        except Exception as e:
+            logger.error(f"Error getting profile protection settings for user {user_id}: {e}")
+            return {
+                "profile_protection_enabled": False,
+                "profile_change_penalty": 10,
+            }
+
+    async def store_original_profile(
+        self,
+        user_id: int,
+        profile_data: Dict[str, Any],
+    ) -> bool:
+        """Store the user's original profile data when session starts."""
+        try:
+            async with self.get_connection() as db:
+                # Check if record exists
+                cursor = await db.execute(
+                    "SELECT id FROM user_profile_protection WHERE user_id = ?",
+                    (user_id,),
+                )
+                exists = await cursor.fetchone()
+
+                first_name = profile_data.get("first_name")
+                last_name = profile_data.get("last_name")
+                bio = profile_data.get("bio")
+                photo_id = profile_data.get("profile_photo_id")
+
+                if exists:
+                    # Update existing record
+                    await db.execute(
+                        """
+                        UPDATE user_profile_protection 
+                        SET original_first_name = COALESCE(?, original_first_name),
+                            original_last_name = COALESCE(?, original_last_name),
+                            original_bio = COALESCE(?, original_bio),
+                            original_profile_photo_id = COALESCE(?, original_profile_photo_id),
+                            profile_locked_at = datetime('now'),
+                            updated_at = datetime('now')
+                        WHERE user_id = ?
+                        """,
+                        (first_name, last_name, bio, photo_id, user_id),
+                    )
+                else:
+                    # Insert new record
+                    await db.execute(
+                        """
+                        INSERT INTO user_profile_protection 
+                        (user_id, original_first_name, original_last_name, original_bio, 
+                         original_profile_photo_id, profile_locked_at)
+                        VALUES (?, ?, ?, ?, ?, datetime('now'))
+                        """,
+                        (user_id, first_name, last_name, bio, photo_id),
+                    )
+
+                await db.commit()
+                logger.info(f"Stored original profile data for user {user_id}")
+                return True
+
+        except Exception as e:
+            logger.error(f"Error storing original profile for user {user_id}: {e}")
+            return False
+
+    async def lock_user_profile(self, user_id: int) -> bool:
+        """Lock the user's profile for protection."""
+        try:
+            async with self.get_connection() as db:
+                # Update or insert profile protection record with lock timestamp
+                cursor = await db.execute(
+                    "SELECT id FROM user_profile_protection WHERE user_id = ?",
+                    (user_id,),
+                )
+                exists = await cursor.fetchone()
+
+                if exists:
+                    # Update existing record
+                    await db.execute(
+                        """
+                        UPDATE user_profile_protection 
+                        SET profile_locked_at = datetime('now'),
+                            updated_at = datetime('now')
+                        WHERE user_id = ?
+                        """,
+                        (user_id,),
+                    )
+                else:
+                    # Insert new record
+                    await db.execute(
+                        """
+                        INSERT INTO user_profile_protection 
+                        (user_id, profile_locked_at)
+                        VALUES (?, datetime('now'))
+                        """,
+                        (user_id,),
+                    )
+
+                await db.commit()
+                logger.info(f"Locked profile for user {user_id}")
+                return True
+
+        except Exception as e:
+            logger.error(f"Error locking profile for user {user_id}: {e}")
+            return False
+
+    async def is_profile_locked(self, user_id: int) -> bool:
+        """Check if the user's profile is locked for protection."""
+        try:
+            async with self.get_connection() as db:
+                cursor = await db.execute(
+                    "SELECT profile_locked_at FROM user_profile_protection WHERE user_id = ?",
+                    (user_id,),
+                )
+                row = await cursor.fetchone()
+                return row is not None and row[0] is not None
+        except Exception as e:
+            logger.error(f"Error checking profile lock for user {user_id}: {e}")
+            return False
+
+    async def get_original_profile(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Get the user's original profile data."""
+        try:
+            async with self.get_connection() as db:
+                cursor = await db.execute(
+                    """SELECT original_first_name, original_last_name, original_bio, 
+                              original_profile_photo_id, profile_locked_at
+                       FROM user_profile_protection WHERE user_id = ?""",
+                    (user_id,),
+                )
+                row = await cursor.fetchone()
+                if row:
+                    return {
+                        "first_name": row[0],
+                        "last_name": row[1],
+                        "bio": row[2],
+                        "profile_photo_id": row[3],
+                        "locked_at": row[4],
+                    }
+                return None
+        except Exception as e:
+            logger.error(f"Error getting original profile for user {user_id}: {e}")
+            return None
+
+    async def clear_profile_lock(self, user_id: int) -> bool:
+        """Clear the profile lock for a user."""
+        try:
+            async with self.get_connection() as db:
+                await db.execute(
+                    """
+                    UPDATE user_profile_protection 
+                    SET profile_locked_at = NULL,
+                        updated_at = datetime('now')
+                    WHERE user_id = ?
+                    """,
+                    (user_id,),
+                )
+                await db.commit()
+                logger.info(f"Cleared profile lock for user {user_id}")
+                return True
+
+        except Exception as e:
+            logger.error(f"Error clearing profile lock for user {user_id}: {e}")
+            return False
+
     # Badwords Operations
     async def get_user_badwords(self, user_id: int) -> List[Dict[str, Any]]:
         """Get all badwords for a user."""
