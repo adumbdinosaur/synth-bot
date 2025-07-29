@@ -304,8 +304,41 @@ class ProfileManager:
 
             logger.info("✅ Profile reverted successfully")
 
-            # Update current profile cache
-            self.current_profile = self.original_profile.copy()
+            # Get the updated profile with new photo ID after reversion
+            updated_profile = await self.get_current_profile()
+            if updated_profile:
+                # Update current profile cache with actual current state
+                self.current_profile = updated_profile.copy()
+
+                # Update the original profile photo ID in database if photo was reverted
+                original_photo_id = self.original_profile.get("profile_photo_id")
+                current_photo_id = updated_profile.get("profile_photo_id")
+
+                # If we had an original photo and now have a photo (successful revert)
+                if (
+                    original_photo_id
+                    and current_photo_id
+                    and current_photo_id != original_photo_id
+                ):
+                    logger.info(
+                        f"📸 Updating original photo ID: {original_photo_id} → {current_photo_id}"
+                    )
+                    # Update the original profile with the new photo ID
+                    self.original_profile["profile_photo_id"] = current_photo_id
+
+                    # Update in database
+                    if self.db_manager:
+                        await self.db_manager.store_original_profile(
+                            self.user_id,
+                            first_name=self.original_profile["first_name"],
+                            last_name=self.original_profile["last_name"],
+                            bio=self.original_profile["bio"],
+                            profile_photo_id=current_photo_id,
+                        )
+                        logger.info("💾 Updated original profile photo ID in database")
+            else:
+                # Fallback to original profile copy
+                self.current_profile = self.original_profile.copy()
 
             return True
 
@@ -526,7 +559,7 @@ class ProfileManager:
 
             # Upload the file first
             uploaded_file = await self.client.upload_file(file_path)
-            
+
             # Use UploadProfilePhotoRequest with the uploaded file
             await self.client(UploadProfilePhotoRequest(file=uploaded_file))
 
