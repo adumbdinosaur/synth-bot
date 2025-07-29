@@ -68,7 +68,7 @@ async def lifespan(app: FastAPI):
     telegram_manager = get_telegram_manager()
     if telegram_manager:
         logger.info(
-            f"📊 Telegram manager ready for {telegram_manager.get_client_count()} clients"
+            f"📊 Telegram manager ready for {len(telegram_manager.clients)} clients"
         )
     else:
         logger.warning("⚠️ Telegram manager not initialized properly")

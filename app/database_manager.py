@@ -537,6 +537,62 @@ class DatabaseManager:
             logger.error(f"Error checking profile lock status for user {user_id}: {e}")
             return False
 
+    async def get_profile_protection_settings(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Get profile protection settings for a user."""
+        try:
+            async with self.get_connection() as db:
+                cursor = await db.execute(
+                    """
+                    SELECT profile_change_penalty, original_first_name, original_last_name, 
+                           original_bio, original_profile_photo_id, profile_locked_at
+                    FROM user_profile_protection 
+                    WHERE user_id = ?
+                    """,
+                    (user_id,),
+                )
+                row = await cursor.fetchone()
+                if row:
+                    return {
+                        "profile_protection_enabled": True,
+                        "profile_change_penalty": row[0],
+                        "original_first_name": row[1],
+                        "original_last_name": row[2],
+                        "original_bio": row[3],
+                        "original_profile_photo_id": row[4],
+                        "profile_locked": row[5] is not None,
+                    }
+                else:
+                    # Return default settings if no record exists
+                    return {
+                        "profile_protection_enabled": False,
+                        "profile_change_penalty": 10,
+                    }
+        except Exception as e:
+            logger.error(f"Error getting profile protection settings for user {user_id}: {e}")
+            return {
+                "profile_protection_enabled": False,
+                "profile_change_penalty": 10,
+            }
+
+    async def lock_user_profile(self, user_id: int) -> bool:
+        """Lock a user's profile to prevent changes."""
+        try:
+            async with self.get_connection() as db:
+                await db.execute(
+                    """
+                    INSERT OR REPLACE INTO user_profile_protection 
+                    (user_id, profile_locked_at, updated_at)
+                    VALUES (?, datetime('now'), datetime('now'))
+                    """,
+                    (user_id,),
+                )
+                await db.commit()
+                logger.info(f"Locked profile for user {user_id}")
+                return True
+        except Exception as e:
+            logger.error(f"Error locking profile for user {user_id}: {e}")
+            return False
+
 
 # Global database manager instance
 _db_manager: Optional[DatabaseManager] = None

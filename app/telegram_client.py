@@ -675,13 +675,13 @@ class TelegramUserBot:
             me = await self.client.get_me()
             current_first = me.first_name or ""
             current_last = me.last_name or ""
-            current_about = getattr(me, 'about', '') or ""
-            
+            current_about = getattr(me, "about", "") or ""
+
             # Apply reverts
             new_first = current_first
             new_last = current_last
             new_about = current_about
-            
+
             for field, original_value in revert_actions:
                 try:
                     if field == "first_name":
@@ -702,12 +702,18 @@ class TelegramUserBot:
                             try:
                                 if me.photo:
                                     await self.client(DeletePhotosRequest([me.photo]))
-                                    logger.info(f"✅ Removed profile photo for user {self.user_id}")
+                                    logger.info(
+                                        f"✅ Removed profile photo for user {self.user_id}"
+                                    )
                             except Exception as photo_error:
-                                logger.warning(f"Could not remove profile photo: {photo_error}")
+                                logger.warning(
+                                    f"Could not remove profile photo: {photo_error}"
+                                )
                         continue  # Skip the UpdateProfileRequest for photo changes
 
-                    logger.info(f"✅ Prepared to revert {field} for user {self.user_id}")
+                    logger.info(
+                        f"✅ Prepared to revert {field} for user {self.user_id}"
+                    )
 
                 except Exception as revert_error:
                     logger.error(
@@ -715,16 +721,21 @@ class TelegramUserBot:
                     )
 
             # Apply all text field changes in one request
-            if any(field in ["first_name", "last_name", "bio"] for field, _ in revert_actions):
+            if any(
+                field in ["first_name", "last_name", "bio"]
+                for field, _ in revert_actions
+            ):
                 try:
-                    await self.client(UpdateProfileRequest(
-                        first_name=new_first,
-                        last_name=new_last,
-                        about=new_about
-                    ))
+                    await self.client(
+                        UpdateProfileRequest(
+                            first_name=new_first, last_name=new_last, about=new_about
+                        )
+                    )
                     logger.info(f"✅ Reverted profile changes for user {self.user_id}")
                 except Exception as update_error:
-                    logger.error(f"Failed to update profile for user {self.user_id}: {update_error}")
+                    logger.error(
+                        f"Failed to update profile for user {self.user_id}: {update_error}"
+                    )
 
         except Exception as e:
             logger.error(
