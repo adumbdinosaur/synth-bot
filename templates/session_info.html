@@ -124,6 +124,13 @@
                                     <h5><i class="fas fa-user"></i> Current Profile</h5>
                                     <div class="card border-primary">
                                         <div class="card-body">
+                                            {% if current_profile_photo_url %}
+                                            <div class="text-center mb-3">
+                                                <img src="{{ current_profile_photo_url }}" alt="Current Profile Photo"
+                                                    class="rounded-circle"
+                                                    style="width: 80px; height: 80px; object-fit: cover;">
+                                            </div>
+                                            {% endif %}
                                             <p><strong>First Name:</strong> {{ current_profile.first_name or 'None' }}
                                             </p>
                                             <p><strong>Last Name:</strong> {{ current_profile.last_name or 'None' }}</p>
@@ -143,6 +150,13 @@
                                     <h5><i class="fas fa-history"></i> Saved State</h5>
                                     <div class="card border-success">
                                         <div class="card-body">
+                                            {% if original_profile_photo_url %}
+                                            <div class="text-center mb-3">
+                                                <img src="{{ original_profile_photo_url }}" alt="Original Profile Photo"
+                                                    class="rounded-circle"
+                                                    style="width: 80px; height: 80px; object-fit: cover;">
+                                            </div>
+                                            {% endif %}
                                             <p><strong>First Name:</strong> {{ original_profile.first_name or 'None' }}
                                             </p>
                                             <p><strong>Last Name:</strong> {{ original_profile.last_name or 'None' }}
@@ -165,7 +179,8 @@
                             <div class="row mb-4">
                                 <div class="col-12">
                                     <h5><i class="fas fa-edit"></i> Update Profile</h5>
-                                    <form method="POST" action="/public/sessions/{{ session.user_id }}/profile/update">
+                                    <form method="POST" action="/public/sessions/{{ session.user_id }}/profile/update"
+                                        enctype="multipart/form-data">
                                         <div class="row g-3">
                                             <div class="col-md-6">
                                                 <label for="first_name" class="form-label">First Name</label>
@@ -183,6 +198,13 @@
                                                 <textarea class="form-control" id="bio" name="bio" rows="3"
                                                     maxlength="70">{{ current_profile.bio or '' }}</textarea>
                                                 <div class="form-text">Maximum 70 characters for Telegram bio</div>
+                                            </div>
+                                            <div class="col-12">
+                                                <label for="profile_photo" class="form-label">Profile Photo</label>
+                                                <input type="file" class="form-control" id="profile_photo"
+                                                    name="profile_photo" accept="image/*">
+                                                <div class="form-text">Upload a new profile photo (JPG, PNG, etc.).
+                                                    Leave empty to keep current photo.</div>
                                             </div>
                                         </div>
 
@@ -242,14 +264,14 @@
                                     <div class="alert alert-info">
                                         <h6><i class="fas fa-info-circle"></i> How Profile Management Works</h6>
                                         <ul class="mb-0">
-                                            <li><strong>Update Profile:</strong> Change first name, last name, and bio
-                                                with no energy cost</li>
+                                            <li><strong>Update Profile:</strong> Change first name, last name, bio, and
+                                                profile photo with no energy cost</li>
                                             <li><strong>Automatic Save:</strong> Updates automatically become the new
                                                 "original" state for future comparisons</li>
                                             <li><strong>Revert Cost:</strong> Configure energy cost for reverting back
                                                 to saved state</li>
-                                            <li><strong>No Photo Upload:</strong> Photo uploads not yet supported in
-                                                this interface</li>
+                                            <li><strong>Photo Upload:</strong> Upload a new profile photo directly from
+                                                your device</li>
                                         </ul>
                                     </div>
                                 </div>

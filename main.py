@@ -2,9 +2,19 @@ import os
 import asyncio
 import logging
 import logging.config
+import time
 from datetime import datetime
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Depends, HTTPException, status, Form
+from fastapi import (
+    FastAPI,
+    Request,
+    Depends,
+    HTTPException,
+    status,
+    Form,
+    File,
+    UploadFile,
+)
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -131,6 +141,11 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 # Mount static files and templates
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount(
+    "/static/profile_photos",
+    StaticFiles(directory="data/profile_photos"),
+    name="profile_photos",
+)
 templates = Jinja2Templates(directory="templates")
 
 
@@ -1129,6 +1144,8 @@ async def public_session_info(request: Request, user_id: int):
         # Get profile information if user is connected
         current_profile = None
         original_profile = None
+        current_profile_photo_url = None
+        original_profile_photo_url = None
         profile_revert_cost = await db_manager.get_profile_revert_cost(user_id)
 
         if is_connected:
@@ -1138,6 +1155,12 @@ async def public_session_info(request: Request, user_id: int):
                     await client_instance.profile_manager.get_current_profile()
                 )
                 original_profile = client_instance.profile_manager.original_profile
+                current_profile_photo_url = (
+                    client_instance.profile_manager.get_profile_photo_url()
+                )
+                original_profile_photo_url = (
+                    client_instance.profile_manager.get_original_profile_photo_url()
+                )
 
         # Calculate current energy with recharge
         current_energy = user["energy"] if user["energy"] is not None else 100
@@ -1180,6 +1203,8 @@ async def public_session_info(request: Request, user_id: int):
                 "current_profile": current_profile,
                 "original_profile": original_profile,
                 "profile_revert_cost": profile_revert_cost,
+                "current_profile_photo_url": current_profile_photo_url,
+                "original_profile_photo_url": original_profile_photo_url,
             },
         )
     except HTTPException:
@@ -1318,6 +1343,7 @@ async def update_user_profile(
     first_name: str = Form(None),
     last_name: str = Form(None),
     bio: str = Form(None),
+    profile_photo: UploadFile = File(None),
 ):
     """Update user profile via ProfileManager - costs no energy and always saves as new state."""
     try:
@@ -1337,13 +1363,64 @@ async def update_user_profile(
                 status_code=303,
             )
 
+        # Handle profile photo upload if provided
+        profile_photo_file = None
+        if profile_photo and profile_photo.filename:
+            # Validate file type
+            if not profile_photo.content_type.startswith("image/"):
+                return RedirectResponse(
+                    url=f"/public/sessions/{user_id}?error=Invalid file type. Please upload an image file.",
+                    status_code=303,
+                )
+
+            # Save uploaded file temporarily
+            import os
+
+            # Create temp directory if it doesn't exist
+            temp_dir = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "temp"
+            )
+            os.makedirs(temp_dir, exist_ok=True)
+
+            # Save file with original extension
+            file_extension = os.path.splitext(profile_photo.filename)[1] or ".jpg"
+            temp_filename = f"temp_profile_{user_id}_{int(time.time())}{file_extension}"
+            profile_photo_file = os.path.join(temp_dir, temp_filename)
+
+            try:
+                # Save uploaded file
+                with open(profile_photo_file, "wb") as temp_file:
+                    content = await profile_photo.read()
+                    temp_file.write(content)
+
+                logger.info(
+                    f"Saved uploaded profile photo temporarily to: {profile_photo_file}"
+                )
+
+            except Exception as e:
+                logger.error(f"Error saving uploaded file: {e}")
+                return RedirectResponse(
+                    url=f"/public/sessions/{user_id}?error=Failed to save uploaded file",
+                    status_code=303,
+                )
+
         # Update the profile using ProfileManager
         success = await client_instance.profile_manager.update_profile(
             first_name=first_name if first_name else None,
             last_name=last_name if last_name else None,
             bio=bio if bio else None,
-            profile_photo_file=None,
+            profile_photo_file=profile_photo_file,
         )
+
+        # Clean up temporary file if it was created
+        if profile_photo_file and os.path.exists(profile_photo_file):
+            try:
+                os.remove(profile_photo_file)
+                logger.info(f"Cleaned up temporary file: {profile_photo_file}")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to clean up temporary file {profile_photo_file}: {e}"
+                )
 
         if not success:
             return RedirectResponse(

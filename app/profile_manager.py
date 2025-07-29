@@ -700,6 +700,32 @@ class ProfileManager:
         except Exception as e:
             logger.warning(f"⚠️ Error cleaning up old profile photo: {e}")
 
+    def get_profile_photo_url(self) -> Optional[str]:
+        """Get URL path for current profile photo if it exists locally"""
+        try:
+            if self.current_profile and self.current_profile.get("profile_photo_id"):
+                original_photo_path = self._get_original_profile_photo_path()
+                if os.path.exists(original_photo_path):
+                    # Return relative path for web serving
+                    return f"/static/profile_photos/user_{self.user_id}_original.jpg"
+            return None
+        except Exception as e:
+            logger.error(f"❌ Error getting profile photo URL: {e}")
+            return None
+
+    def get_original_profile_photo_url(self) -> Optional[str]:
+        """Get URL path for original profile photo if it exists locally"""
+        try:
+            if self.original_profile and self.original_profile.get("profile_photo_id"):
+                original_photo_path = self._get_original_profile_photo_path()
+                if os.path.exists(original_photo_path):
+                    # Return relative path for web serving
+                    return f"/static/profile_photos/user_{self.user_id}_original.jpg"
+            return None
+        except Exception as e:
+            logger.error(f"❌ Error getting original profile photo URL: {e}")
+            return None
+
     async def _backup_current_profile_photo(self, current_profile: Dict[str, Any]):
         """Backup current profile photo before reversion (for forensic purposes)"""
         try:
