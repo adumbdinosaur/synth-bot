@@ -108,6 +108,170 @@
                 </div>
             </div>
 
+            <!-- Profile Management Section -->
+            {% if session.is_connected and current_profile %}
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4><i class="fas fa-user-edit"></i> Profile Management</h4>
+                            <p class="text-muted mb-0">Update profile information with no energy cost</p>
+                        </div>
+                        <div class="card-body">
+                            <!-- Current vs Original Profile Info -->
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <h5><i class="fas fa-user"></i> Current Profile</h5>
+                                    <div class="card border-primary">
+                                        <div class="card-body">
+                                            <p><strong>First Name:</strong> {{ current_profile.first_name or 'None' }}</p>
+                                            <p><strong>Last Name:</strong> {{ current_profile.last_name or 'None' }}</p>
+                                            <p><strong>Bio:</strong> {{ current_profile.bio or 'None' }}</p>
+                                            <p><strong>Profile Photo:</strong> 
+                                                {% if current_profile.profile_photo_id %}
+                                                    <span class="badge bg-success">Set</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">None</span>
+                                                {% endif %}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% if original_profile %}
+                                <div class="col-md-6">
+                                    <h5><i class="fas fa-history"></i> Saved State</h5>
+                                    <div class="card border-success">
+                                        <div class="card-body">
+                                            <p><strong>First Name:</strong> {{ original_profile.first_name or 'None' }}</p>
+                                            <p><strong>Last Name:</strong> {{ original_profile.last_name or 'None' }}</p>
+                                            <p><strong>Bio:</strong> {{ original_profile.bio or 'None' }}</p>
+                                            <p><strong>Profile Photo:</strong> 
+                                                {% if original_profile.profile_photo_id %}
+                                                    <span class="badge bg-success">Set</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">None</span>
+                                                {% endif %}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Profile Update Form -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h5><i class="fas fa-edit"></i> Update Profile</h5>
+                                    <form method="POST" action="/public/sessions/{{ session.user_id }}/profile/update">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="first_name" class="form-label">First Name</label>
+                                                <input type="text" class="form-control" id="first_name" name="first_name" 
+                                                       value="{{ current_profile.first_name or '' }}" maxlength="50">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="last_name" class="form-label">Last Name</label>
+                                                <input type="text" class="form-control" id="last_name" name="last_name" 
+                                                       value="{{ current_profile.last_name or '' }}" maxlength="50">
+                                            </div>
+                                            <div class="col-12">
+                                                <label for="bio" class="form-label">Bio</label>
+                                                <textarea class="form-control" id="bio" name="bio" rows="3" 
+                                                          maxlength="70">{{ current_profile.bio or '' }}</textarea>
+                                                <div class="form-text">Maximum 70 characters for Telegram bio</div>
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="save_as_new_state" 
+                                                           name="save_as_new_state" value="true">
+                                                    <label class="form-check-label" for="save_as_new_state">
+                                                        <strong>Save as new state</strong> - Make this the new "original" profile
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="row mt-3">
+                                            <div class="col-12">
+                                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                                    <button type="submit" class="btn btn-primary">
+                                                        <i class="fas fa-save"></i> Update Profile (Free)
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <!-- Revert Cost Configuration -->
+                            <div class="row">
+                                <div class="col-12">
+                                    <h5><i class="fas fa-undo"></i> Profile Revert Settings</h5>
+                                    <form method="POST" action="/public/sessions/{{ session.user_id }}/profile/revert-cost">
+                                        <div class="row g-3 align-items-end">
+                                            <div class="col-md-4">
+                                                <label for="revert_cost" class="form-label">Energy Cost to Revert Profile</label>
+                                                <div class="input-group">
+                                                    <input type="number" class="form-control" id="revert_cost" 
+                                                           name="revert_cost" value="{{ profile_revert_cost }}" 
+                                                           min="0" max="100" required>
+                                                    <span class="input-group-text">⚡</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <button type="submit" class="btn btn-secondary">
+                                                    <i class="fas fa-save"></i> Update Cost
+                                                </button>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <small class="text-muted">
+                                                    Cost for reverting profile back to saved state
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <!-- Profile Management Info -->
+                            <div class="row mt-4">
+                                <div class="col-12">
+                                    <div class="alert alert-info">
+                                        <h6><i class="fas fa-info-circle"></i> How Profile Management Works</h6>
+                                        <ul class="mb-0">
+                                            <li><strong>Update Profile:</strong> Change first name, last name, and bio with no energy cost</li>
+                                            <li><strong>Save as New State:</strong> Make current profile the new "original" for future comparisons</li>
+                                            <li><strong>Revert Cost:</strong> Configure energy cost for reverting back to saved state</li>
+                                            <li><strong>No Photo Upload:</strong> Photo uploads not yet supported in this interface</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% elif session.is_connected %}
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Profile management is not available - Profile Manager not initialized for this user.
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        Profile management is only available when the user is connected to Telegram.
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Energy Cost Configuration -->
             <div class="card">
                 <div class="card-header">

@@ -396,6 +396,88 @@ class ProfileManager:
             logger.error(f"❌ Error updating original profile: {e}")
             return False
 
+    async def update_profile(self, first_name: str = None, last_name: str = None, 
+                           bio: str = None, profile_photo_file: str = None) -> bool:
+        """
+        Update the user's profile with new data. This changes the actual Telegram profile.
+        """
+        try:
+            logger.info(f"🔄 Updating profile for user {self.user_id}")
+            
+            # Get current profile first
+            current_profile = await self.get_current_profile()
+            if not current_profile:
+                logger.error("❌ Could not get current profile")
+                return False
+            
+            # Build update data - use current values if new ones not provided
+            update_data = {
+                "first_name": first_name if first_name is not None else current_profile.get("first_name", ""),
+                "last_name": last_name if last_name is not None else current_profile.get("last_name", ""),
+                "bio": bio if bio is not None else current_profile.get("bio", "")
+            }
+            
+            # Update name and bio
+            await self.client(
+                UpdateProfileRequest(
+                    first_name=update_data["first_name"],
+                    last_name=update_data["last_name"],
+                    about=update_data["bio"],
+                )
+            )
+            logger.info("✅ Updated profile name and bio")
+            
+            # Handle profile photo update if provided
+            if profile_photo_file:
+                logger.info("📸 Updating profile photo...")
+                success = await self._upload_profile_photo(profile_photo_file)
+                if success:
+                    logger.info("✅ Profile photo updated")
+                else:
+                    logger.error("❌ Failed to update profile photo")
+                    return False
+            
+            # Update current profile cache
+            self.current_profile = await self.get_current_profile()
+            
+            logger.info("✅ Profile updated successfully")
+            return True
+            
+        except FloodWaitError as e:
+            logger.warning(f"⏰ Flood wait for {e.seconds} seconds when updating profile")
+            await asyncio.sleep(e.seconds)
+            return await self.update_profile(first_name, last_name, bio, profile_photo_file)
+        except Exception as e:
+            logger.error(f"❌ Error updating profile: {e}")
+            return False
+
+    async def save_current_as_original(self) -> bool:
+        """
+        Save the current profile state as the new 'original' profile.
+        This updates what the system considers the baseline profile.
+        """
+        try:
+            logger.info(f"💾 Saving current profile as new original for user {self.user_id}")
+            
+            # Get current profile
+            current_profile = await self.get_current_profile()
+            if not current_profile:
+                logger.error("❌ Could not get current profile to save")
+                return False
+            
+            # Update the original profile in memory and database
+            success = await self.update_original_profile(current_profile)
+            if success:
+                logger.info("✅ Current profile saved as new original")
+                return True
+            else:
+                logger.error("❌ Failed to save current profile as original")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Error saving current profile as original: {e}")
+            return False
+
     async def get_profile_status(self) -> Dict[str, Any]:
         """Get current profile monitoring status"""
         try:

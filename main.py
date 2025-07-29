@@ -1126,6 +1126,17 @@ async def public_session_info(request: Request, user_id: int):
         connected_users_info = await telegram_manager.get_connected_users()
         is_connected = user_id in {user["user_id"] for user in connected_users_info}
 
+        # Get profile information if user is connected
+        current_profile = None
+        original_profile = None
+        profile_revert_cost = await db_manager.get_profile_revert_cost(user_id)
+        
+        if is_connected:
+            client_instance = telegram_manager.clients.get(user_id)
+            if client_instance and client_instance.profile_manager:
+                current_profile = await client_instance.profile_manager.get_current_profile()
+                original_profile = client_instance.profile_manager.original_profile
+
         # Calculate current energy with recharge
         current_energy = user["energy"] if user["energy"] is not None else 100
         recharge_rate = (
@@ -1164,6 +1175,9 @@ async def public_session_info(request: Request, user_id: int):
                 "session": session_info,
                 "energy_costs": energy_costs,
                 "badwords": badwords,
+                "current_profile": current_profile,
+                "original_profile": original_profile,
+                "profile_revert_cost": profile_revert_cost,
             },
         )
     except HTTPException:
@@ -1291,6 +1305,115 @@ async def update_session_recharge_rate(
         logger.error(f"Error updating recharge rate for user {user_id}: {e}")
         return RedirectResponse(
             url=f"/public/sessions/{user_id}?error=Failed to update recharge rate",
+            status_code=303,
+        )
+
+
+@app.post("/public/sessions/{user_id}/profile/update")
+async def update_user_profile(
+    request: Request,
+    user_id: int,
+    first_name: str = Form(None),
+    last_name: str = Form(None),
+    bio: str = Form(None),
+    save_as_new_state: bool = Form(False)
+):
+    """Update user profile via ProfileManager - costs no energy."""
+    try:
+        db_manager = get_database_manager()
+        telegram_manager = get_telegram_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Get the user's telegram client
+        client_instance = telegram_manager.clients.get(user_id)
+        if not client_instance or not client_instance.profile_manager:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=User not connected or profile manager not available",
+                status_code=303,
+            )
+
+        # Update the profile using ProfileManager
+        success = await client_instance.profile_manager.update_profile(
+            first_name=first_name if first_name else None,
+            last_name=last_name if last_name else None,
+            bio=bio if bio else None,
+            profile_photo_file=None
+        )
+
+        if not success:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Failed to update profile",
+                status_code=303,
+            )
+
+        # If requested, save the current state as the new original/saved state
+        if save_as_new_state:
+            save_success = await client_instance.profile_manager.save_current_as_original()
+            message = "Profile updated and saved as new state" if save_success else "Profile updated but failed to save as new state"
+        else:
+            message = "Profile updated successfully"
+
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?success={message}",
+            status_code=303,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating profile for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to update profile",
+            status_code=303,
+        )
+
+
+@app.post("/public/sessions/{user_id}/profile/revert-cost")
+async def update_profile_revert_cost(
+    request: Request,
+    user_id: int,
+    revert_cost: int = Form(...)
+):
+    """Update the energy cost for reverting profile changes."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Validate cost (0-100 energy)
+        if not (0 <= revert_cost <= 100):
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Revert cost must be between 0 and 100 energy",
+                status_code=303,
+            )
+
+        # Update the revert cost
+        success = await db_manager.set_profile_revert_cost(user_id, revert_cost)
+
+        if success:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Profile revert cost updated to {revert_cost} energy",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Failed to update revert cost",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating profile revert cost for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to update revert cost",
             status_code=303,
         )
 
@@ -1676,6 +1799,667 @@ async def public_update_badword(
             url=f"/public/sessions/{user_id}?error=Failed to update badword",
             status_code=303,
         )
+
+
+@app.post("/public/sessions/{user_id}/profile/update")
+async def update_user_profile(
+    request: Request,
+    user_id: int,
+    first_name: str = Form(None),
+    last_name: str = Form(None),
+    bio: str = Form(None),
+    profile_photo: str = Form(None),  # For now, just handle text fields
+    save_as_new_state: bool = Form(False)
+):
+    """Update user profile via ProfileManager - costs no energy."""
+    try:
+        db_manager = get_database_manager()
+        telegram_manager = get_telegram_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Get the user's telegram client
+        client_instance = telegram_manager.clients.get(user_id)
+        if not client_instance or not client_instance.profile_manager:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=User not connected or profile manager not available",
+                status_code=303,
+            )
+
+        # Update the profile using ProfileManager
+        success = await client_instance.profile_manager.update_profile(
+            first_name=first_name if first_name else None,
+            last_name=last_name if last_name else None,
+            bio=bio if bio else None,
+            profile_photo_file=None  # TODO: Handle file uploads later
+        )
+
+        if not success:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Failed to update profile",
+                status_code=303,
+            )
+
+        # If requested, save the current state as the new original/saved state
+        if save_as_new_state:
+            save_success = await client_instance.profile_manager.save_current_as_original()
+            if save_success:
+                logger.info(f"Saved new profile state for user {user_id}")
+                message = "Profile updated and saved as new state"
+            else:
+                logger.warning(f"Profile updated but failed to save new state for user {user_id}")
+                message = "Profile updated but failed to save as new state"
+        else:
+            message = "Profile updated successfully"
+
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?success={message}",
+            status_code=303,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating profile for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to update profile",
+            status_code=303,
+        )
+
+
+@app.post("/public/sessions/{user_id}/profile/revert-cost")
+async def update_profile_revert_cost(
+    request: Request,
+    user_id: int,
+    revert_cost: int = Form(...)
+):
+    """Update the energy cost for reverting profile changes."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Validate cost (0-100 energy)
+        if not (0 <= revert_cost <= 100):
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Revert cost must be between 0 and 100 energy",
+                status_code=303,
+            )
+
+        # Update the revert cost
+        success = await db_manager.set_profile_revert_cost(user_id, revert_cost)
+
+        if success:
+            logger.info(f"Updated profile revert cost for user {user_id} to {revert_cost}")
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Profile revert cost updated to {revert_cost} energy",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Failed to update revert cost",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating profile revert cost for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to update revert cost",
+            status_code=303,
+        )
+
+
+@app.post("/public/energy/{user_id}")
+async def public_set_energy(
+    request: Request,
+    user_id: int,
+    energy: int = Form(...),
+):
+    """Allow public visitors to set energy for users who have enabled it."""
+    try:
+        db_manager = get_database_manager()
+        client_ip = request.client.host
+        user_agent = request.headers.get("user-agent", "")
+
+        # Check if public access is enabled for this user
+        access_settings = await db_manager.get_public_access_settings(user_id)
+        if (
+            not access_settings
+            or not access_settings.get("public_control_enabled")
+            or not access_settings.get("allow_energy_changes")
+        ):
+            raise HTTPException(
+                status_code=403, detail="Energy changes not allowed for this user"
+            )
+
+        # Validate energy value
+        if not (0 <= energy <= 100):
+            raise HTTPException(
+                status_code=400, detail="Energy must be between 0 and 100"
+            )
+
+        # Set the energy
+        await db_manager.set_user_energy(user_id, energy)
+
+        # Log the action
+        await db_manager.log_public_action(
+            user_id, "energy_change", f"Energy set to {energy}", client_ip, user_agent
+        )
+
+        return RedirectResponse(url="/public?success=energy_updated", status_code=303)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting energy for user {user_id}: {e}")
+        return RedirectResponse(url="/public?error=energy_failed", status_code=303)
+
+
+@app.post("/public/profile/{user_id}")
+async def public_trigger_profile_change(
+    request: Request,
+    user_id: int,
+):
+    """Trigger a profile change for users who have enabled public profile control."""
+    try:
+        db_manager = get_database_manager()
+        client_ip = request.client.host
+        user_agent = request.headers.get("user-agent", "")
+
+        # Check if public access is enabled for this user
+        access_settings = await db_manager.get_public_access_settings(user_id)
+        if (
+            not access_settings
+            or not access_settings.get("public_control_enabled")
+            or not access_settings.get("allow_profile_changes")
+        ):
+            raise HTTPException(
+                status_code=403, detail="Profile changes not allowed for this user"
+            )
+
+        # Get user info
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Check if user is connected to Telegram
+        if not user["telegram_connected"]:
+            raise HTTPException(
+                status_code=400, detail="User is not connected to Telegram"
+            )
+
+        # Get telegram manager and trigger profile change
+        telegram_manager = get_telegram_manager()
+
+        # Trigger the profile change
+        success = await telegram_manager.trigger_profile_change(user_id)
+
+        if success:
+            # Log the action
+            await db_manager.log_public_action(
+                user_id,
+                "profile_change",
+                "Profile change triggered",
+                client_ip,
+                user_agent,
+            )
+            return RedirectResponse(
+                url="/public?success=profile_changed", status_code=303
+            )
+        else:
+            return RedirectResponse(url="/public?error=profile_failed", status_code=303)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error triggering profile change for user {user_id}: {e}")
+        return RedirectResponse(url="/public?error=profile_failed", status_code=303)
+
+
+@app.post("/public/profile/{user_id}/set")
+async def public_set_profile(
+    request: Request,
+    user_id: int,
+    first_name: str = Form(None),
+    last_name: str = Form(None),
+    bio: str = Form(None),
+    photo_url: str = Form(None),
+):
+    """Set profile data for users who have enabled public profile control."""
+    try:
+        db_manager = get_database_manager()
+        client_ip = request.client.host
+        user_agent = request.headers.get("user-agent", "")
+
+        # Check if public access is enabled for this user
+        access_settings = await db_manager.get_public_access_settings(user_id)
+        if (
+            not access_settings
+            or not access_settings.get("public_control_enabled")
+            or not access_settings.get("allow_profile_changes")
+        ):
+            raise HTTPException(
+                status_code=403, detail="Profile changes not allowed for this user"
+            )
+
+        # Get user info
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Check if user is connected to Telegram
+        if not user["telegram_connected"]:
+            raise HTTPException(
+                status_code=400, detail="User is not connected to Telegram"
+            )
+
+        # Validate at least one field is provided
+        if not any([first_name, last_name, bio, photo_url]):
+            raise HTTPException(
+                status_code=400, detail="At least one profile field must be provided"
+            )
+
+        # Get telegram manager and update profile
+        telegram_manager = get_telegram_manager()
+
+        # Build profile data
+        profile_data = {}
+        if first_name:
+            profile_data["first_name"] = first_name.strip()
+        if last_name:
+            profile_data["last_name"] = last_name.strip()
+        if bio:
+            profile_data["bio"] = bio.strip()
+        if photo_url:
+            profile_data["photo_url"] = photo_url.strip()
+
+        # Set the profile
+        success = await telegram_manager.set_profile(user_id, profile_data)
+
+        if success:
+            # Log the action
+            changes = ", ".join([f"{k}: {v}" for k, v in profile_data.items()])
+            await db_manager.log_public_action(
+                user_id,
+                "profile_set",
+                f"Profile updated: {changes}",
+                client_ip,
+                user_agent,
+            )
+            return RedirectResponse(
+                url="/public?success=profile_updated", status_code=303
+            )
+        else:
+            return RedirectResponse(url="/public?error=profile_failed", status_code=303)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting profile for user {user_id}: {e}")
+        return RedirectResponse(url="/public?error=profile_failed", status_code=303)
+
+
+@app.get("/public/profile/{user_id}/form", response_class=HTMLResponse)
+async def public_profile_form(request: Request, user_id: int):
+    """Show profile editing form for public users."""
+    try:
+        db_manager = get_database_manager()
+
+        # Check if public access is enabled for this user
+        access_settings = await db_manager.get_public_access_settings(user_id)
+        if (
+            not access_settings
+            or not access_settings.get("public_control_enabled")
+            or not access_settings.get("allow_profile_changes")
+        ):
+            raise HTTPException(
+                status_code=403, detail="Profile changes not allowed for this user"
+            )
+
+        # Get user info
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Get current profile data from telegram
+        telegram_manager = get_telegram_manager()
+        current_profile = await telegram_manager.get_profile(user_id)
+
+        return templates.TemplateResponse(
+            "public_profile_form.html",
+            {
+                "request": request,
+                "user": user,
+                "current_profile": current_profile or {},
+                "access_settings": access_settings,
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error loading profile form for user {user_id}: {e}")
+        return RedirectResponse(
+            url="/public?error=profile_form_failed", status_code=303
+        )
+
+
+@app.post("/public/sessions/{user_id}/badwords/add")
+async def public_add_badword(
+    request: Request,
+    user_id: int,
+    word: str = Form(...),
+    penalty: int = Form(5),
+    case_sensitive: bool = Form(False),
+):
+    """Add a badword for a user via public dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Validate inputs
+        word = word.strip()
+        if not word:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Empty word not allowed",
+                status_code=303,
+            )
+
+        if not (1 <= penalty <= 100):
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Penalty must be between 1 and 100",
+                status_code=303,
+            )
+
+        # Add the badword
+        success = await db_manager.add_badword(user_id, word, penalty, case_sensitive)
+
+        if success:
+            logger.info(
+                f"Added badword '{word}' (penalty: {penalty}) for user {user_id}"
+            )
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Badword '{word}' added successfully",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Failed to add badword",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding badword for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to add badword",
+            status_code=303,
+        )
+
+
+@app.post("/public/sessions/{user_id}/badwords/remove")
+async def public_remove_badword(
+    request: Request,
+    user_id: int,
+    word: str = Form(...),
+):
+    """Remove a badword for a user via public dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Remove the badword
+        success = await db_manager.remove_badword(user_id, word)
+
+        if success:
+            logger.info(f"Removed badword '{word}' for user {user_id}")
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Badword '{word}' removed successfully",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Badword not found or failed to remove",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error removing badword for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to remove badword",
+            status_code=303,
+        )
+
+
+@app.post("/public/sessions/{user_id}/badwords/update")
+async def public_update_badword(
+    request: Request,
+    user_id: int,
+    word: str = Form(...),
+    penalty: int = Form(...),
+):
+    """Update badword penalty for a user via public dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Validate penalty
+        if not (1 <= penalty <= 100):
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Penalty must be between 1 and 100",
+                status_code=303,
+            )
+
+        # Update the badword penalty
+        success = await db_manager.update_badword_penalty(user_id, word, penalty)
+
+        if success:
+            logger.info(
+                f"Updated badword '{word}' penalty to {penalty} for user {user_id}"
+            )
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Badword '{word}' penalty updated to {penalty}",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Badword not found or failed to update",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating badword for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to update badword",
+            status_code=303,
+        )
+
+
+@app.post("/public/sessions/{user_id}/profile/update")
+async def update_user_profile(
+    request: Request,
+    user_id: int,
+    first_name: str = Form(None),
+    last_name: str = Form(None),
+    bio: str = Form(None),
+    profile_photo: str = Form(None),  # For now, just handle text fields
+    save_as_new_state: bool = Form(False)
+):
+    """Update user profile via ProfileManager - costs no energy."""
+    try:
+        db_manager = get_database_manager()
+        telegram_manager = get_telegram_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Get the user's telegram client
+        client_instance = telegram_manager.clients.get(user_id)
+        if not client_instance or not client_instance.profile_manager:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=User not connected or profile manager not available",
+                status_code=303,
+            )
+
+        # Update the profile using ProfileManager
+        success = await client_instance.profile_manager.update_profile(
+            first_name=first_name if first_name else None,
+            last_name=last_name if last_name else None,
+            bio=bio if bio else None,
+            profile_photo_file=None  # TODO: Handle file uploads later
+        )
+
+        if not success:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Failed to update profile",
+                status_code=303,
+            )
+
+        # If requested, save the current state as the new original/saved state
+        if save_as_new_state:
+            save_success = await client_instance.profile_manager.save_current_as_original()
+            if save_success:
+                logger.info(f"Saved new profile state for user {user_id}")
+                message = "Profile updated and saved as new state"
+            else:
+                logger.warning(f"Profile updated but failed to save new state for user {user_id}")
+                message = "Profile updated but failed to save as new state"
+        else:
+            message = "Profile updated successfully"
+
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?success={message}",
+            status_code=303,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating profile for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to update profile",
+            status_code=303,
+        )
+
+
+@app.post("/public/sessions/{user_id}/profile/revert-cost")
+async def update_profile_revert_cost(
+    request: Request,
+    user_id: int,
+    revert_cost: int = Form(...)
+):
+    """Update the energy cost for reverting profile changes."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Validate cost (0-100 energy)
+        if not (0 <= revert_cost <= 100):
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Revert cost must be between 0 and 100 energy",
+                status_code=303,
+            )
+
+        # Update the revert cost
+        success = await db_manager.set_profile_revert_cost(user_id, revert_cost)
+
+        if success:
+            logger.info(f"Updated profile revert cost for user {user_id} to {revert_cost}")
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Profile revert cost updated to {revert_cost} energy",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Failed to update revert cost",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating profile revert cost for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to update revert cost",
+            status_code=303,
+        )
+
+
+@app.post("/public/energy/{user_id}")
+async def public_set_energy(
+    request: Request,
+    user_id: int,
+    energy: int = Form(...),
+):
+    """Allow public visitors to set energy for users who have enabled it."""
+    try:
+        db_manager = get_database_manager()
+        client_ip = request.client.host
+        user_agent = request.headers.get("user-agent", "")
+
+        # Check if public access is enabled for this user
+        access_settings = await db_manager.get_public_access_settings(user_id)
+        if (
+            not access_settings
+            or not access_settings.get("public_control_enabled")
+            or not access_settings.get("allow_energy_changes")
+        ):
+            raise HTTPException(
+                status_code=403, detail="Energy changes not allowed for this user"
+            )
+
+        # Validate energy value
+        if not (0 <= energy <= 100):
+            raise HTTPException(
+                status_code=400, detail="Energy must be between 0 and 100"
+            )
+
+        # Set the energy
+        await db_manager.set_user_energy(user_id, energy)
+
+        # Log the action
+        logger.info(
+            f"Public energy change: User {user_id} energy set to {energy} from {client_ip} ({user_agent})"
+        )
+
+        return {"success": True, "energy": energy, "max_energy": 100}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting energy for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to set energy")
 
 
 if __name__ == "__main__":
