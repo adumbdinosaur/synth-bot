@@ -112,12 +112,18 @@
             {% if session.is_connected and current_profile %}
             <div class="row mt-4">
                 <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h4><i class="fas fa-user-edit"></i> Profile Management</h4>
-                            <p class="text-muted mb-0">Update profile information with no energy cost</p>
+                    <div class="card collapsible-section">
+                        <div class="card-header" data-bs-toggle="collapse" data-bs-target="#profileManagementCollapse" aria-expanded="false" aria-controls="profileManagementCollapse">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h4><i class="fas fa-user-edit"></i> Profile Management</h4>
+                                    <p class="text-muted mb-0">Update profile information with no energy cost</p>
+                                </div>
+                                <i class="fas fa-chevron-down collapse-toggle collapsed"></i>
+                            </div>
                         </div>
-                        <div class="card-body">
+                        <div class="collapse" id="profileManagementCollapse">
+                            <div class="card-body">
                             <!-- Current vs Original Profile Info -->
                             <div class="row mb-4">
                                 <div class="col-md-6">
@@ -276,6 +282,7 @@
                                     </div>
                                 </div>
                             </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -301,12 +308,18 @@
             {% endif %}
 
             <!-- Energy Cost Configuration -->
-            <div class="card">
-                <div class="card-header">
-                    <h4><i class="fas fa-cogs"></i> Energy Cost Configuration</h4>
-                    <p class="text-muted mb-0">Configure how much energy each message type costs for this user</p>
+            <div class="card collapsible-section">
+                <div class="card-header" data-bs-toggle="collapse" data-bs-target="#energyCostCollapse" aria-expanded="false" aria-controls="energyCostCollapse">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4><i class="fas fa-cogs"></i> Energy Cost Configuration</h4>
+                            <p class="text-muted mb-0">Configure how much energy each message type costs for this user</p>
+                        </div>
+                        <i class="fas fa-chevron-down collapse-toggle collapsed"></i>
+                    </div>
                 </div>
-                <div class="card-body">
+                <div class="collapse" id="energyCostCollapse">
+                    <div class="card-body">
                     <form method="POST" action="/public/sessions/{{ session.user_id }}/energy-costs">
                         <div class="row g-3">
                             {% for cost in energy_costs %}
@@ -362,20 +375,25 @@
                             </div>
                         </div>
                     </form>
+                    </div>
                 </div>
             </div>
 
             <!-- Badwords Management Section -->
             <div class="row mt-4">
                 <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h4><i class="fas fa-ban"></i> Badwords Management</h4>
-                            <p class="text-muted mb-0">Manage words that trigger automatic filtering and energy
-                                penalties
-                            </p>
+                    <div class="card collapsible-section">
+                        <div class="card-header" data-bs-toggle="collapse" data-bs-target="#badwordsCollapse" aria-expanded="false" aria-controls="badwordsCollapse">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h4><i class="fas fa-ban"></i> Badwords Management</h4>
+                                    <p class="text-muted mb-0">Manage words that trigger automatic filtering and energy penalties</p>
+                                </div>
+                                <i class="fas fa-chevron-down collapse-toggle collapsed"></i>
+                            </div>
                         </div>
-                        <div class="card-body">
+                        <div class="collapse" id="badwordsCollapse">
+                            <div class="card-body">
                             <!-- Add New Badword Form -->
                             <div class="row mb-4">
                                 <div class="col-12">
@@ -520,6 +538,7 @@
                                     </div>
                                 </div>
                             </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -611,5 +630,27 @@
             }
         });
     }, 5000);
+
+    // Handle collapsible section toggle icons
+    document.addEventListener('DOMContentLoaded', function () {
+        // Add event listeners for all collapsible sections
+        const collapseElements = document.querySelectorAll('.collapse');
+        
+        collapseElements.forEach(function (collapseEl) {
+            const toggleIcon = collapseEl.previousElementSibling.querySelector('.collapse-toggle');
+            
+            collapseEl.addEventListener('show.bs.collapse', function () {
+                if (toggleIcon) {
+                    toggleIcon.classList.remove('collapsed');
+                }
+            });
+            
+            collapseEl.addEventListener('hide.bs.collapse', function () {
+                if (toggleIcon) {
+                    toggleIcon.classList.add('collapsed');
+                }
+            });
+        });
+    });
 </script>
 {% endblock %}

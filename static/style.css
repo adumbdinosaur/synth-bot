@@ -127,3 +127,47 @@
         font-size: 1rem;
     }
 }
+
+/* Collapsible section styles */
+.collapsible-section .card-header {
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.collapsible-section .card-header:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.collapsible-section .collapse-toggle {
+    transition: transform 0.3s ease;
+}
+
+.collapsible-section .collapse-toggle.collapsed {
+    transform: rotate(-90deg);
+}
+
+.collapsible-section .card-body {
+    transition: padding 0.3s ease;
+}
+
+/* Collapsible section styles */
+.collapsible-section .card-header {
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.collapsible-section .card-header:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.collapsible-section .collapse-toggle {
+    transition: transform 0.3s ease;
+}
+
+.collapsible-section .collapse-toggle.collapsed {
+    transform: rotate(-90deg);
+}
+
+.collapsible-section .card-body {
+    transition: padding 0.3s ease;
+}
