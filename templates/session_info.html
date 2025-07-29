@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+
+{% block title %}Session Info - {{ session.display_name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>
+                        <i class="fas fa-user-circle"></i> {{ session.display_name }}
+                        {% if session.is_connected %}
+                        <span class="badge bg-success ms-2">
+                            <i class="fas fa-circle"></i> Online
+                        </span>
+                        {% else %}
+                        <span class="badge bg-secondary ms-2">
+                            <i class="fas fa-circle"></i> Offline
+                        </span>
+                        {% endif %}
+                    </h2>
+                    <p class="text-muted mb-0">User ID: {{ session.user_id }}</p>
+                </div>
+                <div>
+                    <a href="/public/sessions" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                </div>
+            </div>
+
+            <!-- Success/Error Messages -->
+            {% if request.query_params.get('success') %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="fas fa-check-circle"></i> {{ request.query_params.get('success') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="fas fa-exclamation-triangle"></i> {{ request.query_params.get('error') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endif %}
+
+            <!-- Session Overview -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card border-primary">
+                        <div class="card-body text-center">
+                            <i class="fas fa-battery-three-quarters fa-2x text-primary mb-2"></i>
+                            <h3 class="mb-0">{{ session.energy }}/100</h3>
+                            <small class="text-muted">Current Energy</small>
+                            <div class="progress mt-2">
+                                <div class="progress-bar 
+                                        {% if session.energy > 70 %}bg-success
+                                        {% elif session.energy > 30 %}bg-warning
+                                        {% else %}bg-danger{% endif %}" role="progressbar"
+                                    style="width: {{ session.energy }}%">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-info">
+                        <div class="card-body text-center">
+                            <i class="fas fa-bolt fa-2x text-info mb-2"></i>
+                            <h3 class="mb-0">{{ session.energy_recharge_rate }}</h3>
+                            <small class="text-muted">Energy/Hour</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-success">
+                        <div class="card-body text-center">
+                            <i class="fas fa-calendar-check fa-2x text-success mb-2"></i>
+                            <h5 class="mb-0">{{ session.account_created[:10] if session.account_created else 'Unknown'
+                                }}</h5>
+                            <small class="text-muted">Member Since</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Energy Cost Configuration -->
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="fas fa-cogs"></i> Energy Cost Configuration</h4>
+                    <p class="text-muted mb-0">Configure how much energy each message type costs for this user</p>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="/public/sessions/{{ session.user_id }}/energy-costs">
+                        <div class="row g-3">
+                            {% for cost in energy_costs %}
+                            <div class="col-md-6 col-lg-4">
+                                <div class="card border-light">
+                                    <div class="card-body">
+                                        <label for="{{ cost.message_type }}_cost" class="form-label">
+                                            <i class="fas fa-{% if cost.message_type == 'text' %}font
+                                                {% elif cost.message_type == 'photo' %}image
+                                                {% elif cost.message_type == 'video' %}video
+                                                {% elif cost.message_type == 'audio' %}music
+                                                {% elif cost.message_type == 'voice' %}microphone
+                                                {% elif cost.message_type == 'document' %}file
+                                                {% elif cost.message_type == 'sticker' %}smile
+                                                {% elif cost.message_type == 'animation' %}gif
+                                                {% elif cost.message_type == 'gif' %}images
+                                                {% elif cost.message_type == 'location' %}map-marker-alt
+                                                {% elif cost.message_type == 'contact' %}address-book
+                                                {% elif cost.message_type == 'poll' %}poll
+                                                {% elif cost.message_type == 'game' %}gamepad
+                                                {% elif cost.message_type == 'venue' %}map-marker
+                                                {% elif cost.message_type == 'web_page' %}link
+                                                {% elif cost.message_type == 'media_group' %}images
+                                                {% else %}message{% endif %}"></i>
+                                            {{ cost.message_type.replace('_', ' ').title() }}
+                                        </label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="{{ cost.message_type }}_cost"
+                                                name="{{ cost.message_type }}_cost" value="{{ cost.energy_cost }}"
+                                                min="0" max="100" required>
+                                            <span class="input-group-text">⚡</span>
+                                        </div>
+                                        {% if cost.description %}
+                                        <small class="text-muted">{{ cost.description }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="button" class="btn btn-outline-secondary me-md-2"
+                                        onclick="resetDefaults()">
+                                        <i class="fas fa-undo"></i> Reset to Defaults
+                                    </button>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save"></i> Save Energy Costs
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Information Section -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-info-circle"></i> About Energy Costs</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-lightbulb"></i> How Energy Works</h6>
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-check text-success"></i> Each message type consumes energy
+                                            when sent</li>
+                                        <li><i class="fas fa-check text-success"></i> Energy recharges automatically
+                                            over time</li>
+                                        <li><i class="fas fa-check text-success"></i> Users need sufficient energy to
+                                            send messages</li>
+                                        <li><i class="fas fa-check text-success"></i> Higher costs mean fewer messages
+                                            of that type</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-cog"></i> Configuration Tips</h6>
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-lightbulb text-warning"></i> Set higher costs for
+                                            media-heavy messages</li>
+                                        <li><i class="fas fa-lightbulb text-warning"></i> Text messages typically cost
+                                            less energy</li>
+                                        <li><i class="fas fa-lightbulb text-warning"></i> Consider user behavior when
+                                            setting costs</li>
+                                        <li><i class="fas fa-lightbulb text-warning"></i> Monitor energy levels to
+                                            adjust accordingly</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function resetDefaults() {
+        // Default energy costs based on message type
+        const defaults = {
+            'text_cost': 1,
+            'photo_cost': 3,
+            'video_cost': 5,
+            'audio_cost': 4,
+            'voice_cost': 2,
+            'document_cost': 3,
+            'sticker_cost': 1,
+            'animation_cost': 3,
+            'gif_cost': 4,
+            'location_cost': 2,
+            'contact_cost': 2,
+            'poll_cost': 3,
+            'game_cost': 3,
+            'venue_cost': 2,
+            'web_page_cost': 2,
+            'media_group_cost': 5
+        };
+
+        if (confirm('Are you sure you want to reset all energy costs to default values?')) {
+            Object.keys(defaults).forEach(key => {
+                const input = document.getElementById(key);
+                if (input) {
+                    input.value = defaults[key];
+                }
+            });
+        }
+    }
+
+    // Auto-dismiss alerts after 5 seconds
+    setTimeout(function () {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            if (alert.classList.contains('show')) {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            }
+        });
+    }, 5000);
+</script>
+{% endblock %}

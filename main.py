@@ -2,6 +2,7 @@ import os
 import asyncio
 import logging
 import logging.config
+from datetime import datetime
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Depends, HTTPException, status, Form
 from fastapi.templating import Jinja2Templates
@@ -962,6 +963,149 @@ async def public_sessions_dashboard(request: Request):
                 "connected_sessions": 0,
                 "error": "Failed to load public sessions dashboard",
             },
+        )
+
+
+@app.get("/public/sessions/{user_id}", response_class=HTMLResponse)
+async def public_session_info(request: Request, user_id: int):
+    """Public session info page with energy cost management."""
+    try:
+        db_manager = get_database_manager()
+
+        # Get user and session info
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Get user's energy costs
+        energy_costs = await db_manager.get_user_energy_costs(user_id)
+
+        # Initialize default energy costs if user doesn't have any
+        if not energy_costs:
+            await db_manager.initialize_user_energy_costs(user_id)
+            energy_costs = await db_manager.get_user_energy_costs(user_id)
+
+        # Get connection status from telegram manager
+        telegram_manager = get_telegram_manager()
+        connected_users_info = await telegram_manager.get_connected_users()
+        is_connected = user_id in {user["user_id"] for user in connected_users_info}
+
+        # Calculate current energy with recharge
+        current_energy = user["energy"] if user["energy"] is not None else 100
+        recharge_rate = (
+            user["energy_recharge_rate"]
+            if user["energy_recharge_rate"] is not None
+            else 1
+        )
+        last_update = (
+            datetime.fromisoformat(user["last_energy_update"])
+            if user["last_energy_update"]
+            else datetime.now()
+        )
+
+        # Calculate recharge
+        now = datetime.now()
+        time_diff = (now - last_update).total_seconds()
+        energy_to_add = int(time_diff // 3600) * recharge_rate
+        current_energy = min(100, current_energy + energy_to_add)
+
+        session_info = {
+            "user_id": user["id"],
+            "username": user["username"],
+            "telegram_connected": bool(user["telegram_connected"]),
+            "energy": current_energy,
+            "energy_recharge_rate": recharge_rate,
+            "last_energy_update": user["last_energy_update"],
+            "account_created": user["created_at"],
+            "display_name": user["username"],
+            "is_connected": is_connected,
+        }
+
+        return templates.TemplateResponse(
+            "session_info.html",
+            {
+                "request": request,
+                "session": session_info,
+                "energy_costs": energy_costs,
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error loading session info for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load session info")
+
+
+@app.post("/public/sessions/{user_id}/energy-costs")
+async def update_session_energy_costs(
+    request: Request,
+    user_id: int,
+    text_cost: int = Form(None),
+    photo_cost: int = Form(None),
+    video_cost: int = Form(None),
+    audio_cost: int = Form(None),
+    voice_cost: int = Form(None),
+    document_cost: int = Form(None),
+    sticker_cost: int = Form(None),
+    animation_cost: int = Form(None),
+    gif_cost: int = Form(None),
+    location_cost: int = Form(None),
+    contact_cost: int = Form(None),
+    poll_cost: int = Form(None),
+    game_cost: int = Form(None),
+    venue_cost: int = Form(None),
+    web_page_cost: int = Form(None),
+    media_group_cost: int = Form(None),
+):
+    """Update energy costs for all message types for a specific user."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Build cost mapping from form data, only including non-None values
+        form_data = {
+            "text": text_cost,
+            "photo": photo_cost,
+            "video": video_cost,
+            "audio": audio_cost,
+            "voice": voice_cost,
+            "document": document_cost,
+            "sticker": sticker_cost,
+            "animation": animation_cost,
+            "gif": gif_cost,
+            "location": location_cost,
+            "contact": contact_cost,
+            "poll": poll_cost,
+            "game": game_cost,
+            "venue": venue_cost,
+            "web_page": web_page_cost,
+            "media_group": media_group_cost,
+        }
+
+        # Update each cost that was provided in the form
+        for message_type, cost in form_data.items():
+            if (
+                cost is not None and cost >= 0
+            ):  # Only update if cost is provided and non-negative
+                await db_manager.update_user_energy_cost(user_id, message_type, cost)
+
+        logger.info(f"Updated energy costs for user {user_id}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?success=Energy costs updated successfully",
+            status_code=303,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating energy costs for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to update energy costs",
+            status_code=303,
         )
 
 
