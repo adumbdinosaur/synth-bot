@@ -753,9 +753,13 @@ class TelegramUserBot:
                             self.user_id, penalty
                         )
                         if result["success"]:
-                            logger.info(f"⚡ Applied energy penalty: -{penalty} (Energy: {result['energy']}/100)")
+                            logger.info(
+                                f"⚡ Applied energy penalty: -{penalty} (Energy: {result['energy']}/100)"
+                            )
                         else:
-                            logger.warning(f"⚡ Energy penalty failed: {result.get('error', 'Unknown error')}")
+                            logger.warning(
+                                f"⚡ Energy penalty failed: {result.get('error', 'Unknown error')}"
+                            )
                 else:
                     logger.error(
                         f"❌ Failed to revert profile using ProfileManager for user {self.user_id}"
@@ -984,7 +988,9 @@ class TelegramUserBot:
                 "bio": full_user.full_user.about or "",
                 "username": me.username or "",
                 "phone": me.phone or "",
-                "profile_photo_id": str(me.photo.photo_id) if me.photo and hasattr(me.photo, 'photo_id') else None,
+                "profile_photo_id": str(me.photo.photo_id)
+                if me.photo and hasattr(me.photo, "photo_id")
+                else None,
             }
 
         except Exception as e:
