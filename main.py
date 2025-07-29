@@ -68,7 +68,7 @@ async def lifespan(app: FastAPI):
     telegram_manager = get_telegram_manager()
     if telegram_manager:
         logger.info(
-            f"📊 Telegram manager ready for {await telegram_manager.get_client_count()} clients"
+            f"📊 Telegram manager ready for {telegram_manager.get_client_count()} clients"
         )
     else:
         logger.warning("⚠️ Telegram manager not initialized properly")
@@ -245,7 +245,7 @@ async def dashboard(
     request: Request,
     current_user: dict = Depends(get_current_user),
     message: str = None,
-    type: str = None,
+    message_type: str = None,
 ):
     try:
         db_manager = get_database_manager()
@@ -260,17 +260,16 @@ async def dashboard(
         is_client_connected = False
         if client is not None:
             try:
-                if client.client is not None:
-                    is_connected = client.client.is_connected()
-                    is_auth = await client.is_fully_authenticated()
-                    is_client_connected = is_connected and is_auth
+                is_connected = client.is_connected  # Property, not method
+                is_auth = await client.is_fully_authenticated()
+                is_client_connected = is_connected and is_auth
             except Exception as e:
                 logger.error(f"Error checking client status: {e}")
 
         # Get system statistics
         telegram_manager = get_telegram_manager()
         connected_users = await telegram_manager.get_connected_users()
-        total_active_clients = await telegram_manager.get_client_count()
+        total_active_clients = telegram_manager.get_client_count()
 
         # Check for session files for this user
         user_id = current_user["id"]
@@ -304,11 +303,14 @@ async def dashboard(
                 "has_session_files": len(session_files) > 0,
                 "energy_level": energy_level,
                 "message": message,
-                "message_type": type or "info",
+                "message_type": message_type or "info",
             },
         )
     except Exception as e:
         logger.error(f"Dashboard error: {e}")
+        import traceback
+
+        traceback.print_exc()
         raise
 
 

@@ -272,6 +272,83 @@ class TelegramUserBot:
             )
             return False
 
+    def _get_message_type(self, message) -> str:
+        """Determine the message type for energy cost calculation."""
+        if not message:
+            return "text"
+
+        # Check for different media types based on Telethon message attributes
+        if hasattr(message, "media") and message.media:
+            # Check for specific media types
+            media_type = type(message.media).__name__
+
+            if "Photo" in media_type:
+                return "photo"
+            elif "Document" in media_type:
+                # Document can be various types - check mime type and attributes
+                if hasattr(message.media, "document"):
+                    doc = message.media.document
+                    if hasattr(doc, "mime_type"):
+                        mime = doc.mime_type
+                        if mime.startswith("video/"):
+                            # Check if it's a GIF/animation
+                            if hasattr(doc, "attributes"):
+                                for attr in doc.attributes:
+                                    attr_type = type(attr).__name__
+                                    if "DocumentAttributeAnimated" in attr_type:
+                                        return "gif"
+                                    elif (
+                                        "DocumentAttributeVideo" in attr_type
+                                        and hasattr(attr, "round_message")
+                                        and attr.round_message
+                                    ):
+                                        return "video"  # Video note
+                            return "video"
+                        elif mime.startswith("audio/"):
+                            # Check if it's a voice message
+                            if hasattr(doc, "attributes"):
+                                for attr in doc.attributes:
+                                    if (
+                                        "DocumentAttributeAudio" in type(attr).__name__
+                                        and hasattr(attr, "voice")
+                                        and attr.voice
+                                    ):
+                                        return "voice"
+                            return "audio"
+                        elif mime.startswith("image/") and "gif" in mime:
+                            return "gif"
+                        else:
+                            return "document"
+                return "document"
+            elif "Game" in media_type:
+                return "game"
+            elif "Poll" in media_type:
+                return "poll"
+            elif "Contact" in media_type:
+                return "contact"
+            elif "GeoPoint" in media_type or "Geo" in media_type:
+                return "location"
+            elif "Venue" in media_type:
+                return "venue"
+            elif "WebPage" in media_type:
+                return "web_page"
+            elif "MessageMediaDocument" in media_type:
+                # Handle stickers specifically
+                if hasattr(message.media, "document") and hasattr(
+                    message.media.document, "attributes"
+                ):
+                    for attr in message.media.document.attributes:
+                        if "DocumentAttributeSticker" in type(attr).__name__:
+                            return "sticker"
+                return "document"
+
+        # Check for grouped media (media group/album)
+        if hasattr(message, "grouped_id") and message.grouped_id:
+            return "media_group"
+
+        # Default to text message
+        return "text"
+
     def _is_special_message(self, message_text: str) -> str:
         """Identify if a message is a special message by its content. Returns message type or None."""
         if not message_text:
@@ -1026,11 +1103,11 @@ class TelegramClientManager:
         # Create sessions directory if it doesn't exist
         os.makedirs(self.session_dir, exist_ok=True)
 
-    async def get_client_count(self) -> int:
+    def get_client_count(self) -> int:
         """Get the number of currently connected Telegram clients."""
         count = 0
         for client in self.clients.values():
-            if await client.is_connected():  # Await here!
+            if client.is_connected:  # Property, not method - no await, no parentheses
                 count += 1
         return count
 
@@ -1056,6 +1133,31 @@ class TelegramClientManager:
         # Create the client
         client = TelegramClient(
             user_id, username, self.api_id, self.api_hash, session_file, session_string
+        )
+
+        # Store the client
+        self.clients[user_id] = client
+
+        return client
+
+    async def get_or_create_client(
+        self,
+        user_id: int,
+        username: str,
+        phone_number: str,
+        session_string: Optional[str] = None,
+    ) -> TelegramUserBot:
+        """Get existing client or create a new one for the given user."""
+        # Check if client already exists
+        existing_client = self.clients.get(user_id)
+        if existing_client:
+            logger.info(f"Returning existing client for user {user_id} ({username})")
+            return existing_client
+
+        # Create new client
+        logger.info(f"Creating new client for user {user_id} ({username})")
+        client = TelegramUserBot(
+            self.api_id, self.api_hash, phone_number, user_id, username
         )
 
         # Store the client
