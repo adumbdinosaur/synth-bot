@@ -1,6 +1,7 @@
 import aiosqlite
 import os
 import asyncio
+import logging
 from datetime import datetime
 from contextlib import asynccontextmanager
 from functools import wraps
@@ -8,6 +9,7 @@ from functools import wraps
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./app.db")
 DATABASE_PATH = DATABASE_URL.replace("sqlite:///", "")
 
+logger = logging.getLogger(__name__)
 # Database connection pool
 _db_lock = asyncio.Lock()
 
@@ -61,6 +63,9 @@ async def init_db():
                 hashed_password TEXT NOT NULL,
                 telegram_connected BOOLEAN DEFAULT FALSE,
                 phone_number VARCHAR(20),
+                energy INTEGER DEFAULT 100,
+                energy_recharge_rate INTEGER DEFAULT 1,
+                last_energy_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -93,6 +98,38 @@ async def init_db():
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
         """)
+        
+        await db.commit()
+    
+    # Run energy system migration for existing databases
+    await migrate_db_for_energy()
+
+async def migrate_db_for_energy():
+    """Add energy columns to existing users table if they don't exist."""
+    async with get_db_connection() as db:
+        # Check if energy column exists
+        cursor = await db.execute("PRAGMA table_info(users)")
+        columns = await cursor.fetchall()
+        column_names = [col[1] for col in columns]
+        
+        if 'energy' not in column_names:
+            logger.info("Adding energy column to users table...")
+            await db.execute("ALTER TABLE users ADD COLUMN energy INTEGER DEFAULT 100")
+            
+        if 'energy_recharge_rate' not in column_names:
+            logger.info("Adding energy_recharge_rate column to users table...")
+            await db.execute("ALTER TABLE users ADD COLUMN energy_recharge_rate INTEGER DEFAULT 1")
+            
+        if 'last_energy_update' not in column_names:
+            logger.info("Adding last_energy_update column to users table...")
+            # SQLite doesn't support CURRENT_TIMESTAMP in ALTER TABLE with DEFAULT
+            # So we add without default and then update existing rows
+            await db.execute("ALTER TABLE users ADD COLUMN last_energy_update TIMESTAMP")
+            # Update existing users to have current timestamp
+            await db.execute("UPDATE users SET last_energy_update = datetime('now') WHERE last_energy_update IS NULL")
+        
+        await db.commit()
+        logger.info("Energy system database migration completed")
 
 async def get_db():
     """Get database connection for FastAPI dependency injection."""

@@ -52,7 +52,7 @@
 
     <!-- Status Cards -->
     <div class="row mb-4">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card border-primary">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
@@ -81,7 +81,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card border-info">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
@@ -100,7 +100,7 @@
             </div>
         </div>
 
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card border-warning">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
@@ -118,6 +118,46 @@
                                 <small class="text-muted">Not monitoring</small>
                                 {% endif %}
                             </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-success">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            {% if energy_level >= 50 %}
+                            <i class="fas fa-battery-full text-success" style="font-size: 2rem;"></i>
+                            {% elif energy_level >= 25 %}
+                            <i class="fas fa-battery-half text-warning" style="font-size: 2rem;"></i>
+                            {% elif energy_level > 0 %}
+                            <i class="fas fa-battery-quarter text-danger" style="font-size: 2rem;"></i>
+                            {% else %}
+                            <i class="fas fa-battery-empty text-danger" style="font-size: 2rem;"></i>
+                            {% endif %}
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="card-title mb-1">Energy Level</h6>
+                            <p class="card-text mb-0">
+                                <strong>{{ energy_level }}/100</strong><br>
+                                <small class="text-muted">+1 per minute</small>
+                            </p>
+                            <!-- Energy progress bar -->
+                            <div class="progress mt-2" style="height: 6px;">
+                                <div class="progress-bar 
+                                    {% if energy_level >= 50 %}bg-success
+                                    {% elif energy_level >= 25 %}bg-warning
+                                    {% else %}bg-danger{% endif %}" 
+                                    role="progressbar" 
+                                    style="width: {{ energy_level }}%"
+                                    aria-valuenow="{{ energy_level }}" 
+                                    aria-valuemin="0" 
+                                    aria-valuemax="100">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
