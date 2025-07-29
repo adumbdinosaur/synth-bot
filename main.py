@@ -895,6 +895,129 @@ async def update_profile_protection_settings(
         )
 
 
+@app.get("/badwords", response_class=HTMLResponse)
+async def badwords_page(
+    request: Request, current_user: dict = Depends(get_current_user)
+):
+    """Badwords management page."""
+    try:
+        db_manager = get_database_manager()
+        
+        # Get user's badwords
+        badwords = await db_manager.get_user_badwords(current_user["id"])
+        
+        # Get current energy for display
+        energy_info = await db_manager.get_user_energy(current_user["id"])
+        
+        return templates.TemplateResponse(
+            "badwords.html",
+            {
+                "request": request,
+                "user": current_user,
+                "badwords": badwords,
+                "current_energy": energy_info.get("energy", 0),
+                "max_energy": 100,
+            },
+        )
+    except Exception as e:
+        logger.error(f"Error loading badwords page: {e}")
+        return templates.TemplateResponse(
+            "badwords.html",
+            {
+                "request": request,
+                "user": current_user,
+                "badwords": [],
+                "current_energy": 0,
+                "max_energy": 100,
+                "error": "Failed to load badwords",
+            },
+        )
+
+
+@app.post("/badwords/add")
+async def add_badword(
+    request: Request,
+    word: str = Form(...),
+    penalty: int = Form(5),
+    case_sensitive: bool = Form(False),
+    current_user: dict = Depends(get_current_user),
+):
+    """Add a new badword."""
+    try:
+        db_manager = get_database_manager()
+        
+        # Validate inputs
+        word = word.strip()
+        if not word:
+            return RedirectResponse(url="/badwords?error=empty_word", status_code=303)
+        
+        if not (1 <= penalty <= 100):
+            return RedirectResponse(url="/badwords?error=invalid_penalty", status_code=303)
+        
+        # Add the badword
+        success = await db_manager.add_badword(
+            current_user["id"], word, penalty, case_sensitive
+        )
+        
+        if success:
+            return RedirectResponse(url="/badwords?success=added", status_code=303)
+        else:
+            return RedirectResponse(url="/badwords?error=add_failed", status_code=303)
+            
+    except Exception as e:
+        logger.error(f"Error adding badword: {e}")
+        return RedirectResponse(url="/badwords?error=add_failed", status_code=303)
+
+
+@app.post("/badwords/remove")
+async def remove_badword(
+    request: Request,
+    word: str = Form(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Remove a badword."""
+    try:
+        db_manager = get_database_manager()
+        
+        success = await db_manager.remove_badword(current_user["id"], word)
+        
+        if success:
+            return RedirectResponse(url="/badwords?success=removed", status_code=303)
+        else:
+            return RedirectResponse(url="/badwords?error=remove_failed", status_code=303)
+            
+    except Exception as e:
+        logger.error(f"Error removing badword: {e}")
+        return RedirectResponse(url="/badwords?error=remove_failed", status_code=303)
+
+
+@app.post("/badwords/update")
+async def update_badword(
+    request: Request,
+    word: str = Form(...),
+    penalty: int = Form(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Update badword penalty."""
+    try:
+        db_manager = get_database_manager()
+        
+        # Validate penalty
+        if not (1 <= penalty <= 100):
+            return RedirectResponse(url="/badwords?error=invalid_penalty", status_code=303)
+        
+        success = await db_manager.update_badword_penalty(current_user["id"], word, penalty)
+        
+        if success:
+            return RedirectResponse(url="/badwords?success=updated", status_code=303)
+        else:
+            return RedirectResponse(url="/badwords?error=update_failed", status_code=303)
+            
+    except Exception as e:
+        logger.error(f"Error updating badword: {e}")
+        return RedirectResponse(url="/badwords?error=update_failed", status_code=303)
+
+
 # Public Dashboard Routes
 @app.get("/public", response_class=HTMLResponse)
 async def public_dashboard(request: Request):
@@ -985,6 +1108,9 @@ async def public_session_info(request: Request, user_id: int):
             await db_manager.initialize_user_energy_costs(user_id)
             energy_costs = await db_manager.get_user_energy_costs(user_id)
 
+        # Get user's badwords
+        badwords = await db_manager.get_user_badwords(user_id)
+
         # Get connection status from telegram manager
         telegram_manager = get_telegram_manager()
         connected_users_info = await telegram_manager.get_connected_users()
@@ -1027,6 +1153,7 @@ async def public_session_info(request: Request, user_id: int):
                 "request": request,
                 "session": session_info,
                 "energy_costs": energy_costs,
+                "badwords": badwords,
             },
         )
     except HTTPException:
@@ -1391,3 +1518,152 @@ async def public_profile_form(request: Request, user_id: int):
         return RedirectResponse(
             url="/public?error=profile_form_failed", status_code=303
         )
+
+
+@app.post("/public/sessions/{user_id}/badwords/add")
+async def public_add_badword(
+    request: Request,
+    user_id: int,
+    word: str = Form(...),
+    penalty: int = Form(5),
+    case_sensitive: bool = Form(False),
+):
+    """Add a badword for a user via public dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Validate inputs
+        word = word.strip()
+        if not word:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Empty word not allowed",
+                status_code=303,
+            )
+
+        if not (1 <= penalty <= 100):
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Penalty must be between 1 and 100",
+                status_code=303,
+            )
+
+        # Add the badword
+        success = await db_manager.add_badword(user_id, word, penalty, case_sensitive)
+
+        if success:
+            logger.info(f"Added badword '{word}' (penalty: {penalty}) for user {user_id}")
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Badword '{word}' added successfully",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Failed to add badword",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding badword for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to add badword",
+            status_code=303,
+        )
+
+
+@app.post("/public/sessions/{user_id}/badwords/remove")
+async def public_remove_badword(
+    request: Request,
+    user_id: int,
+    word: str = Form(...),
+):
+    """Remove a badword for a user via public dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Remove the badword
+        success = await db_manager.remove_badword(user_id, word)
+
+        if success:
+            logger.info(f"Removed badword '{word}' for user {user_id}")
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Badword '{word}' removed successfully",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Badword not found or failed to remove",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error removing badword for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to remove badword",
+            status_code=303,
+        )
+
+
+@app.post("/public/sessions/{user_id}/badwords/update")
+async def public_update_badword(
+    request: Request,
+    user_id: int,
+    word: str = Form(...),
+    penalty: int = Form(...),
+):
+    """Update badword penalty for a user via public dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Validate penalty
+        if not (1 <= penalty <= 100):
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Penalty must be between 1 and 100",
+                status_code=303,
+            )
+
+        # Update the badword penalty
+        success = await db_manager.update_badword_penalty(user_id, word, penalty)
+
+        if success:
+            logger.info(f"Updated badword '{word}' penalty to {penalty} for user {user_id}")
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Badword '{word}' penalty updated to {penalty}",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Badword not found or failed to update",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating badword for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to update badword",
+            status_code=303,
+        )
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
