@@ -7,6 +7,7 @@ from typing import Dict, Any, Optional
 from telethon import TelegramClient
 from telethon.tl.functions.users import GetFullUserRequest
 from telethon.tl.functions.account import UpdateProfileRequest
+from telethon.tl.functions.photos import DeletePhotosRequest
 from telethon.errors import FloodWaitError
 import asyncio
 
@@ -170,9 +171,13 @@ class ProfileManager:
             if current_profile.get(key, "") != self.original_profile.get(key, ""):
                 return True
 
-        # Check profile photo (basic comparison)
+        # Check profile photo (normalize None values for comparison)
         current_photo = current_profile.get("profile_photo_id")
         original_photo = self.original_profile.get("profile_photo_id")
+        
+        # Normalize None/empty values to None for consistent comparison
+        current_photo = current_photo if current_photo else None
+        original_photo = original_photo if original_photo else None
 
         if current_photo != original_photo:
             return True
@@ -189,6 +194,17 @@ class ProfileManager:
                 current_val = current_profile.get(key, "")
                 if original_val != current_val:
                     changes.append(f"{key}: '{original_val}' → '{current_val}'")
+
+            # Check profile photo changes
+            current_photo = current_profile.get("profile_photo_id")
+            original_photo = self.original_profile.get("profile_photo_id")
+            if current_photo != original_photo:
+                if original_photo and current_photo:
+                    changes.append(f"profile_photo: changed (ID: {original_photo} → {current_photo})")
+                elif original_photo and not current_photo:
+                    changes.append("profile_photo: removed")
+                elif not original_photo and current_photo:
+                    changes.append(f"profile_photo: added (ID: {current_photo})")
 
             if changes:
                 logger.warning(f"📝 Profile changes detected: {', '.join(changes)}")
@@ -228,6 +244,9 @@ class ProfileManager:
                     about=self.original_profile["bio"],
                 )
             )
+
+            # Handle profile photo reversion
+            await self._revert_profile_photo()
 
             logger.info("✅ Profile reverted successfully")
 
@@ -287,3 +306,53 @@ class ProfileManager:
         except Exception as e:
             logger.error(f"❌ Error getting profile status: {e}")
             return {"error": str(e)}
+
+    async def _revert_profile_photo(self):
+        """Revert profile photo to original state"""
+        try:
+            current_profile = await self.get_current_profile()
+            if not current_profile:
+                logger.warning("❌ Could not get current profile for photo reversion")
+                return
+
+            current_photo_id = current_profile.get("profile_photo_id")
+            original_photo_id = self.original_profile.get("profile_photo_id")
+
+            # If photos are the same, no reversion needed
+            if current_photo_id == original_photo_id:
+                logger.debug("📸 Profile photo unchanged, no reversion needed")
+                return
+
+            # If user added a photo but originally had none, remove it
+            if current_photo_id and not original_photo_id:
+                logger.info("📸 Removing added profile photo...")
+                try:
+                    from telethon.tl.functions.users import GetFullUserRequest
+                    full_user = await self.client(GetFullUserRequest("me"))
+                    user = full_user.users[0]
+                    
+                    if user.photo:
+                        await self.client(DeletePhotosRequest([user.photo]))
+                        logger.info("✅ Profile photo removed successfully")
+                    else:
+                        logger.debug("📸 No profile photo to remove")
+                except Exception as e:
+                    logger.error(f"❌ Error removing profile photo: {e}")
+
+            # If user changed photo and originally had one, we can't restore the original
+            # (Telegram doesn't allow setting photos by ID, only uploading new ones)
+            elif current_photo_id and original_photo_id and current_photo_id != original_photo_id:
+                logger.warning(
+                    f"⚠️ Profile photo changed (ID: {original_photo_id} → {current_photo_id}). "
+                    "Cannot restore original photo automatically - manual intervention needed."
+                )
+
+            # If user removed photo but originally had one, we can't restore it
+            elif not current_photo_id and original_photo_id:
+                logger.warning(
+                    f"⚠️ Profile photo removed (original ID: {original_photo_id}). "
+                    "Cannot restore original photo automatically - manual intervention needed."
+                )
+
+        except Exception as e:
+            logger.error(f"❌ Error reverting profile photo: {e}")
