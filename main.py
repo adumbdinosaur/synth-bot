@@ -1131,6 +1131,9 @@ async def public_session_info(request: Request, user_id: int):
         # Get user's badwords
         badwords = await db_manager.get_user_badwords(user_id)
 
+        # Get user's autocorrect settings
+        autocorrect_settings = await db_manager.get_autocorrect_settings(user_id)
+
         # Get connection status from telegram manager
         telegram_manager = get_telegram_manager()
         connected_users_info = await telegram_manager.get_connected_users()
@@ -1195,6 +1198,7 @@ async def public_session_info(request: Request, user_id: int):
                 "session": session_info,
                 "energy_costs": energy_costs,
                 "badwords": badwords,
+                "autocorrect_settings": autocorrect_settings,
                 "current_profile": current_profile,
                 "original_profile": original_profile,
                 "profile_revert_cost": profile_revert_cost,
@@ -2038,5 +2042,41 @@ async def public_update_badword(
         logger.error(f"Error updating badword for user {user_id}: {e}")
         return RedirectResponse(
             url=f"/public/sessions/{user_id}?error=Failed to update badword",
+            status_code=303,
+        )
+
+
+@app.post("/public/sessions/{user_id}/autocorrect")
+async def update_autocorrect_settings(
+    request: Request,
+    user_id: int,
+    enabled: bool = Form(False),
+    penalty_per_correction: int = Form(5),
+):
+    """Update autocorrect settings for a specific user."""
+    try:
+        db_manager = get_database_manager()
+        
+        # Validate penalty range
+        if penalty_per_correction < 1 or penalty_per_correction > 50:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Penalty per correction must be between 1 and 50",
+                status_code=303,
+            )
+        
+        # Update autocorrect settings
+        await db_manager.update_autocorrect_settings(user_id, enabled, penalty_per_correction)
+        
+        status_text = "enabled" if enabled else "disabled"
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?success=Autocorrect {status_text} successfully with {penalty_per_correction} energy penalty per correction",
+            status_code=303,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating autocorrect settings for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to update autocorrect settings",
             status_code=303,
         )

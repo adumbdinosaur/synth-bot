@@ -118,3 +118,18 @@ The repository includes automated Docker image building and pushing to `registry
 Configure these secrets in your GitHub repository settings:
 - `REGISTRY_USERNAME`: Username for registry.rptr.dev
 - `REGISTRY_PASSWORD`: Password for registry.rptr.dev
+
+### Autocorrect Feature
+
+The application includes an optional autocorrect feature powered by OpenAI that:
+- Automatically corrects spelling errors in messages to American English
+- Applies configurable energy penalties for each correction
+- Can be enabled/disabled per user
+- Uses conservative correction to avoid changing intended text
+
+To enable autocorrect:
+1. Set the `OPENAI_API_KEY` environment variable with your OpenAI API key
+2. Configure autocorrect settings in the web interface for each user
+3. Users can set energy penalty per correction (1-50 points)
+
+**Note:** Autocorrect requires an OpenAI API key and will incur API costs based on usage.
