@@ -922,6 +922,49 @@ async def public_dashboard(request: Request):
         )
 
 
+@app.get("/public/sessions", response_class=HTMLResponse)
+async def public_sessions_dashboard(request: Request):
+    """Public dashboard showing all active Telegram sessions."""
+    try:
+        db_manager = get_database_manager()
+
+        # Get all active sessions from database
+        active_sessions = await db_manager.get_all_active_sessions()
+
+        # Get connection status from telegram manager
+        telegram_manager = get_telegram_manager()
+        connected_users_info = await telegram_manager.get_connected_users()
+        connected_user_ids = {user["user_id"] for user in connected_users_info}
+
+        # Enhance session data with real-time connection status
+        for session in active_sessions:
+            session["is_connected"] = session["user_id"] in connected_user_ids
+
+        return templates.TemplateResponse(
+            "public_sessions_dashboard.html",
+            {
+                "request": request,
+                "sessions": active_sessions,
+                "total_sessions": len(active_sessions),
+                "connected_sessions": len(
+                    [s for s in active_sessions if s["is_connected"]]
+                ),
+            },
+        )
+    except Exception as e:
+        logger.error(f"Error loading public sessions dashboard: {e}")
+        return templates.TemplateResponse(
+            "public_sessions_dashboard.html",
+            {
+                "request": request,
+                "sessions": [],
+                "total_sessions": 0,
+                "connected_sessions": 0,
+                "error": "Failed to load public sessions dashboard",
+            },
+        )
+
+
 @app.post("/public/energy/{user_id}")
 async def public_set_energy(
     request: Request,

@@ -597,6 +597,112 @@ class DatabaseManager:
             logger.error(f"Error locking profile for user {user_id}: {e}")
             return False
 
+    # Public Access Operations
+    async def get_public_users(self) -> List[Dict[str, Any]]:
+        """Get all users who have enabled public control (placeholder for now)."""
+        # This is a placeholder implementation - you may want to add a proper public_access table
+        # For now, returning empty list since this feature might not be fully implemented
+        return []
+
+    async def get_public_access_settings(
+        self, user_id: int
+    ) -> Optional[Dict[str, Any]]:
+        """Get public access settings for a user (placeholder for now)."""
+        # This is a placeholder implementation - you may want to add a proper public_access table
+        return None
+
+    async def log_public_action(
+        self,
+        user_id: int,
+        action_type: str,
+        action_details: str,
+        visitor_ip: str,
+        user_agent: str,
+    ) -> bool:
+        """Log a public action (placeholder for now)."""
+        # This is a placeholder implementation - you may want to add a proper public_actions table
+        logger.info(
+            f"Public action: {action_type} for user {user_id} from {visitor_ip}"
+        )
+        return True
+
+    # Active Sessions Operations
+    async def get_all_active_sessions(self) -> List[Dict[str, Any]]:
+        """Get all users with active Telegram sessions."""
+        try:
+            async with self.get_connection() as db:
+                cursor = await db.execute(
+                    """
+                    SELECT u.id, u.username, u.telegram_connected, 
+                           u.energy, u.energy_recharge_rate, u.last_energy_update, u.created_at,
+                           ts.session_data, ts.updated_at as session_updated_at
+                    FROM users u
+                    LEFT JOIN telegram_sessions ts ON u.id = ts.user_id
+                    WHERE u.telegram_connected = 1
+                    ORDER BY ts.updated_at DESC NULLS LAST, u.username
+                    """
+                )
+                rows = await cursor.fetchall()
+
+                active_sessions = []
+                for row in rows:
+                    # Calculate current energy with recharge
+                    current_energy = row[3] if row[3] is not None else 100
+                    recharge_rate = row[4] if row[4] is not None else 1
+                    last_update = (
+                        datetime.fromisoformat(row[5]) if row[5] else datetime.now()
+                    )
+
+                    # Calculate recharge
+                    now = datetime.now()
+                    time_diff = (now - last_update).total_seconds()
+                    energy_to_add = (
+                        int(time_diff // 3600) * recharge_rate
+                    )  # 1 energy per hour by default
+                    current_energy = min(100, current_energy + energy_to_add)
+
+                    session_info = {
+                        "user_id": row[0],
+                        "username": row[1],
+                        "telegram_connected": bool(row[2]),
+                        "energy": current_energy,
+                        "energy_recharge_rate": recharge_rate,
+                        "last_energy_update": row[5],
+                        "account_created": row[6],
+                        "has_session_data": bool(row[7]),
+                        "session_last_updated": row[8],
+                        "display_name": row[1],  # Using username as display name
+                        "session_active": bool(
+                            row[7]
+                        ),  # Consider active if has session data
+                    }
+                    active_sessions.append(session_info)
+
+                return active_sessions
+
+        except Exception as e:
+            logger.error(f"Error getting all active sessions: {e}")
+            return []
+
+    async def set_user_energy(self, user_id: int, energy: int) -> bool:
+        """Set user's energy level."""
+        try:
+            async with self.get_connection() as db:
+                await db.execute(
+                    """
+                    UPDATE users 
+                    SET energy = ?, last_energy_update = ?
+                    WHERE id = ?
+                    """,
+                    (energy, datetime.now().isoformat(), user_id),
+                )
+                await db.commit()
+                logger.info(f"Set energy to {energy} for user {user_id}")
+                return True
+        except Exception as e:
+            logger.error(f"Error setting energy for user {user_id}: {e}")
+            return False
+
 
 # Global database manager instance
 _db_manager: Optional[DatabaseManager] = None
