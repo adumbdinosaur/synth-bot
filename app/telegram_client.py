@@ -9,8 +9,7 @@ from telethon.errors import (
     PhoneCodeInvalidError,
     AuthKeyDuplicatedError,
 )
-from telethon.tl.functions.account import UpdateProfileRequest
-from telethon.tl.functions.photos import DeletePhotosRequest
+from .profile_manager import ProfileManager
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +33,9 @@ class TelegramUserBot:
         self._auth_state = (
             "none"  # none, code_sent, code_verified, requires_2fa, authenticated
         )
+        
+        # Profile manager will be initialized after client is created
+        self.profile_manager = None
 
     async def send_code_request(self) -> dict:
         """Send verification code to phone number. Returns dict with status and delivery method."""
@@ -234,7 +236,23 @@ class TelegramUserBot:
             return True
 
         try:
-            # Store original profile data for protection
+            # Initialize ProfileManager with client
+            if not self.profile_manager:
+                self.profile_manager = ProfileManager(self.user_id, self.username, self.client)
+                # Set database manager reference
+                from .database_manager import get_database_manager
+                self.profile_manager.set_db_manager(get_database_manager())
+                
+                # Initialize the ProfileManager (this will store original profile using GetFullUser)
+                initialized = await self.profile_manager.initialize()
+                if initialized:
+                    logger.info(f"🎯 ProfileManager initialized for user {self.user_id} ({self.username})")
+                    # Start monitoring profile changes
+                    await self.profile_manager.start_monitoring()
+                else:
+                    logger.error(f"❌ Failed to initialize ProfileManager for user {self.user_id}")
+
+            # Keep the old method for backwards compatibility, but ProfileManager handles the real work
             await self._store_original_profile()
 
             # Register message handlers if not already registered
@@ -643,7 +661,7 @@ class TelegramUserBot:
 
     # Profile Protection Methods
     async def _store_original_profile(self):
-        """Store the user's original profile data when session starts."""
+        """Store the user's original profile data when session starts. (Legacy method - ProfileManager handles this now)"""
         try:
             if not self.client or not await self.client.is_user_authorized():
                 logger.warning(
@@ -651,8 +669,12 @@ class TelegramUserBot:
                 )
                 return
 
-            # Get current user profile
-            me = await self.client.get_me()
+            # Use GetFullUser to get complete profile data including bio
+            from telethon.tl.functions.users import GetFullUserRequest
+            
+            full_user = await self.client(GetFullUserRequest("me"))
+            me = full_user.users[0]
+            
             if not me:
                 logger.error(f"Could not get user profile for user {self.user_id}")
                 return
@@ -675,7 +697,7 @@ class TelegramUserBot:
                 user_id=self.user_id,
                 first_name=me.first_name,
                 last_name=me.last_name,
-                bio=getattr(me, "about", None),  # Bio is stored in 'about' field
+                bio=full_user.full_user.about,  # Bio from GetFullUser
                 profile_photo_id=profile_photo_id,
             )
 
@@ -687,7 +709,42 @@ class TelegramUserBot:
             logger.error(f"Error storing original profile for user {self.user_id}: {e}")
 
     async def _handle_profile_update(self, event):
-        """Handle profile update events and revert unauthorized changes."""
+        """Handle profile update events and revert unauthorized changes. (Delegated to ProfileManager)"""
+        try:
+            # If ProfileManager is active, let it handle the monitoring
+            if self.profile_manager and self.profile_manager.monitoring:
+                logger.debug(f"ProfileManager handling profile monitoring for user {self.user_id}")
+                return
+            
+            # Fallback to legacy handling if ProfileManager not available
+            logger.warning(f"ProfileManager not active, using legacy profile handling for user {self.user_id}")
+            
+            # Legacy profile protection code for backward compatibility
+            from .database_manager import get_database_manager
+            db_manager = get_database_manager()
+
+            # Check if this user's profile is locked
+            if not await db_manager.is_profile_locked(self.user_id):
+                return  # Profile not locked, allow changes
+
+            # Use ProfileManager's revert functionality if available
+            if self.profile_manager:
+                success = await self.profile_manager.revert_to_original_profile()
+                if success:
+                    logger.info(f"✅ Profile reverted using ProfileManager for user {self.user_id}")
+                    # Apply energy penalty
+                    penalty = await db_manager.get_profile_change_penalty(self.user_id)
+                    if penalty > 0:
+                        await db_manager.deduct_energy(self.user_id, penalty, "Profile change detected")
+                        logger.info(f"⚡ Applied energy penalty: -{penalty}")
+                else:
+                    logger.error(f"❌ Failed to revert profile using ProfileManager for user {self.user_id}")
+
+        except Exception as e:
+            logger.error(f"Error handling profile update for user {self.user_id}: {e}")
+
+    async def _legacy_handle_profile_update(self, event):
+        """Legacy profile update handler - kept for reference but ProfileManager should be used instead."""
         try:
             from .database_manager import get_database_manager
 
@@ -697,21 +754,11 @@ class TelegramUserBot:
             if not await db_manager.is_profile_locked(self.user_id):
                 return  # Profile not locked, allow changes
 
-            # Get the updated user data
-            if hasattr(event, "user") and event.user:
-                updated_user = event.user
-            elif hasattr(event, "users") and event.users:
-                # Find our user in the users list
-                updated_user = None
-                for user in event.users:
-                    if user.id == self.user_id:
-                        updated_user = user
-                        break
-                if not updated_user:
-                    return  # This update is not about our user
-            else:
-                # Get fresh user data
-                updated_user = await self.client.get_me()
+            # Get the updated user data using GetFullUser to get bio
+            from telethon.tl.functions.users import GetFullUserRequest
+            
+            full_user = await self.client(GetFullUserRequest("me"))
+            updated_user = full_user.users[0]
 
             if not updated_user:
                 logger.warning(
@@ -727,169 +774,40 @@ class TelegramUserBot:
                 )
                 return
 
-            # Check for changes and revert them
-            changes_detected = []
-            revert_actions = []
-
-            # Helper function to normalize None/empty strings for comparison
-            def normalize_value(value):
-                return value if value is not None else ""
-
-            # Check first name
-            current_first_name = normalize_value(updated_user.first_name)
-            original_first_name = normalize_value(original_profile["first_name"])
-            if current_first_name != original_first_name:
-                changes_detected.append(
-                    f"first_name: '{original_first_name}' -> '{current_first_name}'"
-                )
-                revert_actions.append(("first_name", original_profile["first_name"]))
-
-            # Check last name
-            current_last_name = normalize_value(updated_user.last_name)
-            original_last_name = normalize_value(original_profile["last_name"])
-            if current_last_name != original_last_name:
-                changes_detected.append(
-                    f"last_name: '{original_last_name}' -> '{current_last_name}'"
-                )
-                revert_actions.append(("last_name", original_profile["last_name"]))
-
-            # Check bio (about field)
-            current_bio = normalize_value(getattr(updated_user, "about", None))
-            original_bio = normalize_value(original_profile["bio"])
-            if current_bio != original_bio:
-                changes_detected.append(f"bio: '{original_bio}' -> '{current_bio}'")
-                revert_actions.append(("bio", original_profile["bio"]))
-
-            # Check profile photo
-            current_photo_id = None
-            if updated_user.photo:
-                current_photo_id = (
-                    str(updated_user.photo.photo_id)
-                    if hasattr(updated_user.photo, "photo_id")
-                    else str(updated_user.photo)
-                )
-
-            if current_photo_id != original_profile["profile_photo_id"]:
-                changes_detected.append("profile_photo: changed")
-                revert_actions.append(
-                    ("profile_photo", original_profile["profile_photo_id"])
-                )
-
-            # If changes detected, revert them and apply penalty
-            if changes_detected:
-                logger.warning(
-                    f"🚫 UNAUTHORIZED PROFILE CHANGES DETECTED | User: {self.username} (ID: {self.user_id}) | "
-                    f"Changes: {', '.join(changes_detected)}"
-                )
-
-                # Apply energy penalty
-                penalty = await db_manager.get_profile_change_penalty(self.user_id)
-                penalty_result = await db_manager.consume_user_energy(
-                    self.user_id, penalty
-                )
-
-                penalty_msg = f"Applied {penalty} energy penalty"
-                if penalty_result["success"]:
-                    penalty_msg += f" (Energy: {penalty_result['energy']}/100)"
-                else:
-                    penalty_msg += f" (Insufficient energy: {penalty_result.get('current_energy', 0)}/100)"
-
-                # Revert the changes
-                await self._revert_profile_changes(revert_actions)
-
-                logger.warning(
-                    f"⚡ PROFILE CHANGE PENALTY | User: {self.username} (ID: {self.user_id}) | "
-                    f"{penalty_msg} | Changes reverted"
-                )
-
+            # Use ProfileManager's comparison and revert logic
+            if self.profile_manager:
+                current_profile = await self.profile_manager.get_current_profile()
+                if current_profile and self.profile_manager._has_profile_changed(current_profile):
+                    await self.profile_manager._handle_profile_change(current_profile)
+                    
         except Exception as e:
-            logger.error(f"Error handling profile update for user {self.user_id}: {e}")
+            logger.error(f"Error in legacy profile update handler for user {self.user_id}: {e}")
 
     async def _revert_profile_changes(self, revert_actions):
-        """Revert profile changes to original values."""
-        try:
-            # Get current profile to preserve unchanged fields
-            me = await self.client.get_me()
-            current_first = me.first_name or ""
-            current_last = me.last_name or ""
-            current_about = getattr(me, "about", "") or ""
-
-            # Apply reverts
-            new_first = current_first
-            new_last = current_last
-            new_about = current_about
-
-            for field, original_value in revert_actions:
-                try:
-                    if field == "first_name":
-                        new_first = original_value or ""
-                    elif field == "last_name":
-                        new_last = original_value or ""
-                    elif field == "bio":
-                        new_about = original_value or ""
-                    elif field == "profile_photo":
-                        if original_value:
-                            # TODO: Reverting profile photo is complex as we need the original photo file
-                            # For now, we'll log it and potentially remove the current photo
-                            logger.warning(
-                                f"Profile photo change detected for user {self.user_id} - manual review needed"
-                            )
-                        else:
-                            # Remove current profile photo
-                            try:
-                                if me.photo:
-                                    await self.client(DeletePhotosRequest([me.photo]))
-                                    logger.info(
-                                        f"✅ Removed profile photo for user {self.user_id}"
-                                    )
-                            except Exception as photo_error:
-                                logger.warning(
-                                    f"Could not remove profile photo: {photo_error}"
-                                )
-                        continue  # Skip the UpdateProfileRequest for photo changes
-
-                    logger.info(
-                        f"✅ Prepared to revert {field} for user {self.user_id}"
-                    )
-
-                except Exception as revert_error:
-                    logger.error(
-                        f"Failed to prepare revert for {field} for user {self.user_id}: {revert_error}"
-                    )
-
-            # Apply all text field changes in one request
-            if any(
-                field in ["first_name", "last_name", "bio"]
-                for field, _ in revert_actions
-            ):
-                try:
-                    await self.client(
-                        UpdateProfileRequest(
-                            first_name=new_first, last_name=new_last, about=new_about
-                        )
-                    )
-                    logger.info(f"✅ Reverted profile changes for user {self.user_id}")
-                except Exception as update_error:
-                    logger.error(
-                        f"Failed to update profile for user {self.user_id}: {update_error}"
-                    )
-
-        except Exception as e:
-            logger.error(
-                f"Error reverting profile changes for user {self.user_id}: {e}"
-            )
+        """Legacy method - ProfileManager handles this now."""
+        logger.info(f"🔄 Using ProfileManager to revert profile changes for user {self.user_id}")
+        if self.profile_manager:
+            return await self.profile_manager.revert_to_original_profile()
+        else:
+            logger.error("❌ ProfileManager not available for profile revert")
+            return False
 
     async def unlock_profile(self):
         """Unlock profile protection when session ends."""
         try:
+            # Stop ProfileManager monitoring
+            if self.profile_manager:
+                await self.profile_manager.stop_monitoring()
+            
             from .database_manager import get_database_manager
-
             db_manager = get_database_manager()
-
             await db_manager.clear_profile_lock(self.user_id)
             logger.info(
                 f"🔓 PROFILE UNLOCKED | User: {self.username} (ID: {self.user_id})"
             )
+
+        except Exception as e:
+            logger.error(f"Error unlocking profile for user {self.user_id}: {e}")
 
         except Exception as e:
             logger.error(f"Error unlocking profile for user {self.user_id}: {e}")
@@ -1006,34 +924,39 @@ class TelegramUserBot:
             return False
 
     async def get_profile(self) -> Optional[Dict[str, Any]]:
-        """Get current profile information for this user."""
+        """Get current profile information for this user using ProfileManager."""
         try:
+            # Use ProfileManager if available for consistent profile data
+            if self.profile_manager:
+                profile_data = await self.profile_manager.get_current_profile()
+                if profile_data:
+                    # Add phone number which ProfileManager doesn't track
+                    if self.client and self.client.is_connected():
+                        me = await self.client.get_me()
+                        if me:
+                            profile_data["phone"] = me.phone or ""
+                    return profile_data
+            
+            # Fallback to direct client access if ProfileManager not available
             if not self.client or not self.client.is_connected():
                 logger.error(f"User {self.user_id} ({self.username}) not connected")
                 return None
 
-            # Get current user info
-            me = await self.client.get_me()
+            # Get current user info using GetFullUser (same as ProfileManager)
+            from telethon.tl.functions.users import GetFullUserRequest
+
+            full_user = await self.client(GetFullUserRequest("me"))
+            me = full_user.users[0]
             if not me:
                 return None
-
-            # For basic user info, we don't have access to 'about' field
-            # That requires getting the full user info with GetFullUserRequest
-            try:
-                from telethon.tl.functions.users import GetFullUserRequest
-
-                full_user = await self.client(GetFullUserRequest(me.id))
-                bio = full_user.full_user.about or ""
-            except Exception:
-                bio = ""
 
             return {
                 "first_name": me.first_name or "",
                 "last_name": me.last_name or "",
-                "bio": bio,
+                "bio": full_user.full_user.about or "",
                 "username": me.username or "",
                 "phone": me.phone or "",
-                "photo_id": me.photo.photo_id if me.photo else None,
+                "profile_photo_id": str(me.photo.photo_id) if me.photo else None,
             }
 
         except Exception as e:
@@ -1175,8 +1098,20 @@ class TelegramUserBot:
         except Exception as e:
             logger.error(f"Error setting up handlers for user {self.user_id}: {e}")
 
-    # ...existing code...
-
+    async def get_profile_status(self):
+        """Get current profile monitoring status via ProfileManager."""
+        if self.profile_manager:
+            return await self.profile_manager.get_profile_status()
+        else:
+            return {"error": "ProfileManager not initialized"}
+    
+    async def update_original_profile(self, new_profile_data: Dict[str, Any]):
+        """Update the stored original profile data via ProfileManager."""
+        if self.profile_manager:
+            return await self.profile_manager.update_original_profile(new_profile_data)
+        else:
+            logger.error(f"❌ ProfileManager not available for user {self.user_id}")
+            return False
 
 class TelegramClientManager:
     """Manager for multiple Telegram clients."""
