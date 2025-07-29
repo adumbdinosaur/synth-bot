@@ -1352,9 +1352,7 @@ async def update_user_profile(
             )
 
         # Always save the current state as the new original/saved state
-        save_success = (
-            await client_instance.profile_manager.save_current_as_original()
-        )
+        save_success = await client_instance.profile_manager.save_current_as_original()
         message = (
             "Profile updated and saved as new state"
             if save_success
