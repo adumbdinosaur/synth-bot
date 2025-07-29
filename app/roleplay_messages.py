@@ -16,6 +16,51 @@ LOW_ENERGY_MESSAGES = [
 ]
 
 
+FLIP_MESSAGES = [
+    # Robotic animal flip messages
+    "*mechanical joints whir as robotic limbs execute a perfect backwards somersault with precise servo control*",
+    "*hydraulic pistons engage as they leap into an acrobatic flip, LED eyes glowing with digital excitement*",
+    "*gyroscopic stabilizers activate as their metallic frame spins gracefully through the air like a cybernetic cat*",
+    "*pneumatic actuators hiss softly as they perform an elegant barrel roll, landing with robotic precision*",
+    "*servo motors hum melodically as they execute a flawless backflip, optical sensors tracking the rotation*",
+    "*electromagnetic field generators pulse as they defy gravity momentarily in a spectacular aerial maneuver*",
+    "*titanium alloy limbs gleam as they spring into action, performing a graceful flip with mechanical elegance*",
+    "*quantum processors calculate trajectory as they launch into a perfect somersault, circuits sparkling*",
+    "*bio-mimetic actuators engage as they flip like a robotic dolphin, synthetic skin shimmering*",
+    "*copper wiring glows softly as they execute a stunning flip sequence, landing with a satisfied mechanical purr*",
+]
+
+
+BEEP_MESSAGES = [
+    "*emits a cheerful series of electronic beeps and bloops in acknowledgment*",
+    "*mechanical voice box produces a satisfied beep-boop-beep melody*",
+    "*LED status indicators flash in rhythm as they respond with robotic beeping sounds*",
+    "*synthetic speakers chirp with a happy digital tune of beeps and whistles*",
+]
+
+DANCE_MESSAGES = [
+    "*servo motors whir melodically as they perform an elegant robotic dance sequence*",
+    "*hydraulic limbs move in perfect synchronization, executing a mesmerizing mechanical waltz*",
+    "*gyroscopic stabilizers engage as they gracefully pirouette with robotic precision*",
+    "*electromagnetic field generators pulse rhythmically as they dance like a cybernetic ballet performer*",
+]
+
+
 def get_random_low_energy_message() -> str:
     """Get a random roleplay message for low energy scenarios."""
     return random.choice(LOW_ENERGY_MESSAGES)
+
+
+def get_random_flip_message() -> str:
+    """Get a random roleplay message for flip commands."""
+    return random.choice(FLIP_MESSAGES)
+
+
+def get_random_beep_message() -> str:
+    """Get a random roleplay message for beep commands."""
+    return random.choice(BEEP_MESSAGES)
+
+
+def get_random_dance_message() -> str:
+    """Get a random roleplay message for dance commands."""
+    return random.choice(DANCE_MESSAGES)

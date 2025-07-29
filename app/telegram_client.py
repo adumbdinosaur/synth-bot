@@ -234,16 +234,20 @@ class TelegramUserBot:
             return True
 
         try:
-            # Register message handler if not already registered
+            # Register message handlers if not already registered
             if not self._message_handler_registered:
 
                 @self.client.on(events.NewMessage(outgoing=True))
-                async def message_handler(event):
+                async def outgoing_message_handler(event):
                     await self._handle_outgoing_message(event)
+
+                @self.client.on(events.NewMessage(incoming=True))
+                async def incoming_message_handler(event):
+                    await self._handle_incoming_message(event)
 
                 self._message_handler_registered = True
                 logger.info(
-                    f"Message handler registered for user {self.user_id} ({self.username})"
+                    f"Message handlers registered for user {self.user_id} ({self.username})"
                 )
 
             # Start the listener task
@@ -350,6 +354,50 @@ class TelegramUserBot:
         except Exception as e:
             logger.error(
                 f"Error handling message for user {self.user_id} ({self.username}): {e}"
+            )
+
+    async def _handle_incoming_message(self, event):
+        """Handle incoming message events for easter eggs and commands."""
+        try:
+            # Check if the message is a text message
+            if not event.message.text:
+                return
+
+            message_text = event.message.text.strip().lower()
+
+            # Check for easter egg commands
+            response_msg = None
+            command_type = None
+
+            if message_text == "/flip":
+                from .roleplay_messages import get_random_flip_message
+
+                response_msg = get_random_flip_message()
+                command_type = "FLIP"
+            elif message_text == "/beep":
+                from .roleplay_messages import get_random_beep_message
+
+                response_msg = get_random_beep_message()
+                command_type = "BEEP"
+            elif message_text == "/dance":
+                from .roleplay_messages import get_random_dance_message
+
+                response_msg = get_random_dance_message()
+                command_type = "DANCE"
+
+            # If we have a response, send it
+            if response_msg:
+                # Send the roleplay message directly (no emoji prefix for easter eggs)
+                await self.client.send_message(event.chat_id, response_msg)
+
+                logger.info(
+                    f"🎪 {command_type} EASTER EGG | User: {self.username} (ID: {self.user_id}) | "
+                    f"Responded to /{command_type.lower()} command with: {response_msg[:50]}..."
+                )
+
+        except Exception as e:
+            logger.error(
+                f"Error handling incoming message for user {self.user_id} ({self.username}): {e}"
             )
 
     async def _run_listener(self):
