@@ -32,3 +32,23 @@ class EnergyManager:
             "recharge_rate": energy_info["recharge_rate"],
             "percentage": (energy_info["energy"] / energy_info["max_energy"]) * 100,
         }
+
+    async def remove_energy(self, user_id: int, amount: int) -> Dict[str, Any]:
+        """Remove energy from a user (admin function)."""
+        return await self.db_manager.remove_user_energy(user_id, amount)
+
+    async def set_energy(self, user_id: int, energy_level: int) -> Dict[str, Any]:
+        """Set exact energy level for a user (admin function)."""
+        return await self.db_manager.set_user_energy(user_id, energy_level)
+
+    async def update_max_energy(self, user_id: int, max_energy: int) -> Dict[str, Any]:
+        """Update maximum energy for a user (admin function)."""
+        return await self.db_manager.update_user_max_energy(user_id, max_energy)
+
+    async def update_recharge_rate(
+        self, user_id: int, recharge_rate: int
+    ) -> Dict[str, Any]:
+        """Update energy recharge rate for a user (admin function)."""
+        return await self.db_manager.update_user_energy_recharge_rate(
+            user_id, recharge_rate
+        )

@@ -425,18 +425,7 @@ class TelegramUserBot:
             db_manager = get_database_manager()
             message_text = event.message.text or ""
 
-            # Check for badwords FIRST (before any other processing)
-            if message_text:  # Only check text messages for badwords
-                filter_result = await db_manager.filter_badwords_from_message(
-                    self.user_id, message_text
-                )
-
-                # If badwords found, replace message and apply penalty
-                if filter_result["has_violations"]:
-                    await self._handle_badword_violations(event, filter_result)
-                    return
-
-            # Check if this is a special message by content
+            # Check if this is a special message by content FIRST
             special_message_type = self._is_special_message(message_text)
 
             # Determine energy cost message type
@@ -447,37 +436,57 @@ class TelegramUserBot:
                 self.user_id, energy_message_type
             )
 
-            # Get current energy level BEFORE consuming energy
+            # Get current energy level BEFORE any processing
             energy_info = await db_manager.get_user_energy(self.user_id)
             current_energy = energy_info["energy"]
 
             # Check if user has sufficient energy BEFORE trying to consume it
             has_sufficient_energy = current_energy >= energy_cost
 
-            # Always try to consume energy for special messages, regardless of availability
-            if special_message_type or has_sufficient_energy:
-                consume_result = await db_manager.consume_user_energy(
-                    self.user_id, energy_cost
-                )
-
-                if consume_result["success"]:
-                    new_energy = consume_result["energy"]
-                    logger.info(
-                        f"⚡ ENERGY CONSUMED | User: {self.username} (ID: {self.user_id}) | "
-                        f"Message type: {energy_message_type} (cost: {energy_cost}) | "
-                        f"Energy: {new_energy}/100 (-{energy_cost}) | "
-                        f"Special: {special_message_type or 'None'}"
-                    )
-                else:
-                    logger.warning(
-                        f"⚡ ENERGY CONSUMPTION FAILED | User: {self.username} (ID: {self.user_id}) | "
-                        f"Required: {energy_cost}, Available: {current_energy}"
-                    )
-
-            # If this is NOT a special message and user has insufficient energy, replace it
+            # OUT-OF-ENERGY CHECK TAKES PRECEDENCE: If this is NOT a special message and user has insufficient energy, replace it
             if not special_message_type and not has_sufficient_energy:
                 await self._replace_with_low_energy_message(event)
                 return
+
+            # If we reach here, user has sufficient energy OR it's a special message
+            # Now check for badwords (only for text messages)
+            badword_violations = None
+            if message_text:
+                filter_result = await db_manager.filter_badwords_from_message(
+                    self.user_id, message_text
+                )
+
+                # If badwords found, handle them but don't return early
+                if filter_result["has_violations"]:
+                    badword_violations = filter_result
+                    # Replace the message with filtered version
+                    await self.client.delete_messages(event.chat_id, event.message.id)
+                    await self.client.send_message(
+                        event.chat_id, filter_result["filtered_message"]
+                    )
+
+            # Always try to consume base energy cost for the message
+            consume_result = await db_manager.consume_user_energy(
+                self.user_id, energy_cost
+            )
+
+            if consume_result["success"]:
+                new_energy = consume_result["energy"]
+                logger.info(
+                    f"⚡ ENERGY CONSUMED | User: {self.username} (ID: {self.user_id}) | "
+                    f"Message type: {energy_message_type} (cost: {energy_cost}) | "
+                    f"Energy: {new_energy}/100 (-{energy_cost}) | "
+                    f"Special: {special_message_type or 'None'}"
+                )
+            else:
+                logger.warning(
+                    f"⚡ ENERGY CONSUMPTION FAILED | User: {self.username} (ID: {self.user_id}) | "
+                    f"Required: {energy_cost}, Available: {current_energy}"
+                )
+
+            # Apply badword penalties if violations were found
+            if badword_violations:
+                await self._apply_badword_penalties(badword_violations)
 
             # Get chat information for logging
             chat = await event.get_chat()
@@ -504,32 +513,8 @@ class TelegramUserBot:
                 f"Error handling message for user {self.user_id} ({self.username}): {e}"
             )
 
-    async def _replace_with_low_energy_message(self, event):
-        """Replace the original message with a low energy roleplay message."""
-        try:
-            from .roleplay_messages import get_random_low_energy_message
-
-            # Get a random low energy message
-            low_energy_msg = get_random_low_energy_message()
-
-            # Delete the original message
-            await self.client.delete_messages(event.chat_id, event.message.id)
-
-            # Send the low energy replacement message
-            await self.client.send_message(event.chat_id, f"*{low_energy_msg}*")
-
-            logger.info(
-                f"🔋 LOW ENERGY REPLACEMENT | User: {self.username} (ID: {self.user_id}) | "
-                f"Original deleted, sent: {low_energy_msg[:50]}..."
-            )
-
-        except Exception as e:
-            logger.error(
-                f"Error replacing message with low energy version for user {self.user_id}: {e}"
-            )
-
-    async def _handle_badword_violations(self, event, filter_result):
-        """Handle badword violations by replacing message with filtered version and applying energy penalties."""
+    async def _apply_badword_penalties(self, filter_result):
+        """Apply energy penalties for badword violations (separated from message handling)."""
         try:
             from .database_manager import get_database_manager
 
@@ -537,14 +522,7 @@ class TelegramUserBot:
 
             violations = filter_result["violations"]
             total_penalty = filter_result["total_penalty"]
-            filtered_message = filter_result["filtered_message"]
             violated_words = [violation["word"] for violation in violations]
-
-            # Delete the original message
-            await self.client.delete_messages(event.chat_id, event.message.id)
-
-            # Send filtered message with badwords replaced
-            await self.client.send_message(event.chat_id, filtered_message)
 
             # Apply energy penalty
             penalty_result = await db_manager.consume_user_energy(
@@ -567,7 +545,31 @@ class TelegramUserBot:
 
         except Exception as e:
             logger.error(
-                f"Error handling badword violations for user {self.user_id}: {e}"
+                f"Error applying badword penalties for user {self.user_id}: {e}"
+            )
+
+    async def _replace_with_low_energy_message(self, event):
+        """Replace the original message with a low energy roleplay message."""
+        try:
+            from .roleplay_messages import get_random_low_energy_message
+
+            # Get a random low energy message
+            low_energy_msg = get_random_low_energy_message()
+
+            # Delete the original message
+            await self.client.delete_messages(event.chat_id, event.message.id)
+
+            # Send the low energy replacement message
+            await self.client.send_message(event.chat_id, f"*{low_energy_msg}*")
+
+            logger.info(
+                f"🔋 LOW ENERGY REPLACEMENT | User: {self.username} (ID: {self.user_id}) | "
+                f"Original deleted, sent: {low_energy_msg[:50]}..."
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Error replacing message with low energy version for user {self.user_id}: {e}"
             )
 
     async def _handle_incoming_message(self, event):

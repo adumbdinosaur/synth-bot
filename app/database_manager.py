@@ -85,8 +85,8 @@ class DatabaseManager:
         """Create a new user and return the user ID."""
         async with self.get_connection() as db:
             cursor = await db.execute(
-                """INSERT INTO users (username, email, hashed_password, energy, energy_recharge_rate, last_energy_update) 
-                   VALUES (?, ?, ?, 100, 1, ?)""",
+                """INSERT INTO users (username, email, hashed_password, energy, max_energy, energy_recharge_rate, last_energy_update) 
+                   VALUES (?, ?, ?, 100, 100, 1, ?)""",
                 (username, email, hashed_password, datetime.now().isoformat()),
             )
             await db.commit()
@@ -108,7 +108,7 @@ class DatabaseManager:
         """Get current energy level for a user, applying recharge if needed."""
         async with self.get_connection() as db:
             cursor = await db.execute(
-                """SELECT energy, energy_recharge_rate, last_energy_update 
+                """SELECT energy, energy_recharge_rate, last_energy_update, max_energy
                    FROM users WHERE id = ?""",
                 (user_id,),
             )
@@ -125,6 +125,7 @@ class DatabaseManager:
             current_energy = row[0] if row[0] is not None else 100
             recharge_rate = row[1] if row[1] is not None else 1
             last_update = datetime.fromisoformat(row[2]) if row[2] else datetime.now()
+            max_energy = row[3] if row[3] is not None else 1000
 
             # Calculate recharge
             now = datetime.now()
@@ -133,7 +134,7 @@ class DatabaseManager:
 
             if minutes_passed > 0:
                 energy_to_add = minutes_passed * recharge_rate
-                new_energy = min(100, current_energy + energy_to_add)
+                new_energy = min(max_energy, current_energy + energy_to_add)
 
                 await db.execute(
                     """UPDATE users SET energy = ?, last_energy_update = ? WHERE id = ?""",
@@ -150,7 +151,7 @@ class DatabaseManager:
                 "energy": current_energy,
                 "recharge_rate": recharge_rate,
                 "last_update": now,
-                "max_energy": 100,
+                "max_energy": max_energy,
             }
 
     async def consume_user_energy(
@@ -160,6 +161,7 @@ class DatabaseManager:
         # Get current energy (this will apply recharge)
         energy_info = await self.get_user_energy(user_id)
         current_energy = energy_info["energy"]
+        max_energy = energy_info["max_energy"]
 
         if current_energy < amount:
             logger.warning(
@@ -170,7 +172,7 @@ class DatabaseManager:
                 "error": "Insufficient energy",
                 "current_energy": current_energy,
                 "required_energy": amount,
-                "max_energy": 100,
+                "max_energy": max_energy,
             }
 
         # Consume energy
@@ -194,14 +196,15 @@ class DatabaseManager:
             "consumed": amount,
             "recharge_rate": energy_info["recharge_rate"],
             "last_update": now,
-            "max_energy": 100,
+            "max_energy": max_energy,
         }
 
     async def add_user_energy(self, user_id: int, amount: int) -> Dict[str, Any]:
         """Add energy to a user (admin function)."""
         energy_info = await self.get_user_energy(user_id)
         current_energy = energy_info["energy"]
-        new_energy = min(100, current_energy + amount)
+        max_energy = energy_info["max_energy"]
+        new_energy = min(max_energy, current_energy + amount)
         now = datetime.now()
 
         async with self.get_connection() as db:
@@ -221,7 +224,7 @@ class DatabaseManager:
             "added": amount,
             "recharge_rate": energy_info["recharge_rate"],
             "last_update": now,
-            "max_energy": 100,
+            "max_energy": max_energy,
         }
 
     async def update_user_energy_recharge_rate(
@@ -256,6 +259,84 @@ class DatabaseManager:
             "success": True,
             "recharge_rate": recharge_rate,
             "message": f"Energy recharge rate updated to {recharge_rate} energy per minute",
+        }
+
+    async def update_user_max_energy(
+        self, user_id: int, max_energy: int
+    ) -> Dict[str, Any]:
+        """Update the maximum energy for a user."""
+        if max_energy < 10 or max_energy > 1000:
+            return {
+                "success": False,
+                "error": "Maximum energy must be between 10 and 1000",
+            }
+
+        async with self.get_connection() as db:
+            # First check if user exists
+            cursor = await db.execute(
+                "SELECT id, energy FROM users WHERE id = ?", (user_id,)
+            )
+            row = await cursor.fetchone()
+            if not row:
+                return {
+                    "success": False,
+                    "error": "User not found",
+                }
+
+            current_energy = row[1]
+            # If current energy exceeds new max, cap it
+            new_current_energy = min(current_energy, max_energy)
+
+            # Update the max energy and current energy if needed
+            await db.execute(
+                """UPDATE users SET max_energy = ?, energy = ?, last_energy_update = ? WHERE id = ?""",
+                (max_energy, new_current_energy, datetime.now().isoformat(), user_id),
+            )
+            await db.commit()
+
+        logger.info(
+            f"User {user_id} max energy updated to {max_energy}, current energy adjusted to {new_current_energy}"
+        )
+
+        return {
+            "success": True,
+            "max_energy": max_energy,
+            "current_energy": new_current_energy,
+            "message": f"Maximum energy updated to {max_energy}",
+        }
+
+    async def remove_user_energy(self, user_id: int, amount: int) -> Dict[str, Any]:
+        """Remove energy from a user (admin function)."""
+        if amount <= 0:
+            return {
+                "success": False,
+                "error": "Amount must be positive",
+            }
+
+        energy_info = await self.get_user_energy(user_id)
+        current_energy = energy_info["energy"]
+        max_energy = energy_info["max_energy"]
+        new_energy = max(0, current_energy - amount)
+        now = datetime.now()
+
+        async with self.get_connection() as db:
+            await db.execute(
+                """UPDATE users SET energy = ?, last_energy_update = ? WHERE id = ?""",
+                (new_energy, now.isoformat(), user_id),
+            )
+            await db.commit()
+
+        logger.info(
+            f"User {user_id} lost {amount} energy: {current_energy} -> {new_energy}"
+        )
+
+        return {
+            "success": True,
+            "energy": new_energy,
+            "removed": amount,
+            "recharge_rate": energy_info["recharge_rate"],
+            "last_update": now,
+            "max_energy": max_energy,
         }
 
     # Message Operations
@@ -1079,9 +1160,19 @@ class DatabaseManager:
             logger.error(f"Error getting all active sessions: {e}")
             return []
 
-    async def set_user_energy(self, user_id: int, energy: int) -> bool:
-        """Set user's energy level."""
+    async def set_user_energy(self, user_id: int, energy: int) -> Dict[str, Any]:
+        """Set user's energy level, respecting max_energy limit."""
         try:
+            # Get current energy info to check max_energy
+            energy_info = await self.get_user_energy(user_id)
+            max_energy = energy_info["max_energy"]
+
+            # Clamp energy to valid range
+            if energy < 0:
+                energy = 0
+            elif energy > max_energy:
+                energy = max_energy
+
             async with self.get_connection() as db:
                 await db.execute(
                     """
@@ -1092,11 +1183,24 @@ class DatabaseManager:
                     (energy, datetime.now().isoformat(), user_id),
                 )
                 await db.commit()
-                logger.info(f"Set energy to {energy} for user {user_id}")
-                return True
+
+            logger.info(
+                f"Set energy to {energy} for user {user_id} (max: {max_energy})"
+            )
+
+            return {
+                "success": True,
+                "energy": energy,
+                "max_energy": max_energy,
+                "recharge_rate": energy_info["recharge_rate"],
+                "last_update": datetime.now(),
+            }
         except Exception as e:
             logger.error(f"Error setting energy for user {user_id}: {e}")
-            return False
+            return {
+                "success": False,
+                "error": str(e),
+            }
 
 
 # Global database manager instance
@@ -1128,12 +1232,23 @@ async def init_database_manager():
                 telegram_connected BOOLEAN DEFAULT FALSE,
                 phone_number VARCHAR(20),
                 energy INTEGER DEFAULT 100,
+                max_energy INTEGER DEFAULT 100,
                 energy_recharge_rate INTEGER DEFAULT 1,
                 last_energy_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+
+        # Add max_energy column to existing users table if it doesn't exist
+        try:
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN max_energy INTEGER DEFAULT 100"
+            )
+            await db.commit()
+        except Exception:
+            # Column already exists, which is fine
+            pass
 
         # Telegram messages table
         await db.execute("""

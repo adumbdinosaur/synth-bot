@@ -1331,6 +1331,177 @@ async def update_session_recharge_rate(
         )
 
 
+@app.post("/public/sessions/{user_id}/energy/add")
+async def add_user_energy(
+    request: Request,
+    user_id: int,
+    amount: int = Form(...),
+):
+    """Add energy to a user via public dashboard."""
+    try:
+        energy_manager = EnergyManager()
+
+        # Verify user exists
+        db_manager = get_database_manager()
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Validate amount
+        if amount <= 0:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Amount must be positive",
+                status_code=303,
+            )
+
+        # Add energy
+        result = await energy_manager.add_energy(user_id, amount)
+
+        if result["success"]:
+            logger.info(f"Added {amount} energy to user {user_id}")
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Added {amount} energy. Current: {result['energy']}/{result['max_energy']}",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Failed to add energy",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding energy for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to add energy",
+            status_code=303,
+        )
+
+
+@app.post("/public/sessions/{user_id}/energy/remove")
+async def remove_user_energy(
+    request: Request,
+    user_id: int,
+    amount: int = Form(...),
+):
+    """Remove energy from a user via public dashboard."""
+    try:
+        energy_manager = EnergyManager()
+
+        # Verify user exists
+        db_manager = get_database_manager()
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Remove energy
+        result = await energy_manager.remove_energy(user_id, amount)
+
+        if result["success"]:
+            logger.info(f"Removed {amount} energy from user {user_id}")
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Removed {amount} energy. Current: {result['energy']}/{result['max_energy']}",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error={result.get('error', 'Failed to remove energy')}",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error removing energy for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to remove energy",
+            status_code=303,
+        )
+
+
+@app.post("/public/sessions/{user_id}/energy/set")
+async def set_user_energy_level(
+    request: Request,
+    user_id: int,
+    energy_level: int = Form(...),
+):
+    """Set exact energy level for a user via public dashboard."""
+    try:
+        energy_manager = EnergyManager()
+
+        # Verify user exists
+        db_manager = get_database_manager()
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Set energy level
+        result = await energy_manager.set_energy(user_id, energy_level)
+
+        if result["success"]:
+            logger.info(f"Set energy to {energy_level} for user {user_id}")
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Energy set to {result['energy']}/{result['max_energy']}",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error={result.get('error', 'Failed to set energy')}",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting energy for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to set energy",
+            status_code=303,
+        )
+
+
+@app.post("/public/sessions/{user_id}/energy/max-energy")
+async def update_user_max_energy_level(
+    request: Request,
+    user_id: int,
+    max_energy: int = Form(...),
+):
+    """Update maximum energy for a user via public dashboard."""
+    try:
+        energy_manager = EnergyManager()
+
+        # Verify user exists
+        db_manager = get_database_manager()
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Update max energy
+        result = await energy_manager.update_max_energy(user_id, max_energy)
+
+        if result["success"]:
+            logger.info(f"Updated max energy to {max_energy} for user {user_id}")
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Maximum energy updated to {result['max_energy']}. Current: {result['current_energy']}/{result['max_energy']}",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error={result.get('error', 'Failed to update maximum energy')}",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating max energy for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to update maximum energy",
+            status_code=303,
+        )
+
+
 @app.post("/public/sessions/{user_id}/profile/update")
 async def update_user_profile(
     request: Request,
@@ -1869,82 +2040,3 @@ async def public_update_badword(
             url=f"/public/sessions/{user_id}?error=Failed to update badword",
             status_code=303,
         )
-
-
-@app.post("/public/sessions/{user_id}/profile/update")
-async def update_user_profile(
-    request: Request,
-    user_id: int,
-    first_name: str = Form(None),
-    last_name: str = Form(None),
-    bio: str = Form(None),
-    profile_photo: str = Form(None),  # For now, just handle text fields
-    save_as_new_state: bool = Form(False),
-):
-    """Update user profile via ProfileManager - costs no energy."""
-    try:
-        db_manager = get_database_manager()
-        telegram_manager = get_telegram_manager()
-
-        # Verify user exists
-        user = await db_manager.get_user_by_id(user_id)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        # Get the user's telegram client
-        client_instance = telegram_manager.clients.get(user_id)
-        if not client_instance or not client_instance.profile_manager:
-            return RedirectResponse(
-                url=f"/public/sessions/{user_id}?error=User not connected or profile manager not available",
-                status_code=303,
-            )
-
-        # Update the profile using ProfileManager
-        success = await client_instance.profile_manager.update_profile(
-            first_name=first_name if first_name else None,
-            last_name=last_name if last_name else None,
-            bio=bio if bio else None,
-            profile_photo_file=None,  # TODO: Handle file uploads later
-        )
-
-        if not success:
-            return RedirectResponse(
-                url=f"/public/sessions/{user_id}?error=Failed to update profile",
-                status_code=303,
-            )
-
-        # If requested, save the current state as the new original/saved state
-        if save_as_new_state:
-            save_success = (
-                await client_instance.profile_manager.save_current_as_original()
-            )
-            if save_success:
-                logger.info(f"Saved new profile state for user {user_id}")
-                message = "Profile updated and saved as new state"
-            else:
-                logger.warning(
-                    f"Profile updated but failed to save new state for user {user_id}"
-                )
-                message = "Profile updated but failed to save as new state"
-        else:
-            message = "Profile updated successfully"
-
-        return RedirectResponse(
-            url=f"/public/sessions/{user_id}?success={message}",
-            status_code=303,
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating profile for user {user_id}: {e}")
-        return RedirectResponse(
-            url=f"/public/sessions/{user_id}?error=Failed to update profile",
-            status_code=303,
-        )
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=8000)
