@@ -142,6 +142,21 @@ async def init_db():
             )
         """)
 
+        # Badwords table (stores badwords and their energy penalties for each user)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_badwords (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                word TEXT NOT NULL,
+                penalty INTEGER NOT NULL DEFAULT 5,
+                case_sensitive BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id),
+                UNIQUE(user_id, word COLLATE NOCASE)
+            )
+        """)
+
         await db.commit()
 
     # Run energy system migration for existing databases

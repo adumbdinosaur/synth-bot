@@ -459,206 +459,179 @@ class DatabaseManager:
             )
             return 10  # Default penalty
 
-    async def store_original_profile(
-        self,
-        user_id: int,
-        first_name: str = None,
-        last_name: str = None,
-        bio: str = None,
-        profile_photo_id: str = None,
-    ) -> bool:
-        """Store the user's original profile data when session starts."""
-        try:
-            async with self.get_connection() as db:
-                # Check if record exists
-                cursor = await db.execute(
-                    "SELECT id FROM user_profile_protection WHERE user_id = ?",
-                    (user_id,),
-                )
-                exists = await cursor.fetchone()
-
-                if exists:
-                    # Update existing record
-                    await db.execute(
-                        """
-                        UPDATE user_profile_protection 
-                        SET original_first_name = COALESCE(?, original_first_name),
-                            original_last_name = COALESCE(?, original_last_name),
-                            original_bio = COALESCE(?, original_bio),
-                            original_profile_photo_id = COALESCE(?, original_profile_photo_id),
-                            profile_locked_at = datetime('now'),
-                            updated_at = datetime('now')
-                        WHERE user_id = ?
-                        """,
-                        (first_name, last_name, bio, profile_photo_id, user_id),
-                    )
-                else:
-                    # Insert new record
-                    await db.execute(
-                        """
-                        INSERT INTO user_profile_protection 
-                        (user_id, original_first_name, original_last_name, original_bio, 
-                         original_profile_photo_id, profile_locked_at)
-                        VALUES (?, ?, ?, ?, ?, datetime('now'))
-                        """,
-                        (user_id, first_name, last_name, bio, profile_photo_id),
-                    )
-
-                await db.commit()
-                logger.info(f"Stored original profile data for user {user_id}")
-                return True
-        except Exception as e:
-            logger.error(f"Error storing original profile for user {user_id}: {e}")
-            return False
-
-    async def get_original_profile(self, user_id: int) -> Optional[Dict[str, Any]]:
-        """Get the user's original profile data."""
+    # Badwords Operations
+    async def get_user_badwords(self, user_id: int) -> List[Dict[str, Any]]:
+        """Get all badwords for a user."""
         try:
             async with self.get_connection() as db:
                 cursor = await db.execute(
-                    """
-                    SELECT original_first_name, original_last_name, original_bio, 
-                           original_profile_photo_id, profile_locked_at
-                    FROM user_profile_protection 
-                    WHERE user_id = ?
-                    """,
+                    """SELECT id, word, penalty, case_sensitive, created_at 
+                       FROM user_badwords WHERE user_id = ? ORDER BY word""",
                     (user_id,),
                 )
-                row = await cursor.fetchone()
-                if row:
-                    return {
-                        "first_name": row[0],
-                        "last_name": row[1],
-                        "bio": row[2],
-                        "profile_photo_id": row[3],
-                        "locked_at": row[4],
+                rows = await cursor.fetchall()
+                return [
+                    {
+                        "id": row[0],
+                        "word": row[1],
+                        "penalty": row[2],
+                        "case_sensitive": bool(row[3]),
+                        "created_at": row[4],
                     }
-                return None
+                    for row in rows
+                ]
         except Exception as e:
-            logger.error(f"Error getting original profile for user {user_id}: {e}")
-            return None
+            logger.error(f"Error getting badwords for user {user_id}: {e}")
+            return []
 
-    async def clear_profile_lock(self, user_id: int) -> bool:
-        """Clear the profile lock when session ends."""
+    async def add_badword(
+        self, user_id: int, word: str, penalty: int = 5, case_sensitive: bool = False
+    ) -> bool:
+        """Add a badword for a user."""
         try:
             async with self.get_connection() as db:
                 await db.execute(
-                    """
-                    UPDATE user_profile_protection 
-                    SET profile_locked_at = NULL, updated_at = datetime('now')
-                    WHERE user_id = ?
-                    """,
-                    (user_id,),
+                    """INSERT OR REPLACE INTO user_badwords 
+                       (user_id, word, penalty, case_sensitive, updated_at) 
+                       VALUES (?, ?, ?, ?, datetime('now'))""",
+                    (user_id, word.strip(), penalty, case_sensitive),
                 )
                 await db.commit()
-                logger.info(f"Cleared profile lock for user {user_id}")
+                logger.info(f"Added badword '{word}' for user {user_id} with penalty {penalty}")
                 return True
         except Exception as e:
-            logger.error(f"Error clearing profile lock for user {user_id}: {e}")
+            logger.error(f"Error adding badword for user {user_id}: {e}")
             return False
 
-    async def is_profile_locked(self, user_id: int) -> bool:
-        """Check if user's profile is currently locked."""
+    async def remove_badword(self, user_id: int, word: str) -> bool:
+        """Remove a badword for a user."""
         try:
             async with self.get_connection() as db:
                 cursor = await db.execute(
-                    "SELECT profile_locked_at FROM user_profile_protection WHERE user_id = ?",
-                    (user_id,),
+                    "DELETE FROM user_badwords WHERE user_id = ? AND word = ?",
+                    (user_id, word),
                 )
-                row = await cursor.fetchone()
-                return row and row[0] is not None
+                await db.commit()
+                if cursor.rowcount > 0:
+                    logger.info(f"Removed badword '{word}' for user {user_id}")
+                    return True
+                return False
         except Exception as e:
-            logger.error(f"Error checking profile lock status for user {user_id}: {e}")
+            logger.error(f"Error removing badword for user {user_id}: {e}")
             return False
 
-    async def get_profile_protection_settings(
-        self, user_id: int
-    ) -> Optional[Dict[str, Any]]:
-        """Get profile protection settings for a user."""
+    async def update_badword_penalty(self, user_id: int, word: str, penalty: int) -> bool:
+        """Update the penalty for a specific badword."""
         try:
             async with self.get_connection() as db:
                 cursor = await db.execute(
-                    """
-                    SELECT profile_change_penalty, original_first_name, original_last_name, 
-                           original_bio, original_profile_photo_id, profile_locked_at
-                    FROM user_profile_protection 
-                    WHERE user_id = ?
-                    """,
-                    (user_id,),
+                    """UPDATE user_badwords SET penalty = ?, updated_at = datetime('now') 
+                       WHERE user_id = ? AND word = ?""",
+                    (penalty, user_id, word),
                 )
-                row = await cursor.fetchone()
-                if row:
-                    return {
-                        "profile_protection_enabled": True,
-                        "profile_change_penalty": row[0],
-                        "original_first_name": row[1],
-                        "original_last_name": row[2],
-                        "original_bio": row[3],
-                        "original_profile_photo_id": row[4],
-                        "profile_locked": row[5] is not None,
-                    }
+                await db.commit()
+                if cursor.rowcount > 0:
+                    logger.info(f"Updated penalty for badword '{word}' to {penalty} for user {user_id}")
+                    return True
+                return False
+        except Exception as e:
+            logger.error(f"Error updating badword penalty for user {user_id}: {e}")
+            return False
+
+    async def check_for_badwords(self, user_id: int, message_text: str) -> List[Dict[str, Any]]:
+        """Check if message contains any badwords and return list of violations."""
+        try:
+            badwords = await self.get_user_badwords(user_id)
+            violations = []
+            
+            if not badwords or not message_text:
+                return violations
+            
+            # Check each badword
+            for badword_info in badwords:
+                word = badword_info["word"]
+                penalty = badword_info["penalty"]
+                case_sensitive = badword_info["case_sensitive"]
+                
+                # Determine if word is found in message
+                if case_sensitive:
+                    found = word in message_text
                 else:
-                    # Return default settings if no record exists
-                    return {
-                        "profile_protection_enabled": False,
-                        "profile_change_penalty": 10,
-                    }
+                    found = word.lower() in message_text.lower()
+                
+                if found:
+                    violations.append({
+                        "word": word,
+                        "penalty": penalty,
+                        "case_sensitive": case_sensitive
+                    })
+            
+            return violations
         except Exception as e:
-            logger.error(
-                f"Error getting profile protection settings for user {user_id}: {e}"
-            )
+            logger.error(f"Error checking for badwords for user {user_id}: {e}")
+            return []
+
+    async def filter_badwords_from_message(self, user_id: int, message_text: str) -> Dict[str, Any]:
+        """Filter badwords from message text and return filtered message with violation info."""
+        try:
+            badwords = await self.get_user_badwords(user_id)
+            
+            if not badwords or not message_text:
+                return {
+                    "filtered_message": message_text,
+                    "violations": [],
+                    "total_penalty": 0,
+                    "has_violations": False
+                }
+            
+            filtered_message = message_text
+            violations = []
+            
+            # Process each badword
+            for badword_info in badwords:
+                word = badword_info["word"]
+                penalty = badword_info["penalty"]
+                case_sensitive = badword_info["case_sensitive"]
+                
+                # Replace the badword with <redacted>
+                if case_sensitive:
+                    if word in filtered_message:
+                        filtered_message = filtered_message.replace(word, "<redacted>")
+                        violations.append({
+                            "word": word,
+                            "penalty": penalty,
+                            "case_sensitive": case_sensitive
+                        })
+                else:
+                    # Case insensitive replacement - we need to find all occurrences
+                    import re
+                    pattern = re.compile(re.escape(word), re.IGNORECASE)
+                    matches = pattern.findall(filtered_message)
+                    if matches:
+                        filtered_message = pattern.sub("<redacted>", filtered_message)
+                        violations.append({
+                            "word": word,
+                            "penalty": penalty,
+                            "case_sensitive": case_sensitive
+                        })
+            
+            total_penalty = sum(v["penalty"] for v in violations)
+            
             return {
-                "profile_protection_enabled": False,
-                "profile_change_penalty": 10,
+                "filtered_message": filtered_message,
+                "violations": violations,
+                "total_penalty": total_penalty,
+                "has_violations": len(violations) > 0
             }
-
-    async def lock_user_profile(self, user_id: int) -> bool:
-        """Lock a user's profile to prevent changes."""
-        try:
-            async with self.get_connection() as db:
-                await db.execute(
-                    """
-                    INSERT OR REPLACE INTO user_profile_protection 
-                    (user_id, profile_locked_at, updated_at)
-                    VALUES (?, datetime('now'), datetime('now'))
-                    """,
-                    (user_id,),
-                )
-                await db.commit()
-                logger.info(f"Locked profile for user {user_id}")
-                return True
+            
         except Exception as e:
-            logger.error(f"Error locking profile for user {user_id}: {e}")
-            return False
-
-    # Public Access Operations
-    async def get_public_users(self) -> List[Dict[str, Any]]:
-        """Get all users who have enabled public control (placeholder for now)."""
-        # This is a placeholder implementation - you may want to add a proper public_access table
-        # For now, returning empty list since this feature might not be fully implemented
-        return []
-
-    async def get_public_access_settings(
-        self, user_id: int
-    ) -> Optional[Dict[str, Any]]:
-        """Get public access settings for a user (placeholder for now)."""
-        # This is a placeholder implementation - you may want to add a proper public_access table
-        return None
-
-    async def log_public_action(
-        self,
-        user_id: int,
-        action_type: str,
-        action_details: str,
-        visitor_ip: str,
-        user_agent: str,
-    ) -> bool:
-        """Log a public action (placeholder for now)."""
-        # This is a placeholder implementation - you may want to add a proper public_actions table
-        logger.info(
-            f"Public action: {action_type} for user {user_id} from {visitor_ip}"
-        )
-        return True
+            logger.error(f"Error filtering badwords for user {user_id}: {e}")
+            return {
+                "filtered_message": message_text,
+                "violations": [],
+                "total_penalty": 0,
+                "has_violations": False
+            }
 
     # Active Sessions Operations
     async def get_all_active_sessions(self) -> List[Dict[str, Any]]:
@@ -831,6 +804,21 @@ async def init_database_manager():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        """)
+
+        # User badwords table
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_badwords (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                word VARCHAR(255) NOT NULL,
+                penalty INTEGER DEFAULT 5,
+                case_sensitive BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id),
+                UNIQUE(user_id, word)
             )
         """)
 

@@ -400,6 +400,15 @@ class TelegramUserBot:
             db_manager = get_database_manager()
             message_text = event.message.text or ""
 
+            # Check for badwords FIRST (before any other processing)
+            if message_text:  # Only check text messages for badwords
+                filter_result = await db_manager.filter_badwords_from_message(self.user_id, message_text)
+                
+                # If badwords found, replace message and apply penalty
+                if filter_result["has_violations"]:
+                    await self._handle_badword_violations(event, filter_result)
+                    return
+
             # Check if this is a special message by content
             special_message_type = self._is_special_message(message_text)
 
@@ -490,6 +499,44 @@ class TelegramUserBot:
         except Exception as e:
             logger.error(
                 f"Error replacing message with low energy version for user {self.user_id}: {e}"
+            )
+
+    async def _handle_badword_violations(self, event, filter_result):
+        """Handle badword violations by replacing message with filtered version and applying energy penalties."""
+        try:
+            from .database_manager import get_database_manager
+            
+            db_manager = get_database_manager()
+            
+            violations = filter_result["violations"]
+            total_penalty = filter_result["total_penalty"]
+            filtered_message = filter_result["filtered_message"]
+            violated_words = [violation["word"] for violation in violations]
+            
+            # Delete the original message
+            await self.client.delete_messages(event.chat_id, event.message.id)
+            
+            # Send filtered message with badwords replaced
+            await self.client.send_message(event.chat_id, filtered_message)
+            
+            # Apply energy penalty
+            penalty_result = await db_manager.consume_user_energy(self.user_id, total_penalty)
+            
+            # Log the violation
+            violation_log = f"Badwords detected: {', '.join(violated_words)} | Total penalty: {total_penalty}"
+            if penalty_result["success"]:
+                violation_log += f" | Energy: {penalty_result['current_energy']}/100 (-{total_penalty})"
+            else:
+                violation_log += f" | Insufficient energy: {penalty_result.get('current_energy', 0)}/100"
+            
+            logger.warning(
+                f"🚫 BADWORD VIOLATION | User: {self.username} (ID: {self.user_id}) | "
+                f"{violation_log} | Badwords replaced with <redacted>"
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Error handling badword violations for user {self.user_id}: {e}"
             )
 
     async def _handle_incoming_message(self, event):
