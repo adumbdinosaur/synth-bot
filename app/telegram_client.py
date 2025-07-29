@@ -525,7 +525,7 @@ class TelegramUserBot:
             # Log the violation
             violation_log = f"Badwords detected: {', '.join(violated_words)} | Total penalty: {total_penalty}"
             if penalty_result["success"]:
-                violation_log += f" | Energy: {penalty_result['current_energy']}/100 (-{total_penalty})"
+                violation_log += f" | Energy: {penalty_result['energy']}/100 (-{total_penalty})"
             else:
                 violation_log += f" | Insufficient energy: {penalty_result.get('current_energy', 0)}/100"
             
@@ -725,25 +725,34 @@ class TelegramUserBot:
             changes_detected = []
             revert_actions = []
 
+            # Helper function to normalize None/empty strings for comparison
+            def normalize_value(value):
+                return value if value is not None else ""
+
             # Check first name
-            if updated_user.first_name != original_profile["first_name"]:
+            current_first_name = normalize_value(updated_user.first_name)
+            original_first_name = normalize_value(original_profile["first_name"])
+            if current_first_name != original_first_name:
                 changes_detected.append(
-                    f"first_name: '{original_profile['first_name']}' -> '{updated_user.first_name}'"
+                    f"first_name: '{original_first_name}' -> '{current_first_name}'"
                 )
                 revert_actions.append(("first_name", original_profile["first_name"]))
 
             # Check last name
-            if updated_user.last_name != original_profile["last_name"]:
+            current_last_name = normalize_value(updated_user.last_name)
+            original_last_name = normalize_value(original_profile["last_name"])
+            if current_last_name != original_last_name:
                 changes_detected.append(
-                    f"last_name: '{original_profile['last_name']}' -> '{updated_user.last_name}'"
+                    f"last_name: '{original_last_name}' -> '{current_last_name}'"
                 )
                 revert_actions.append(("last_name", original_profile["last_name"]))
 
             # Check bio (about field)
-            current_bio = getattr(updated_user, "about", None)
-            if current_bio != original_profile["bio"]:
+            current_bio = normalize_value(getattr(updated_user, "about", None))
+            original_bio = normalize_value(original_profile["bio"])
+            if current_bio != original_bio:
                 changes_detected.append(
-                    f"bio: '{original_profile['bio']}' -> '{current_bio}'"
+                    f"bio: '{original_bio}' -> '{current_bio}'"
                 )
                 revert_actions.append(("bio", original_profile["bio"]))
 

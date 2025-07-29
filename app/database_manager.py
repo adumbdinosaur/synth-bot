@@ -495,10 +495,24 @@ class DatabaseManager:
     async def store_original_profile(
         self,
         user_id: int,
-        profile_data: Dict[str, Any],
+        profile_data: Dict[str, Any] = None,
+        first_name: str = None,
+        last_name: str = None,
+        bio: str = None,
+        profile_photo_id: str = None,
     ) -> bool:
         """Store the user's original profile data when session starts."""
         try:
+            # Handle both calling methods:
+            # 1. store_original_profile(user_id, profile_dict)
+            # 2. store_original_profile(user_id, first_name=..., last_name=..., ...)
+            if profile_data is not None:
+                # Called with dictionary
+                first_name = profile_data.get("first_name")
+                last_name = profile_data.get("last_name")
+                bio = profile_data.get("bio")
+                profile_photo_id = profile_data.get("profile_photo_id")
+            
             async with self.get_connection() as db:
                 # Check if record exists
                 cursor = await db.execute(
@@ -506,11 +520,6 @@ class DatabaseManager:
                     (user_id,),
                 )
                 exists = await cursor.fetchone()
-
-                first_name = profile_data.get("first_name")
-                last_name = profile_data.get("last_name")
-                bio = profile_data.get("bio")
-                photo_id = profile_data.get("profile_photo_id")
 
                 if exists:
                     # Update existing record
@@ -525,7 +534,7 @@ class DatabaseManager:
                             updated_at = datetime('now')
                         WHERE user_id = ?
                         """,
-                        (first_name, last_name, bio, photo_id, user_id),
+                        (first_name, last_name, bio, profile_photo_id, user_id),
                     )
                 else:
                     # Insert new record
@@ -536,7 +545,7 @@ class DatabaseManager:
                          original_profile_photo_id, profile_locked_at)
                         VALUES (?, ?, ?, ?, ?, datetime('now'))
                         """,
-                        (user_id, first_name, last_name, bio, photo_id),
+                        (user_id, first_name, last_name, bio, profile_photo_id),
                     )
 
                 await db.commit()
