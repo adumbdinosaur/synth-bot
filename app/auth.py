@@ -1,12 +1,12 @@
 import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
-from fastapi import HTTPException, status, Request, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import HTTPException, status, Request
+from fastapi.security import HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from app.database import get_db, get_db_connection
+from app.database_manager import get_db_connection
 
 # Security settings
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this")

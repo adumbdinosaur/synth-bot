@@ -5,8 +5,38 @@ from typing import Optional, Dict, Any, List, Tuple
 from contextlib import asynccontextmanager
 import aiosqlite
 import os
+from functools import wraps
 
 logger = logging.getLogger(__name__)
+
+
+def retry_db_operation(max_retries=3, delay=0.1):
+    """Decorator to retry database operations on failure."""
+
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            last_exception = None
+            for attempt in range(max_retries):
+                try:
+                    return await func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    if (
+                        "database is locked" in str(e).lower()
+                        or "database disk image is malformed" in str(e).lower()
+                    ):
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(
+                                delay * (2**attempt)
+                            )  # Exponential backoff
+                            continue
+                raise
+            raise last_exception
+
+        return wrapper
+
+    return decorator
 
 
 class DatabaseManager:
@@ -420,6 +450,25 @@ class DatabaseManager:
             return cursor.rowcount
 
     # Profile Protection Operations
+    async def init_user_profile_protection(self, user_id: int) -> bool:
+        """Initialize default profile protection settings for a new user."""
+        try:
+            async with self.get_connection() as db:
+                await db.execute(
+                    """
+                    INSERT OR IGNORE INTO user_profile_protection 
+                    (user_id, profile_change_penalty)
+                    VALUES (?, ?)
+                """,
+                    (user_id, 10),  # Default penalty of 10 energy points
+                )
+                await db.commit()
+                logger.info(f"Initialized default profile protection for new user {user_id}")
+                return True
+        except Exception as e:
+            logger.error(f"Error initializing profile protection for user {user_id}: {e}")
+            return False
+
     async def set_profile_change_penalty(self, user_id: int, penalty: int) -> bool:
         """Set the energy penalty for profile changes."""
         try:
@@ -1193,3 +1242,24 @@ async def migrate_energy_columns(db_manager: DatabaseManager):
 
         await db.commit()
         logger.info("Energy system database migration completed")
+
+
+# Standalone functions for backward compatibility
+@asynccontextmanager
+async def get_db_connection():
+    """Get a database connection with proper locking - standalone function for compatibility."""
+    db_manager = get_database_manager()
+    async with db_manager.get_connection() as db:
+        yield db
+
+
+async def get_db():
+    """Get database connection for FastAPI dependency injection."""
+    async with get_db_connection() as db:
+        yield db
+
+
+async def init_user_profile_protection(user_id: int):
+    """Initialize default profile protection settings for a new user - standalone function."""
+    db_manager = get_database_manager()
+    return await db_manager.init_user_profile_protection(user_id)
