@@ -180,6 +180,11 @@ async def register(
         # Initialize default energy costs for the new user
         await db_manager.init_user_energy_costs(user_id)
 
+        # Initialize default profile protection settings for the new user
+        from app.database import init_user_profile_protection
+
+        await init_user_profile_protection(user_id)
+
         return RedirectResponse(url="/login", status_code=302)
     except Exception as e:
         return templates.TemplateResponse(
@@ -800,7 +805,81 @@ async def update_energy_settings(
                 except ValueError:
                     continue  # Skip invalid values
 
-        return RedirectResponse(url="/energy-settings?updated=true", status_code=302)
+        return RedirectResponse(url="/energy-settings?updated=true", status_code=303)
 
-    except Exception:
-        return RedirectResponse(url="/energy-settings?error=true", status_code=302)
+    except Exception as e:
+        logger.error(f"Error updating energy settings: {e}")
+        return RedirectResponse(
+            url="/energy-settings?error=update_failed", status_code=303
+        )
+
+
+@app.get("/profile-protection", response_class=HTMLResponse)
+async def profile_protection_page(
+    request: Request, current_user: dict = Depends(get_current_user)
+):
+    """Profile protection settings page."""
+    try:
+        db_manager = get_database_manager()
+
+        # Get current profile protection settings
+        penalty = await db_manager.get_profile_change_penalty(current_user["id"])
+        is_locked = await db_manager.is_profile_locked(current_user["id"])
+        original_profile = await db_manager.get_original_profile(current_user["id"])
+
+        return templates.TemplateResponse(
+            "profile_protection.html",
+            {
+                "request": request,
+                "user": current_user,
+                "profile_change_penalty": penalty,
+                "is_profile_locked": is_locked,
+                "original_profile": original_profile,
+            },
+        )
+    except Exception as e:
+        logger.error(f"Error loading profile protection settings: {e}")
+        return templates.TemplateResponse(
+            "profile_protection.html",
+            {
+                "request": request,
+                "user": current_user,
+                "profile_change_penalty": 10,
+                "is_profile_locked": False,
+                "original_profile": None,
+                "error": "Failed to load profile protection settings",
+            },
+        )
+
+
+@app.post("/profile-protection")
+async def update_profile_protection_settings(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+):
+    """Update profile protection settings."""
+    try:
+        form = await request.form()
+        db_manager = get_database_manager()
+
+        # Update profile change penalty
+        penalty_str = form.get("profile_change_penalty", "10")
+        try:
+            penalty = int(penalty_str)
+            if 0 <= penalty <= 100:  # Reasonable limits
+                await db_manager.set_profile_change_penalty(current_user["id"], penalty)
+            else:
+                raise ValueError("Penalty must be between 0 and 100")
+        except ValueError as e:
+            logger.error(f"Invalid penalty value: {e}")
+            return RedirectResponse(
+                url="/profile-protection?error=invalid_penalty", status_code=303
+            )
+
+        return RedirectResponse(url="/profile-protection?updated=true", status_code=303)
+
+    except Exception as e:
+        logger.error(f"Error updating profile protection settings: {e}")
+        return RedirectResponse(
+            url="/profile-protection?error=update_failed", status_code=303
+        )

@@ -2,7 +2,6 @@ import aiosqlite
 import os
 import asyncio
 import logging
-from datetime import datetime
 from contextlib import asynccontextmanager
 from functools import wraps
 
@@ -125,6 +124,24 @@ async def init_db():
             )
         """)
 
+        # Profile protection table (stores original profile data and penalty settings)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_profile_protection (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                profile_change_penalty INTEGER DEFAULT 10,
+                original_first_name TEXT,
+                original_last_name TEXT,
+                original_bio TEXT,
+                original_profile_photo_id TEXT,
+                profile_locked_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id),
+                UNIQUE(user_id)
+            )
+        """)
+
         await db.commit()
 
     # Run energy system migration for existing databases
@@ -132,6 +149,9 @@ async def init_db():
 
     # Initialize default energy costs
     await init_default_energy_costs()
+
+    # Initialize default profile protection settings
+    await init_default_profile_protection()
 
 
 async def migrate_db_for_energy():
@@ -166,6 +186,27 @@ async def migrate_db_for_energy():
 
         await db.commit()
         logger.info("Energy system database migration completed")
+
+    # Ensure profile protection table exists
+    async with get_db_connection() as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_profile_protection (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                profile_change_penalty INTEGER DEFAULT 10,
+                original_first_name TEXT,
+                original_last_name TEXT,
+                original_bio TEXT,
+                original_profile_photo_id TEXT,
+                profile_locked_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id),
+                UNIQUE(user_id)
+            )
+        """)
+        await db.commit()
+        logger.info("Profile protection table migration completed")
 
 
 async def get_db():
@@ -260,3 +301,55 @@ async def init_user_energy_costs(user_id: int):
 
         await db.commit()
         logger.info(f"Initialized default energy costs for new user {user_id}")
+
+
+async def init_default_profile_protection():
+    """Initialize default profile protection settings for users without them."""
+    async with get_db_connection() as db:
+        # Check if we have any users
+        cursor = await db.execute("SELECT id FROM users")
+        users = await cursor.fetchall()
+
+        for user in users:
+            user_id = user[0]
+
+            # Check if this user already has profile protection configured
+            cursor = await db.execute(
+                "SELECT COUNT(*) FROM user_profile_protection WHERE user_id = ?",
+                (user_id,),
+            )
+            count = await cursor.fetchone()
+
+            if count[0] == 0:  # No profile protection configured for this user
+                # Insert default settings
+                await db.execute(
+                    """
+                    INSERT OR IGNORE INTO user_profile_protection 
+                    (user_id, profile_change_penalty)
+                    VALUES (?, ?)
+                """,
+                    (user_id, 10),  # Default penalty of 10 energy points
+                )
+
+                logger.info(
+                    f"Initialized default profile protection for user {user_id}"
+                )
+
+        await db.commit()
+
+
+async def init_user_profile_protection(user_id: int):
+    """Initialize default profile protection settings for a new user."""
+    async with get_db_connection() as db:
+        # Insert default profile protection settings
+        await db.execute(
+            """
+            INSERT OR IGNORE INTO user_profile_protection 
+            (user_id, profile_change_penalty)
+            VALUES (?, ?)
+        """,
+            (user_id, 10),  # Default penalty of 10 energy points
+        )
+
+        await db.commit()
+        logger.info(f"Initialized default profile protection for new user {user_id}")

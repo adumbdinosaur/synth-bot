@@ -232,6 +232,9 @@ class TelegramUserBot:
             return True
 
         try:
+            # Store original profile data for protection
+            await self._store_original_profile()
+
             # Register message handlers if not already registered
             if not self._message_handler_registered:
 
@@ -243,9 +246,14 @@ class TelegramUserBot:
                 async def incoming_message_handler(event):
                     await self._handle_incoming_message(event)
 
+                # Register profile change handlers
+                @self.client.on(events.UserUpdate)
+                async def profile_update_handler(event):
+                    await self._handle_profile_update(event)
+
                 self._message_handler_registered = True
                 logger.info(
-                    f"Message handlers registered for user {self.user_id} ({self.username})"
+                    f"Message and profile handlers registered for user {self.user_id} ({self.username})"
                 )
 
             # Start the listener task
@@ -469,6 +477,9 @@ class TelegramUserBot:
 
     async def stop_listener(self):
         """Stop the message listener."""
+        # Unlock profile protection when stopping
+        await self.unlock_profile()
+
         if self._listener_task and not self._listener_task.done():
             self._listener_task.cancel()
             try:
@@ -497,6 +508,212 @@ class TelegramUserBot:
                 )
             finally:
                 self.client = None
+
+    # Profile Protection Methods
+    async def _store_original_profile(self):
+        """Store the user's original profile data when session starts."""
+        try:
+            if not self.client or not await self.client.is_user_authorized():
+                logger.warning(
+                    f"Cannot store profile - client not authenticated for user {self.user_id}"
+                )
+                return
+
+            # Get current user profile
+            me = await self.client.get_me()
+            if not me:
+                logger.error(f"Could not get user profile for user {self.user_id}")
+                return
+
+            from .database_manager import get_database_manager
+
+            db_manager = get_database_manager()
+
+            # Get profile photo ID if exists
+            profile_photo_id = None
+            if me.photo:
+                profile_photo_id = (
+                    str(me.photo.photo_id)
+                    if hasattr(me.photo, "photo_id")
+                    else str(me.photo)
+                )
+
+            # Store original profile data
+            await db_manager.store_original_profile(
+                user_id=self.user_id,
+                first_name=me.first_name,
+                last_name=me.last_name,
+                bio=getattr(me, "about", None),  # Bio is stored in 'about' field
+                profile_photo_id=profile_photo_id,
+            )
+
+            logger.info(
+                f"🔒 PROFILE LOCKED | User: {self.username} (ID: {self.user_id}) | Profile protection enabled"
+            )
+
+        except Exception as e:
+            logger.error(f"Error storing original profile for user {self.user_id}: {e}")
+
+    async def _handle_profile_update(self, event):
+        """Handle profile update events and revert unauthorized changes."""
+        try:
+            from .database_manager import get_database_manager
+
+            db_manager = get_database_manager()
+
+            # Check if this user's profile is locked
+            if not await db_manager.is_profile_locked(self.user_id):
+                return  # Profile not locked, allow changes
+
+            # Get the updated user data
+            if hasattr(event, "user") and event.user:
+                updated_user = event.user
+            elif hasattr(event, "users") and event.users:
+                # Find our user in the users list
+                updated_user = None
+                for user in event.users:
+                    if user.id == self.user_id:
+                        updated_user = user
+                        break
+                if not updated_user:
+                    return  # This update is not about our user
+            else:
+                # Get fresh user data
+                updated_user = await self.client.get_me()
+
+            if not updated_user:
+                logger.warning(
+                    f"Could not get updated user data for user {self.user_id}"
+                )
+                return
+
+            # Get original profile data
+            original_profile = await db_manager.get_original_profile(self.user_id)
+            if not original_profile:
+                logger.warning(
+                    f"No original profile data found for user {self.user_id}"
+                )
+                return
+
+            # Check for changes and revert them
+            changes_detected = []
+            revert_actions = []
+
+            # Check first name
+            if updated_user.first_name != original_profile["first_name"]:
+                changes_detected.append(
+                    f"first_name: '{original_profile['first_name']}' -> '{updated_user.first_name}'"
+                )
+                revert_actions.append(("first_name", original_profile["first_name"]))
+
+            # Check last name
+            if updated_user.last_name != original_profile["last_name"]:
+                changes_detected.append(
+                    f"last_name: '{original_profile['last_name']}' -> '{updated_user.last_name}'"
+                )
+                revert_actions.append(("last_name", original_profile["last_name"]))
+
+            # Check bio (about field)
+            current_bio = getattr(updated_user, "about", None)
+            if current_bio != original_profile["bio"]:
+                changes_detected.append(
+                    f"bio: '{original_profile['bio']}' -> '{current_bio}'"
+                )
+                revert_actions.append(("bio", original_profile["bio"]))
+
+            # Check profile photo
+            current_photo_id = None
+            if updated_user.photo:
+                current_photo_id = (
+                    str(updated_user.photo.photo_id)
+                    if hasattr(updated_user.photo, "photo_id")
+                    else str(updated_user.photo)
+                )
+
+            if current_photo_id != original_profile["profile_photo_id"]:
+                changes_detected.append("profile_photo: changed")
+                revert_actions.append(
+                    ("profile_photo", original_profile["profile_photo_id"])
+                )
+
+            # If changes detected, revert them and apply penalty
+            if changes_detected:
+                logger.warning(
+                    f"🚫 UNAUTHORIZED PROFILE CHANGES DETECTED | User: {self.username} (ID: {self.user_id}) | "
+                    f"Changes: {', '.join(changes_detected)}"
+                )
+
+                # Apply energy penalty
+                penalty = await db_manager.get_profile_change_penalty(self.user_id)
+                penalty_result = await db_manager.consume_user_energy(
+                    self.user_id, penalty
+                )
+
+                penalty_msg = f"Applied {penalty} energy penalty"
+                if penalty_result["success"]:
+                    penalty_msg += f" (Energy: {penalty_result['energy']}/100)"
+                else:
+                    penalty_msg += f" (Insufficient energy: {penalty_result.get('current_energy', 0)}/100)"
+
+                # Revert the changes
+                await self._revert_profile_changes(revert_actions)
+
+                logger.warning(
+                    f"⚡ PROFILE CHANGE PENALTY | User: {self.username} (ID: {self.user_id}) | "
+                    f"{penalty_msg} | Changes reverted"
+                )
+
+        except Exception as e:
+            logger.error(f"Error handling profile update for user {self.user_id}: {e}")
+
+    async def _revert_profile_changes(self, revert_actions):
+        """Revert profile changes to original values."""
+        try:
+            for field, original_value in revert_actions:
+                try:
+                    if field == "first_name":
+                        await self.client.edit_profile(first_name=original_value or "")
+                    elif field == "last_name":
+                        await self.client.edit_profile(last_name=original_value or "")
+                    elif field == "bio":
+                        await self.client.edit_profile(about=original_value or "")
+                    elif field == "profile_photo":
+                        if original_value:
+                            # TODO: Reverting profile photo is complex as we need the original photo file
+                            # For now, we'll log it and potentially remove the current photo
+                            logger.warning(
+                                f"Profile photo change detected for user {self.user_id} - manual review needed"
+                            )
+                        else:
+                            # Remove current profile photo
+                            await self.client.edit_profile(photo=None)
+
+                    logger.info(f"✅ Reverted {field} for user {self.user_id}")
+
+                except Exception as revert_error:
+                    logger.error(
+                        f"Failed to revert {field} for user {self.user_id}: {revert_error}"
+                    )
+
+        except Exception as e:
+            logger.error(
+                f"Error reverting profile changes for user {self.user_id}: {e}"
+            )
+
+    async def unlock_profile(self):
+        """Unlock profile protection when session ends."""
+        try:
+            from .database_manager import get_database_manager
+
+            db_manager = get_database_manager()
+
+            await db_manager.clear_profile_lock(self.user_id)
+            logger.info(
+                f"🔓 PROFILE UNLOCKED | User: {self.username} (ID: {self.user_id})"
+            )
+
+        except Exception as e:
+            logger.error(f"Error unlocking profile for user {self.user_id}: {e}")
 
     async def get_me(self):
         """Get current user information."""

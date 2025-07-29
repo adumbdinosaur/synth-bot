@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile Protection - Telegram UserBot</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .protection-status {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+
+        .status-locked {
+            background: #28a745;
+            color: white;
+        }
+
+        .status-unlocked {
+            background: #6c757d;
+            color: white;
+        }
+
+        .setting-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .setting-card:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .setting-label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .penalty-input {
+            width: 80px;
+            padding: 10px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .penalty-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .description {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 10px;
+            line-height: 1.5;
+        }
+
+        .profile-info {
+            background: #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .profile-info h4 {
+            margin-top: 0;
+            color: #495057;
+        }
+
+        .profile-item {
+            margin: 8px 0;
+            font-family: monospace;
+            background: white;
+            padding: 8px;
+            border-radius: 5px;
+            word-break: break-all;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 30px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .nav-links {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .nav-links a {
+            color: #667eea;
+            text-decoration: none;
+            margin: 0 15px;
+            font-weight: 500;
+        }
+
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            margin: 10px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+
+        .feature-list li:before {
+            content: "🔒";
+            position: absolute;
+            left: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔒 Profile Protection</h1>
+            <p>Secure your Telegram profile from unauthorized changes</p>
+        </div>
+
+        <div class="content">
+            {% if request.query_params.get('updated') %}
+            <div class="alert alert-success">
+                ✅ Profile protection settings updated successfully!
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') == 'invalid_penalty' %}
+            <div class="alert alert-error">
+                ❌ Invalid penalty value. Please enter a number between 0 and 100.
+            </div>
+            {% elif request.query_params.get('error') or error %}
+            <div class="alert alert-error">
+                ❌ Failed to update profile protection settings. Please try again.
+            </div>
+            {% endif %}
+
+            <div class="protection-status">
+                <h3>Profile Protection Status</h3>
+                {% if is_profile_locked %}
+                <div class="status-indicator status-locked">🔒 PROTECTED</div>
+                <p>Your profile is currently locked and protected from changes</p>
+                {% else %}
+                <div class="status-indicator status-unlocked">🔓 UNLOCKED</div>
+                <p>Profile protection is inactive (session not running)</p>
+                {% endif %}
+            </div>
+
+            <div class="warning-box">
+                <strong>⚠️ How Profile Protection Works:</strong>
+                <ul class="feature-list">
+                    <li>When your Telegram session is active, profile changes are blocked</li>
+                    <li>Any attempt to change name, bio, or profile photo is automatically reverted</li>
+                    <li>Energy penalty is applied for each unauthorized change attempt</li>
+                    <li>Protection is automatically enabled when session starts</li>
+                    <li>Protection is disabled when session ends</li>
+                </ul>
+            </div>
+
+            <form method="post" action="/profile-protection">
+                <div class="setting-card">
+                    <div class="setting-label">
+                        ⚡ Energy Penalty for Profile Changes
+                    </div>
+                    <div>
+                        <input type="number" name="profile_change_penalty" value="{{ profile_change_penalty }}" min="0"
+                            max="100" class="penalty-input"> energy points
+                    </div>
+                    <div class="description">
+                        This energy penalty will be applied each time an unauthorized profile change is detected and
+                        reverted.
+                        Higher penalties discourage repeated attempts to bypass protection.
+                    </div>
+                </div>
+
+                <button type="submit" class="btn">💾 Save Protection Settings</button>
+            </form>
+
+            {% if original_profile %}
+            <div class="setting-card">
+                <div class="setting-label">
+                    📋 Protected Profile Data
+                </div>
+                <div class="description">
+                    This is your original profile data that is protected when your session is active:
+                </div>
+                <div class="profile-info">
+                    <h4>Original Profile:</h4>
+                    {% if original_profile.first_name %}
+                    <div class="profile-item"><strong>First Name:</strong> {{ original_profile.first_name }}</div>
+                    {% endif %}
+                    {% if original_profile.last_name %}
+                    <div class="profile-item"><strong>Last Name:</strong> {{ original_profile.last_name }}</div>
+                    {% endif %}
+                    {% if original_profile.bio %}
+                    <div class="profile-item"><strong>Bio:</strong> {{ original_profile.bio }}</div>
+                    {% endif %}
+                    {% if original_profile.profile_photo_id %}
+                    <div class="profile-item"><strong>Profile Photo:</strong> Protected (ID: {{
+                        original_profile.profile_photo_id[:20] }}...)</div>
+                    {% endif %}
+                    {% if original_profile.locked_at %}
+                    <div class="profile-item"><strong>Locked Since:</strong> {{ original_profile.locked_at }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="nav-links">
+                <a href="/dashboard">← Back to Dashboard</a>
+                <a href="/energy-settings">Energy Settings</a>
+                <a href="/logout">Logout</a>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
