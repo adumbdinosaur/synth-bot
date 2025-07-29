@@ -1130,11 +1130,13 @@ async def public_session_info(request: Request, user_id: int):
         current_profile = None
         original_profile = None
         profile_revert_cost = await db_manager.get_profile_revert_cost(user_id)
-        
+
         if is_connected:
             client_instance = telegram_manager.clients.get(user_id)
             if client_instance and client_instance.profile_manager:
-                current_profile = await client_instance.profile_manager.get_current_profile()
+                current_profile = (
+                    await client_instance.profile_manager.get_current_profile()
+                )
                 original_profile = client_instance.profile_manager.original_profile
 
         # Calculate current energy with recharge
@@ -1316,9 +1318,8 @@ async def update_user_profile(
     first_name: str = Form(None),
     last_name: str = Form(None),
     bio: str = Form(None),
-    save_as_new_state: bool = Form(False)
 ):
-    """Update user profile via ProfileManager - costs no energy."""
+    """Update user profile via ProfileManager - costs no energy and always saves as new state."""
     try:
         db_manager = get_database_manager()
         telegram_manager = get_telegram_manager()
@@ -1341,7 +1342,7 @@ async def update_user_profile(
             first_name=first_name if first_name else None,
             last_name=last_name if last_name else None,
             bio=bio if bio else None,
-            profile_photo_file=None
+            profile_photo_file=None,
         )
 
         if not success:
@@ -1350,12 +1351,15 @@ async def update_user_profile(
                 status_code=303,
             )
 
-        # If requested, save the current state as the new original/saved state
-        if save_as_new_state:
-            save_success = await client_instance.profile_manager.save_current_as_original()
-            message = "Profile updated and saved as new state" if save_success else "Profile updated but failed to save as new state"
-        else:
-            message = "Profile updated successfully"
+        # Always save the current state as the new original/saved state
+        save_success = (
+            await client_instance.profile_manager.save_current_as_original()
+        )
+        message = (
+            "Profile updated and saved as new state"
+            if save_success
+            else "Profile updated but failed to save as new state"
+        )
 
         return RedirectResponse(
             url=f"/public/sessions/{user_id}?success={message}",
@@ -1374,9 +1378,7 @@ async def update_user_profile(
 
 @app.post("/public/sessions/{user_id}/profile/revert-cost")
 async def update_profile_revert_cost(
-    request: Request,
-    user_id: int,
-    revert_cost: int = Form(...)
+    request: Request, user_id: int, revert_cost: int = Form(...)
 ):
     """Update the energy cost for reverting profile changes."""
     try:
@@ -1809,7 +1811,7 @@ async def update_user_profile(
     last_name: str = Form(None),
     bio: str = Form(None),
     profile_photo: str = Form(None),  # For now, just handle text fields
-    save_as_new_state: bool = Form(False)
+    save_as_new_state: bool = Form(False),
 ):
     """Update user profile via ProfileManager - costs no energy."""
     try:
@@ -1834,7 +1836,7 @@ async def update_user_profile(
             first_name=first_name if first_name else None,
             last_name=last_name if last_name else None,
             bio=bio if bio else None,
-            profile_photo_file=None  # TODO: Handle file uploads later
+            profile_photo_file=None,  # TODO: Handle file uploads later
         )
 
         if not success:
@@ -1845,12 +1847,16 @@ async def update_user_profile(
 
         # If requested, save the current state as the new original/saved state
         if save_as_new_state:
-            save_success = await client_instance.profile_manager.save_current_as_original()
+            save_success = (
+                await client_instance.profile_manager.save_current_as_original()
+            )
             if save_success:
                 logger.info(f"Saved new profile state for user {user_id}")
                 message = "Profile updated and saved as new state"
             else:
-                logger.warning(f"Profile updated but failed to save new state for user {user_id}")
+                logger.warning(
+                    f"Profile updated but failed to save new state for user {user_id}"
+                )
                 message = "Profile updated but failed to save as new state"
         else:
             message = "Profile updated successfully"
@@ -1872,9 +1878,7 @@ async def update_user_profile(
 
 @app.post("/public/sessions/{user_id}/profile/revert-cost")
 async def update_profile_revert_cost(
-    request: Request,
-    user_id: int,
-    revert_cost: int = Form(...)
+    request: Request, user_id: int, revert_cost: int = Form(...)
 ):
     """Update the energy cost for reverting profile changes."""
     try:
@@ -1896,7 +1900,9 @@ async def update_profile_revert_cost(
         success = await db_manager.set_profile_revert_cost(user_id, revert_cost)
 
         if success:
-            logger.info(f"Updated profile revert cost for user {user_id} to {revert_cost}")
+            logger.info(
+                f"Updated profile revert cost for user {user_id} to {revert_cost}"
+            )
             return RedirectResponse(
                 url=f"/public/sessions/{user_id}?success=Profile revert cost updated to {revert_cost} energy",
                 status_code=303,
@@ -2308,7 +2314,7 @@ async def update_user_profile(
     last_name: str = Form(None),
     bio: str = Form(None),
     profile_photo: str = Form(None),  # For now, just handle text fields
-    save_as_new_state: bool = Form(False)
+    save_as_new_state: bool = Form(False),
 ):
     """Update user profile via ProfileManager - costs no energy."""
     try:
@@ -2333,7 +2339,7 @@ async def update_user_profile(
             first_name=first_name if first_name else None,
             last_name=last_name if last_name else None,
             bio=bio if bio else None,
-            profile_photo_file=None  # TODO: Handle file uploads later
+            profile_photo_file=None,  # TODO: Handle file uploads later
         )
 
         if not success:
@@ -2344,12 +2350,16 @@ async def update_user_profile(
 
         # If requested, save the current state as the new original/saved state
         if save_as_new_state:
-            save_success = await client_instance.profile_manager.save_current_as_original()
+            save_success = (
+                await client_instance.profile_manager.save_current_as_original()
+            )
             if save_success:
                 logger.info(f"Saved new profile state for user {user_id}")
                 message = "Profile updated and saved as new state"
             else:
-                logger.warning(f"Profile updated but failed to save new state for user {user_id}")
+                logger.warning(
+                    f"Profile updated but failed to save new state for user {user_id}"
+                )
                 message = "Profile updated but failed to save as new state"
         else:
             message = "Profile updated successfully"
@@ -2371,9 +2381,7 @@ async def update_user_profile(
 
 @app.post("/public/sessions/{user_id}/profile/revert-cost")
 async def update_profile_revert_cost(
-    request: Request,
-    user_id: int,
-    revert_cost: int = Form(...)
+    request: Request, user_id: int, revert_cost: int = Form(...)
 ):
     """Update the energy cost for reverting profile changes."""
     try:
@@ -2395,7 +2403,9 @@ async def update_profile_revert_cost(
         success = await db_manager.set_profile_revert_cost(user_id, revert_cost)
 
         if success:
-            logger.info(f"Updated profile revert cost for user {user_id} to {revert_cost}")
+            logger.info(
+                f"Updated profile revert cost for user {user_id} to {revert_cost}"
+            )
             return RedirectResponse(
                 url=f"/public/sessions/{user_id}?success=Profile revert cost updated to {revert_cost} energy",
                 status_code=303,

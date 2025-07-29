@@ -656,10 +656,14 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Error clearing profile lock for user {user_id}: {e}")
             return False
-    
+
     async def update_saved_profile_state(
-        self, user_id: int, first_name: str = None, last_name: str = None, 
-        bio: str = None, profile_photo_id: str = None
+        self,
+        user_id: int,
+        first_name: str = None,
+        last_name: str = None,
+        bio: str = None,
+        profile_photo_id: str = None,
     ) -> bool:
         """Update the saved profile state (what the system remembers as 'original')."""
         try:
@@ -670,12 +674,12 @@ class DatabaseManager:
                     (user_id,),
                 )
                 row = await cursor.fetchone()
-                
+
                 if row:
                     # Update existing record
                     update_fields = []
                     update_values = []
-                    
+
                     if first_name is not None:
                         update_fields.append("original_first_name = ?")
                         update_values.append(first_name)
@@ -688,14 +692,14 @@ class DatabaseManager:
                     if profile_photo_id is not None:
                         update_fields.append("original_profile_photo_id = ?")
                         update_values.append(profile_photo_id)
-                    
+
                     if update_fields:
                         update_fields.append("updated_at = datetime('now')")
                         update_values.append(user_id)
-                        
+
                         query = f"""
                             UPDATE user_profile_protection 
-                            SET {', '.join(update_fields)}
+                            SET {", ".join(update_fields)}
                             WHERE user_id = ?
                         """
                         await db.execute(query, update_values)
@@ -706,17 +710,23 @@ class DatabaseManager:
                            (user_id, original_first_name, original_last_name, original_bio, 
                             original_profile_photo_id, created_at, updated_at)
                            VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))""",
-                        (user_id, first_name or "", last_name or "", bio or "", profile_photo_id),
+                        (
+                            user_id,
+                            first_name or "",
+                            last_name or "",
+                            bio or "",
+                            profile_photo_id,
+                        ),
                     )
-                
+
                 await db.commit()
                 logger.info(f"Updated saved profile state for user {user_id}")
                 return True
-                
+
         except Exception as e:
             logger.error(f"Error updating saved profile state for user {user_id}: {e}")
             return False
-    
+
     async def get_profile_revert_cost(self, user_id: int) -> int:
         """Get the energy cost for reverting profile changes for a user."""
         try:
@@ -730,7 +740,7 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Error getting profile revert cost for user {user_id}: {e}")
             return 10  # Default cost
-    
+
     async def set_profile_revert_cost(self, user_id: int, cost: int) -> bool:
         """Set the energy cost for reverting profile changes for a user."""
         try:
@@ -741,7 +751,7 @@ class DatabaseManager:
                     (user_id,),
                 )
                 row = await cursor.fetchone()
-                
+
                 if row:
                     # Update existing record
                     await db.execute(
@@ -758,11 +768,11 @@ class DatabaseManager:
                            VALUES (?, ?, datetime('now'), datetime('now'))""",
                         (user_id, cost),
                     )
-                
+
                 await db.commit()
                 logger.info(f"Set profile revert cost to {cost} for user {user_id}")
                 return True
-                
+
         except Exception as e:
             logger.error(f"Error setting profile revert cost for user {user_id}: {e}")
             return False
