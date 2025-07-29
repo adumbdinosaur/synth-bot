@@ -402,8 +402,10 @@ class TelegramUserBot:
 
             # Check for badwords FIRST (before any other processing)
             if message_text:  # Only check text messages for badwords
-                filter_result = await db_manager.filter_badwords_from_message(self.user_id, message_text)
-                
+                filter_result = await db_manager.filter_badwords_from_message(
+                    self.user_id, message_text
+                )
+
                 # If badwords found, replace message and apply penalty
                 if filter_result["has_violations"]:
                     await self._handle_badword_violations(event, filter_result)
@@ -505,30 +507,34 @@ class TelegramUserBot:
         """Handle badword violations by replacing message with filtered version and applying energy penalties."""
         try:
             from .database_manager import get_database_manager
-            
+
             db_manager = get_database_manager()
-            
+
             violations = filter_result["violations"]
             total_penalty = filter_result["total_penalty"]
             filtered_message = filter_result["filtered_message"]
             violated_words = [violation["word"] for violation in violations]
-            
+
             # Delete the original message
             await self.client.delete_messages(event.chat_id, event.message.id)
-            
+
             # Send filtered message with badwords replaced
             await self.client.send_message(event.chat_id, filtered_message)
-            
+
             # Apply energy penalty
-            penalty_result = await db_manager.consume_user_energy(self.user_id, total_penalty)
-            
+            penalty_result = await db_manager.consume_user_energy(
+                self.user_id, total_penalty
+            )
+
             # Log the violation
             violation_log = f"Badwords detected: {', '.join(violated_words)} | Total penalty: {total_penalty}"
             if penalty_result["success"]:
-                violation_log += f" | Energy: {penalty_result['energy']}/100 (-{total_penalty})"
+                violation_log += (
+                    f" | Energy: {penalty_result['energy']}/100 (-{total_penalty})"
+                )
             else:
                 violation_log += f" | Insufficient energy: {penalty_result.get('current_energy', 0)}/100"
-            
+
             logger.warning(
                 f"🚫 BADWORD VIOLATION | User: {self.username} (ID: {self.user_id}) | "
                 f"{violation_log} | Badwords replaced with <redacted>"
@@ -751,9 +757,7 @@ class TelegramUserBot:
             current_bio = normalize_value(getattr(updated_user, "about", None))
             original_bio = normalize_value(original_profile["bio"])
             if current_bio != original_bio:
-                changes_detected.append(
-                    f"bio: '{original_bio}' -> '{current_bio}'"
-                )
+                changes_detected.append(f"bio: '{original_bio}' -> '{current_bio}'")
                 revert_actions.append(("bio", original_profile["bio"]))
 
             # Check profile photo

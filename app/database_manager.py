@@ -486,7 +486,9 @@ class DatabaseManager:
                         "profile_change_penalty": 10,
                     }
         except Exception as e:
-            logger.error(f"Error getting profile protection settings for user {user_id}: {e}")
+            logger.error(
+                f"Error getting profile protection settings for user {user_id}: {e}"
+            )
             return {
                 "profile_protection_enabled": False,
                 "profile_change_penalty": 10,
@@ -512,7 +514,7 @@ class DatabaseManager:
                 last_name = profile_data.get("last_name")
                 bio = profile_data.get("bio")
                 profile_photo_id = profile_data.get("profile_photo_id")
-            
+
             async with self.get_connection() as db:
                 # Check if record exists
                 cursor = await db.execute(
@@ -694,7 +696,9 @@ class DatabaseManager:
                     (user_id, word.strip(), penalty, case_sensitive),
                 )
                 await db.commit()
-                logger.info(f"Added badword '{word}' for user {user_id} with penalty {penalty}")
+                logger.info(
+                    f"Added badword '{word}' for user {user_id} with penalty {penalty}"
+                )
                 return True
         except Exception as e:
             logger.error(f"Error adding badword for user {user_id}: {e}")
@@ -717,7 +721,9 @@ class DatabaseManager:
             logger.error(f"Error removing badword for user {user_id}: {e}")
             return False
 
-    async def update_badword_penalty(self, user_id: int, word: str, penalty: int) -> bool:
+    async def update_badword_penalty(
+        self, user_id: int, word: str, penalty: int
+    ) -> bool:
         """Update the penalty for a specific badword."""
         try:
             async with self.get_connection() as db:
@@ -728,106 +734,119 @@ class DatabaseManager:
                 )
                 await db.commit()
                 if cursor.rowcount > 0:
-                    logger.info(f"Updated penalty for badword '{word}' to {penalty} for user {user_id}")
+                    logger.info(
+                        f"Updated penalty for badword '{word}' to {penalty} for user {user_id}"
+                    )
                     return True
                 return False
         except Exception as e:
             logger.error(f"Error updating badword penalty for user {user_id}: {e}")
             return False
 
-    async def check_for_badwords(self, user_id: int, message_text: str) -> List[Dict[str, Any]]:
+    async def check_for_badwords(
+        self, user_id: int, message_text: str
+    ) -> List[Dict[str, Any]]:
         """Check if message contains any badwords and return list of violations."""
         try:
             badwords = await self.get_user_badwords(user_id)
             violations = []
-            
+
             if not badwords or not message_text:
                 return violations
-            
+
             # Check each badword
             for badword_info in badwords:
                 word = badword_info["word"]
                 penalty = badword_info["penalty"]
                 case_sensitive = badword_info["case_sensitive"]
-                
+
                 # Determine if word is found in message
                 if case_sensitive:
                     found = word in message_text
                 else:
                     found = word.lower() in message_text.lower()
-                
+
                 if found:
-                    violations.append({
-                        "word": word,
-                        "penalty": penalty,
-                        "case_sensitive": case_sensitive
-                    })
-            
+                    violations.append(
+                        {
+                            "word": word,
+                            "penalty": penalty,
+                            "case_sensitive": case_sensitive,
+                        }
+                    )
+
             return violations
         except Exception as e:
             logger.error(f"Error checking for badwords for user {user_id}: {e}")
             return []
 
-    async def filter_badwords_from_message(self, user_id: int, message_text: str) -> Dict[str, Any]:
+    async def filter_badwords_from_message(
+        self, user_id: int, message_text: str
+    ) -> Dict[str, Any]:
         """Filter badwords from message text and return filtered message with violation info."""
         try:
             badwords = await self.get_user_badwords(user_id)
-            
+
             if not badwords or not message_text:
                 return {
                     "filtered_message": message_text,
                     "violations": [],
                     "total_penalty": 0,
-                    "has_violations": False
+                    "has_violations": False,
                 }
-            
+
             filtered_message = message_text
             violations = []
-            
+
             # Process each badword
             for badword_info in badwords:
                 word = badword_info["word"]
                 penalty = badword_info["penalty"]
                 case_sensitive = badword_info["case_sensitive"]
-                
+
                 # Replace the badword with <redacted>
                 if case_sensitive:
                     if word in filtered_message:
                         filtered_message = filtered_message.replace(word, "<redacted>")
-                        violations.append({
-                            "word": word,
-                            "penalty": penalty,
-                            "case_sensitive": case_sensitive
-                        })
+                        violations.append(
+                            {
+                                "word": word,
+                                "penalty": penalty,
+                                "case_sensitive": case_sensitive,
+                            }
+                        )
                 else:
                     # Case insensitive replacement - we need to find all occurrences
                     import re
+
                     pattern = re.compile(re.escape(word), re.IGNORECASE)
                     matches = pattern.findall(filtered_message)
                     if matches:
                         filtered_message = pattern.sub("<redacted>", filtered_message)
-                        violations.append({
-                            "word": word,
-                            "penalty": penalty,
-                            "case_sensitive": case_sensitive
-                        })
-            
+                        violations.append(
+                            {
+                                "word": word,
+                                "penalty": penalty,
+                                "case_sensitive": case_sensitive,
+                            }
+                        )
+
             total_penalty = sum(v["penalty"] for v in violations)
-            
+
             return {
                 "filtered_message": filtered_message,
                 "violations": violations,
                 "total_penalty": total_penalty,
-                "has_violations": len(violations) > 0
+                "has_violations": len(violations) > 0,
             }
-            
+
         except Exception as e:
             logger.error(f"Error filtering badwords for user {user_id}: {e}")
             return {
                 "filtered_message": message_text,
                 "violations": [],
                 "total_penalty": 0,
-                "has_violations": False
+                "has_violations": False,
             }
 
     # Active Sessions Operations

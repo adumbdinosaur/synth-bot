@@ -179,7 +179,8 @@
                     <div class="card">
                         <div class="card-header">
                             <h4><i class="fas fa-ban"></i> Badwords Management</h4>
-                            <p class="text-muted mb-0">Manage words that trigger automatic filtering and energy penalties
+                            <p class="text-muted mb-0">Manage words that trigger automatic filtering and energy
+                                penalties
                             </p>
                         </div>
                         <div class="card-body">
@@ -243,13 +244,17 @@
                                                         <code class="text-danger">{{ badword.word }}</code>
                                                     </td>
                                                     <td>
-                                                        <form method="POST" action="/public/sessions/{{ session.user_id }}/badwords/update"
-                                                              class="d-inline">
+                                                        <form method="POST"
+                                                            action="/public/sessions/{{ session.user_id }}/badwords/update"
+                                                            class="d-inline">
                                                             <input type="hidden" name="word" value="{{ badword.word }}">
-                                                            <div class="input-group input-group-sm" style="width: 120px;">
+                                                            <div class="input-group input-group-sm"
+                                                                style="width: 120px;">
                                                                 <input type="number" class="form-control" name="penalty"
-                                                                       value="{{ badword.penalty }}" min="1" max="100" required>
-                                                                <button type="submit" class="btn btn-outline-primary btn-sm">
+                                                                    value="{{ badword.penalty }}" min="1" max="100"
+                                                                    required>
+                                                                <button type="submit"
+                                                                    class="btn btn-outline-primary btn-sm">
                                                                     <i class="fas fa-save"></i>
                                                                 </button>
                                                             </div>
@@ -268,15 +273,17 @@
                                                     </td>
                                                     <td>
                                                         <small class="text-muted">
-                                                            {{ badword.created_at[:10] if badword.created_at else 'Unknown' }}
+                                                            {{ badword.created_at[:10] if badword.created_at else
+                                                            'Unknown' }}
                                                         </small>
                                                     </td>
                                                     <td>
-                                                        <form method="POST" action="/public/sessions/{{ session.user_id }}/badwords/remove"
-                                                              class="d-inline">
+                                                        <form method="POST"
+                                                            action="/public/sessions/{{ session.user_id }}/badwords/remove"
+                                                            class="d-inline">
                                                             <input type="hidden" name="word" value="{{ badword.word }}">
                                                             <button type="submit" class="btn btn-outline-danger btn-sm"
-                                                                    onclick="return confirm('Remove badword \'{{ badword.word }}\'?')">
+                                                                onclick="return confirm('Remove badword \'{{ badword.word }}\'?')">
                                                                 <i class="fas fa-trash"></i>
                                                             </button>
                                                         </form>
@@ -289,7 +296,8 @@
                                     {% else %}
                                     <div class="alert alert-info">
                                         <i class="fas fa-info-circle"></i>
-                                        No badwords configured for this user. Add some above to enable message filtering.
+                                        No badwords configured for this user. Add some above to enable message
+                                        filtering.
                                     </div>
                                     {% endif %}
                                 </div>
@@ -301,15 +309,20 @@
                                     <div class="alert alert-warning">
                                         <h6><i class="fas fa-exclamation-triangle"></i> How Badwords Work</h6>
                                         <ul class="mb-0">
-                                            <li><strong>Detection:</strong> Messages containing badwords are automatically detected
+                                            <li><strong>Detection:</strong> Messages containing badwords are
+                                                automatically detected
                                             </li>
-                                            <li><strong>Filtering:</strong> Badwords are replaced with <code>&lt;redacted&gt;</code> in the message
+                                            <li><strong>Filtering:</strong> Badwords are replaced with
+                                                <code>&lt;redacted&gt;</code> in the message
                                             </li>
-                                            <li><strong>Energy Penalty:</strong> User loses energy equal to the penalty for each badword used
+                                            <li><strong>Energy Penalty:</strong> User loses energy equal to the penalty
+                                                for each badword used
                                             </li>
-                                            <li><strong>Case Sensitivity:</strong> Choose whether matching should be case-sensitive or not
+                                            <li><strong>Case Sensitivity:</strong> Choose whether matching should be
+                                                case-sensitive or not
                                             </li>
-                                            <li><strong>Multiple Words:</strong> If a message contains multiple badwords, all penalties are combined
+                                            <li><strong>Multiple Words:</strong> If a message contains multiple
+                                                badwords, all penalties are combined
                                             </li>
                                         </ul>
                                     </div>

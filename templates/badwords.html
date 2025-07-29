@@ -7,9 +7,11 @@
     .badword-card {
         transition: transform 0.2s;
     }
+
     .badword-card:hover {
         transform: translateY(-2px);
     }
+
     .badword-text {
         font-family: 'Courier New', monospace;
         background: #f8f9fa;
@@ -18,6 +20,7 @@
         color: #dc3545;
         border: 1px solid #dee2e6;
     }
+
     .penalty-badge {
         font-size: 0.9em;
     }
@@ -46,13 +49,13 @@
             <div class="alert alert-success alert-dismissible fade show" role="alert">
                 <i class="fas fa-check-circle"></i>
                 {% if request.query_params.get('success') == 'added' %}
-                    Badword added successfully!
+                Badword added successfully!
                 {% elif request.query_params.get('success') == 'removed' %}
-                    Badword removed successfully!
+                Badword removed successfully!
                 {% elif request.query_params.get('success') == 'updated' %}
-                    Badword penalty updated successfully!
+                Badword penalty updated successfully!
                 {% else %}
-                    {{ request.query_params.get('success') }}
+                {{ request.query_params.get('success') }}
                 {% endif %}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
@@ -62,17 +65,17 @@
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
                 <i class="fas fa-exclamation-triangle"></i>
                 {% if request.query_params.get('error') == 'empty_word' %}
-                    Word cannot be empty!
+                Word cannot be empty!
                 {% elif request.query_params.get('error') == 'invalid_penalty' %}
-                    Penalty must be between 1 and 100!
+                Penalty must be between 1 and 100!
                 {% elif request.query_params.get('error') == 'add_failed' %}
-                    Failed to add badword. It may already exist.
+                Failed to add badword. It may already exist.
                 {% elif request.query_params.get('error') == 'remove_failed' %}
-                    Failed to remove badword.
+                Failed to remove badword.
                 {% elif request.query_params.get('error') == 'update_failed' %}
-                    Failed to update badword penalty.
+                Failed to update badword penalty.
                 {% else %}
-                    {{ request.query_params.get('error') }}
+                {{ request.query_params.get('error') }}
                 {% endif %}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
@@ -86,13 +89,15 @@
                             <div class="row align-items-center">
                                 <div class="col-md-8">
                                     <h5 class="mb-2">
-                                        <i class="fas fa-bolt text-warning"></i> Current Energy: 
-                                        <span class="badge bg-{% if current_energy > 70 %}success{% elif current_energy > 30 %}warning{% else %}danger{% endif %} fs-6">
+                                        <i class="fas fa-bolt text-warning"></i> Current Energy:
+                                        <span
+                                            class="badge bg-{% if current_energy > 70 %}success{% elif current_energy > 30 %}warning{% else %}danger{% endif %} fs-6">
                                             {{ current_energy }}/{{ max_energy }}
                                         </span>
                                     </h5>
                                     <p class="text-muted mb-0">
-                                        Energy is deducted when you use badwords in your messages. Manage your badwords carefully!
+                                        Energy is deducted when you use badwords in your messages. Manage your badwords
+                                        carefully!
                                     </p>
                                 </div>
                                 <div class="col-md-4">
@@ -100,8 +105,8 @@
                                         <div class="progress-bar 
                                             {% if current_energy > 70 %}bg-success
                                             {% elif current_energy > 30 %}bg-warning
-                                            {% else %}bg-danger{% endif %}" 
-                                            role="progressbar" style="width: {{ current_energy }}%">
+                                            {% else %}bg-danger{% endif %}" role="progressbar"
+                                            style="width: {{ current_energy }}%">
                                             {{ current_energy }}%
                                         </div>
                                     </div>
@@ -124,21 +129,21 @@
                                 <div class="row g-3">
                                     <div class="col-md-4">
                                         <label for="word" class="form-label">Word</label>
-                                        <input type="text" class="form-control" id="word" name="word" 
-                                               placeholder="Enter badword" required maxlength="50">
+                                        <input type="text" class="form-control" id="word" name="word"
+                                            placeholder="Enter badword" required maxlength="50">
                                         <div class="form-text">The word to filter from your messages</div>
                                     </div>
                                     <div class="col-md-3">
                                         <label for="penalty" class="form-label">Energy Penalty</label>
-                                        <input type="number" class="form-control" id="penalty" name="penalty" 
-                                               value="5" min="1" max="100" required>
+                                        <input type="number" class="form-control" id="penalty" name="penalty" value="5"
+                                            min="1" max="100" required>
                                         <div class="form-text">Energy lost per use (1-100)</div>
                                     </div>
                                     <div class="col-md-3">
                                         <label class="form-label">Matching Options</label>
                                         <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="case_sensitive" 
-                                                   name="case_sensitive" value="true">
+                                            <input class="form-check-input" type="checkbox" id="case_sensitive"
+                                                name="case_sensitive" value="true">
                                             <label class="form-check-label" for="case_sensitive">
                                                 Case Sensitive
                                             </label>
@@ -180,23 +185,27 @@
                                             <div class="d-flex justify-content-between align-items-start mb-2">
                                                 <span class="badword-text">{{ badword.word }}</span>
                                                 <div class="dropdown">
-                                                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" 
-                                                            type="button" data-bs-toggle="dropdown">
+                                                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle"
+                                                        type="button" data-bs-toggle="dropdown">
                                                         <i class="fas fa-cog"></i>
                                                     </button>
                                                     <ul class="dropdown-menu">
                                                         <li>
-                                                            <a class="dropdown-item" href="#" 
-                                                               onclick="editBadword('{{ badword.word }}', {{ badword.penalty }})">
+                                                            <a class="dropdown-item" href="#"
+                                                                onclick="editBadword('{{ badword.word }}', {{ badword.penalty }})">
                                                                 <i class="fas fa-edit"></i> Edit Penalty
                                                             </a>
                                                         </li>
-                                                        <li><hr class="dropdown-divider"></li>
                                                         <li>
-                                                            <form method="POST" action="/badwords/remove" class="d-inline">
-                                                                <input type="hidden" name="word" value="{{ badword.word }}">
+                                                            <hr class="dropdown-divider">
+                                                        </li>
+                                                        <li>
+                                                            <form method="POST" action="/badwords/remove"
+                                                                class="d-inline">
+                                                                <input type="hidden" name="word"
+                                                                    value="{{ badword.word }}">
                                                                 <button type="submit" class="dropdown-item text-danger"
-                                                                        onclick="return confirm('Remove badword \'{{ badword.word }}\'?')">
+                                                                    onclick="return confirm('Remove badword \'{{ badword.word }}\'?')">
                                                                     <i class="fas fa-trash"></i> Remove
                                                                 </button>
                                                             </form>
@@ -215,7 +224,8 @@
                                                 {% endif %}
                                             </div>
                                             <small class="text-muted">
-                                                Added: {{ badword.created_at[:10] if badword.created_at else 'Unknown' }}
+                                                Added: {{ badword.created_at[:10] if badword.created_at else 'Unknown'
+                                                }}
                                             </small>
                                         </div>
                                     </div>
@@ -226,7 +236,8 @@
                             <div class="text-center py-5">
                                 <i class="fas fa-ban fa-3x text-muted mb-3"></i>
                                 <h5 class="text-muted">No Badwords Configured</h5>
-                                <p class="text-muted">Add badwords above to enable automatic message filtering and energy penalties.</p>
+                                <p class="text-muted">Add badwords above to enable automatic message filtering and
+                                    energy penalties.</p>
                             </div>
                             {% endif %}
                         </div>
@@ -246,25 +257,33 @@
                                 <div class="col-md-6">
                                     <h6><i class="fas fa-search text-primary"></i> Detection & Filtering</h6>
                                     <ul class="list-unstyled">
-                                        <li><i class="fas fa-check text-success"></i> Messages are scanned for badwords before sending</li>
-                                        <li><i class="fas fa-check text-success"></i> Detected badwords are replaced with <code>&lt;redacted&gt;</code></li>
-                                        <li><i class="fas fa-check text-success"></i> Original message is deleted and replaced automatically</li>
-                                        <li><i class="fas fa-check text-success"></i> Case sensitivity can be configured per word</li>
+                                        <li><i class="fas fa-check text-success"></i> Messages are scanned for badwords
+                                            before sending</li>
+                                        <li><i class="fas fa-check text-success"></i> Detected badwords are replaced
+                                            with <code>&lt;redacted&gt;</code></li>
+                                        <li><i class="fas fa-check text-success"></i> Original message is deleted and
+                                            replaced automatically</li>
+                                        <li><i class="fas fa-check text-success"></i> Case sensitivity can be configured
+                                            per word</li>
                                     </ul>
                                 </div>
                                 <div class="col-md-6">
                                     <h6><i class="fas fa-bolt text-warning"></i> Energy Penalties</h6>
                                     <ul class="list-unstyled">
-                                        <li><i class="fas fa-check text-success"></i> Each badword usage costs energy</li>
-                                        <li><i class="fas fa-check text-success"></i> Multiple badwords in one message add up</li>
-                                        <li><i class="fas fa-check text-success"></i> Higher penalties discourage usage</li>
+                                        <li><i class="fas fa-check text-success"></i> Each badword usage costs energy
+                                        </li>
+                                        <li><i class="fas fa-check text-success"></i> Multiple badwords in one message
+                                            add up</li>
+                                        <li><i class="fas fa-check text-success"></i> Higher penalties discourage usage
+                                        </li>
                                         <li><i class="fas fa-check text-success"></i> Energy recharges over time</li>
                                     </ul>
                                 </div>
                             </div>
                             <div class="alert alert-warning mt-3">
                                 <strong><i class="fas fa-exclamation-triangle"></i> Example:</strong>
-                                Message "This is damn stupid shit" with badwords "damn" (5 energy) and "stupid" (3 energy) 
+                                Message "This is damn stupid shit" with badwords "damn" (5 energy) and "stupid" (3
+                                energy)
                                 becomes "This is &lt;redacted&gt; &lt;redacted&gt; shit" and costs 8 total energy.
                             </div>
                         </div>
@@ -288,8 +307,8 @@
                     <input type="hidden" id="edit-word" name="word">
                     <div class="mb-3">
                         <label for="edit-penalty" class="form-label">Energy Penalty</label>
-                        <input type="number" class="form-control" id="edit-penalty" name="penalty" 
-                               min="1" max="100" required>
+                        <input type="number" class="form-control" id="edit-penalty" name="penalty" min="1" max="100"
+                            required>
                         <div class="form-text">Energy lost per use of this badword (1-100)</div>
                     </div>
                     <div class="alert alert-info">
@@ -306,24 +325,24 @@
 </div>
 
 <script>
-function editBadword(word, currentPenalty) {
-    document.getElementById('edit-word').value = word;
-    document.getElementById('edit-penalty').value = currentPenalty;
-    document.getElementById('edit-word-display').textContent = word;
-    
-    const modal = new bootstrap.Modal(document.getElementById('editPenaltyModal'));
-    modal.show();
-}
+    function editBadword(word, currentPenalty) {
+        document.getElementById('edit-word').value = word;
+        document.getElementById('edit-penalty').value = currentPenalty;
+        document.getElementById('edit-word-display').textContent = word;
 
-// Auto-dismiss alerts after 5 seconds
-setTimeout(function () {
-    const alerts = document.querySelectorAll('.alert');
-    alerts.forEach(alert => {
-        if (alert.classList.contains('show')) {
-            const bsAlert = new bootstrap.Alert(alert);
-            bsAlert.close();
-        }
-    });
-}, 5000);
+        const modal = new bootstrap.Modal(document.getElementById('editPenaltyModal'));
+        modal.show();
+    }
+
+    // Auto-dismiss alerts after 5 seconds
+    setTimeout(function () {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            if (alert.classList.contains('show')) {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            }
+        });
+    }, 5000);
 </script>
 {% endblock %}
