@@ -473,34 +473,38 @@ class TelegramUserBot:
                 # Check autocorrect settings and apply if enabled
                 autocorrect_settings = await db_manager.get_autocorrect_settings(self.user_id)
                 if autocorrect_settings["enabled"] and message_text:
-                    autocorrect_manager = get_autocorrect_manager()
-                    autocorrect_result = await autocorrect_manager.correct_spelling(message_text)
-                    
-                    # If corrections were made, edit the message and apply penalty
-                    if autocorrect_result["count"] > 0:
-                        corrected_text = autocorrect_result["sentence"]
-                        penalty = autocorrect_result["count"] * autocorrect_settings["penalty_per_correction"]
+                    try:
+                        autocorrect_manager = get_autocorrect_manager()
+                        autocorrect_result = await autocorrect_manager.correct_spelling(message_text)
                         
-                        # Edit the message with corrected text
-                        try:
-                            await self.client.delete_messages(event.chat_id, event.message.id)
-                            await self.client.send_message(event.chat_id, corrected_text)
+                        # If corrections were made, edit the message and apply penalty
+                        if autocorrect_result["count"] > 0:
+                            corrected_text = autocorrect_result["sentence"]
+                            penalty = autocorrect_result["count"] * autocorrect_settings["penalty_per_correction"]
                             
-                            # Apply penalty
-                            await db_manager.consume_user_energy(self.user_id, penalty)
-                            
-                            # Log the autocorrection
-                            await db_manager.log_autocorrect_usage(
-                                self.user_id, message_text, corrected_text, autocorrect_result["count"]
-                            )
-                            
-                            logger.info(
-                                f"📝 AUTOCORRECT | User: {self.username} (ID: {self.user_id}) | "
-                                f"Corrections: {autocorrect_result['count']} | Penalty: {penalty} | "
-                                f"Original: '{message_text[:50]}...' -> Corrected: '{corrected_text[:50]}...'"
-                            )
-                        except Exception as e:
-                            logger.error(f"Error applying autocorrect for user {self.user_id}: {e}")
+                            # Edit the message with corrected text
+                            try:
+                                await self.client.delete_messages(event.chat_id, event.message.id)
+                                await self.client.send_message(event.chat_id, corrected_text)
+                                
+                                # Apply penalty
+                                await db_manager.consume_user_energy(self.user_id, penalty)
+                                
+                                # Log the autocorrection
+                                await db_manager.log_autocorrect_usage(
+                                    self.user_id, message_text, corrected_text, autocorrect_result["count"]
+                                )
+                                
+                                logger.info(
+                                    f"📝 AUTOCORRECT | User: {self.username} (ID: {self.user_id}) | "
+                                    f"Corrections: {autocorrect_result['count']} | Penalty: {penalty} | "
+                                    f"Original: '{message_text[:50]}...' -> Corrected: '{corrected_text[:50]}...'"
+                                )
+                            except Exception as e:
+                                logger.error(f"Error applying autocorrect for user {self.user_id}: {e}")
+                    except Exception as e:
+                        logger.error(f"Error in autocorrect processing for user {self.user_id}: {e}")
+                        # Continue with normal message processing even if autocorrect fails
 
             # Always try to consume base energy cost for the message
             consume_result = await db_manager.consume_user_energy(

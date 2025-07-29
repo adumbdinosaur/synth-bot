@@ -17,8 +17,14 @@ class AutocorrectManager:
             self.enabled = False
             self.client = None
         else:
-            self.client = AsyncOpenAI(api_key=self.api_key)
-            self.enabled = True
+            try:
+                self.client = AsyncOpenAI(api_key=self.api_key)
+                self.enabled = True
+                logger.info("OpenAI client initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize OpenAI client: {e}")
+                self.enabled = False
+                self.client = None
 
     async def correct_spelling(self, text: str) -> Dict[str, Any]:
         """
