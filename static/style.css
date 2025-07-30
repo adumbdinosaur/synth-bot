@@ -4,34 +4,38 @@
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
 
 :root {
-    /* Cyberpunk Color Palette - Toned Down */
-    --cyber-dark: #0a0a0a;
-    --cyber-darker: #050505;
-    --cyber-grey: #1a1a1a;
-    --cyber-light-grey: #2a2a2a;
-    --cyber-blue: #00a8cc;
-    --cyber-cyan: #00ccdd;
-    --cyber-purple: #9925b8;
-    --cyber-pink: #cc0066;
-    --cyber-green: #00cc33;
-    --cyber-orange: #cc5500;
-    --cyber-red: #cc0033;
-    --cyber-yellow: #cccc00;
-
+    /* Harmonious Cyberpunk Color Palette */
+    --cyber-dark: #0f0f0f;
+    --cyber-darker: #080808;
+    --cyber-grey: #1c1c1c;
+    --cyber-light-grey: #2d2d2d;
+    --cyber-text: #e8e8e8;
+    --cyber-text-muted: #a0a0a0;
+    
+    /* Primary Colors - Blue-based harmony */
+    --cyber-blue: #4a9eff;
+    --cyber-cyan: #64b5f6;
+    --cyber-purple: #7986cb;
+    --cyber-pink: #ba68c8;
+    --cyber-green: #66bb6a;
+    --cyber-orange: #ff8a65;
+    --cyber-red: #ef5350;
+    --cyber-yellow: #ffcc02;
+    
     /* RPTR Corporation Colors */
-    --rptr-primary: #00a8cc;
-    --rptr-secondary: #9925b8;
-    --rptr-accent: #cc0066;
-    --rptr-warning: #cc5500;
-    --rptr-success: #00cc33;
-    --rptr-danger: #cc0033;
-
+    --rptr-primary: #4a9eff;
+    --rptr-secondary: #7986cb;
+    --rptr-accent: #64b5f6;
+    --rptr-warning: #ff8a65;
+    --rptr-success: #66bb6a;
+    --rptr-danger: #ef5350;
+    
     /* Gradients */
-    --primary-gradient: linear-gradient(135deg, var(--cyber-blue) 0%, var(--cyber-purple) 50%, var(--cyber-pink) 100%);
+    --primary-gradient: linear-gradient(135deg, var(--cyber-blue) 0%, var(--cyber-cyan) 50%, var(--cyber-purple) 100%);
     --dark-gradient: linear-gradient(135deg, var(--cyber-darker) 0%, var(--cyber-grey) 100%);
     --neon-glow: 0 0 3px currentColor, 0 0 6px currentColor, 0 0 9px currentColor;
-    --box-shadow-cyber: 0 0 15px rgba(0, 168, 204, 0.25), 0 0 30px rgba(153, 37, 184, 0.15);
-
+    --box-shadow-cyber: 0 0 15px rgba(74, 158, 255, 0.25), 0 0 30px rgba(121, 134, 203, 0.15);
+    
     /* Typography */
     --font-primary: 'Rajdhani', monospace;
     --font-header: 'Orbitron', monospace;
@@ -44,10 +48,10 @@
 
 body {
     background: var(--cyber-dark);
-    background-image:
-        radial-gradient(circle at 20% 80%, rgba(0, 212, 255, 0.1) 0%, transparent 50%),
-        radial-gradient(circle at 80% 20%, rgba(184, 41, 212, 0.1) 0%, transparent 50%),
-        radial-gradient(circle at 40% 40%, rgba(255, 0, 128, 0.05) 0%, transparent 50%);
+    background-image: 
+        radial-gradient(circle at 20% 80%, rgba(74, 158, 255, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(121, 134, 203, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 40% 40%, rgba(100, 181, 246, 0.05) 0%, transparent 50%);
     color: #e0e0e0;
     font-family: var(--font-primary);
     font-weight: 400;
@@ -63,37 +67,27 @@ body::before {
     left: 0;
     width: 100%;
     height: 100%;
-    background-image:
-        linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+    background-image: 
+        linear-gradient(rgba(74, 158, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(74, 158, 255, 0.03) 1px, transparent 1px);
     background-size: 20px 20px;
     z-index: -1;
     animation: grid-move 20s linear infinite;
 }
 
 @keyframes grid-move {
-    0% {
-        transform: translate(0, 0);
-    }
-
-    100% {
-        transform: translate(20px, 20px);
-    }
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(20px, 20px); }
 }
 
 /* Typography */
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-header);
     font-weight: 700;
     color: var(--cyber-cyan);
     text-transform: uppercase;
     letter-spacing: 1px;
-    text-shadow: 0 0 5px rgba(0, 204, 221, 0.3);
+    text-shadow: 0 0 5px rgba(100, 181, 246, 0.3);
 }
 
 /* RPTR Corporation Branding */
@@ -137,7 +131,7 @@ h6 {
 
 .navbar-nav .nav-link:hover {
     color: var(--cyber-cyan) !important;
-    text-shadow: 0 0 3px rgba(0, 204, 221, 0.4);
+    text-shadow: 0 0 3px rgba(100, 181, 246, 0.4);
 }
 
 /* Buttons */
@@ -168,16 +162,14 @@ h6 {
     left: 100%;
 }
 
-.btn-gradient,
-.btn-primary {
+.btn-gradient, .btn-primary {
     background: var(--primary-gradient);
     border: 2px solid var(--cyber-blue);
     color: white;
-    box-shadow: 0 0 10px rgba(0, 168, 204, 0.3);
+    box-shadow: 0 0 10px rgba(74, 158, 255, 0.3);
 }
 
-.btn-gradient:hover,
-.btn-primary:hover {
+.btn-gradient:hover, .btn-primary:hover {
     background: var(--primary-gradient);
     color: white;
     transform: translateY(-2px);
@@ -194,7 +186,7 @@ h6 {
 .btn-secondary:hover {
     background: var(--cyber-purple);
     color: white;
-    box-shadow: 0 0 10px rgba(153, 37, 184, 0.3);
+    box-shadow: 0 0 10px rgba(121, 134, 203, 0.3);
 }
 
 .btn-danger {
@@ -206,7 +198,7 @@ h6 {
 .btn-danger:hover {
     background: var(--cyber-red);
     color: white;
-    box-shadow: 0 0 10px rgba(204, 0, 51, 0.3);
+    box-shadow: 0 0 10px rgba(239, 83, 80, 0.3);
 }
 
 .btn-success {
@@ -218,7 +210,7 @@ h6 {
 .btn-success:hover {
     background: var(--cyber-green);
     color: var(--cyber-dark);
-    box-shadow: 0 0 10px rgba(0, 204, 51, 0.3);
+    box-shadow: 0 0 10px rgba(102, 187, 106, 0.3);
 }
 
 .btn-warning {
@@ -230,7 +222,7 @@ h6 {
 .btn-warning:hover {
     background: var(--cyber-orange);
     color: white;
-    box-shadow: 0 0 10px rgba(204, 85, 0, 0.3);
+    box-shadow: 0 0 10px rgba(255, 138, 101, 0.3);
 }
 
 /* Cards */
@@ -322,9 +314,9 @@ h6 {
 /* Hero Section */
 .hero-section {
     background: var(--dark-gradient);
-    background-image:
-        radial-gradient(circle at 30% 20%, rgba(0, 212, 255, 0.2) 0%, transparent 50%),
-        radial-gradient(circle at 70% 80%, rgba(184, 41, 212, 0.2) 0%, transparent 50%);
+    background-image: 
+        radial-gradient(circle at 30% 20%, rgba(74, 158, 255, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 70% 80%, rgba(121, 134, 203, 0.15) 0%, transparent 50%);
     min-height: 70vh;
     display: flex;
     align-items: center;
@@ -339,21 +331,16 @@ h6 {
     left: 0;
     right: 0;
     bottom: 0;
-    background-image:
-        linear-gradient(45deg, rgba(0, 212, 255, 0.05) 1px, transparent 1px),
-        linear-gradient(-45deg, rgba(184, 41, 212, 0.05) 1px, transparent 1px);
+    background-image: 
+        linear-gradient(45deg, rgba(74, 158, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(-45deg, rgba(121, 134, 203, 0.05) 1px, transparent 1px);
     background-size: 30px 30px;
     animation: hero-grid 15s linear infinite;
 }
 
 @keyframes hero-grid {
-    0% {
-        transform: translate(0, 0);
-    }
-
-    100% {
-        transform: translate(30px, 30px);
-    }
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(30px, 30px); }
 }
 
 /* Forms */
@@ -370,7 +357,7 @@ h6 {
     background: rgba(26, 26, 26, 0.95);
     border-color: var(--cyber-blue);
     color: #e0e0e0;
-    box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+    box-shadow: 0 0 10px rgba(74, 158, 255, 0.3);
 }
 
 .form-control::placeholder {
@@ -398,15 +385,8 @@ h6 {
 }
 
 @keyframes pulse {
-
-    0%,
-    100% {
-        opacity: 1;
-    }
-
-    50% {
-        opacity: 0.6;
-    }
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
 }
 
 .status-connected {
@@ -429,13 +409,8 @@ h6 {
 }
 
 @keyframes spin {
-    0% {
-        transform: rotate(0deg);
-    }
-
-    100% {
-        transform: rotate(360deg);
-    }
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 /* Alerts */
@@ -448,25 +423,25 @@ h6 {
 }
 
 .alert-success {
-    background: rgba(0, 255, 65, 0.1);
+    background: rgba(102, 187, 106, 0.1);
     border-left-color: var(--cyber-green);
     color: var(--cyber-green);
 }
 
 .alert-danger {
-    background: rgba(255, 0, 64, 0.1);
+    background: rgba(239, 83, 80, 0.1);
     border-left-color: var(--cyber-red);
     color: var(--cyber-red);
 }
 
 .alert-warning {
-    background: rgba(255, 102, 0, 0.1);
+    background: rgba(255, 138, 101, 0.1);
     border-left-color: var(--cyber-orange);
     color: var(--cyber-orange);
 }
 
 .alert-info {
-    background: rgba(0, 212, 255, 0.1);
+    background: rgba(74, 158, 255, 0.1);
     border-left-color: var(--cyber-blue);
     color: var(--cyber-blue);
 }
@@ -481,12 +456,12 @@ h6 {
 
 .text-cyber-cyan {
     color: var(--cyber-cyan);
-    text-shadow: 0 0 3px rgba(0, 204, 221, 0.4);
+    text-shadow: 0 0 3px rgba(100, 181, 246, 0.4);
 }
 
 .text-cyber-purple {
     color: var(--cyber-purple);
-    text-shadow: 0 0 3px rgba(153, 37, 184, 0.4);
+    text-shadow: 0 0 3px rgba(121, 134, 203, 0.4);
 }
 
 .text-muted {
@@ -549,7 +524,7 @@ h6 {
 }
 
 .dropdown-item:hover {
-    background: rgba(0, 212, 255, 0.1);
+    background: rgba(74, 158, 255, 0.1);
     color: var(--cyber-cyan);
 }
 
