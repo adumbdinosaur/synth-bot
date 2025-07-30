@@ -31,7 +31,6 @@ def retry_db_operation(max_retries=3, delay=0.1):
                                 delay * (2**attempt)
                             )  # Exponential backoff
                             continue
-                raise
             raise last_exception
 
         return wrapper
