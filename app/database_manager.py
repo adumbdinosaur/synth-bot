@@ -1007,17 +1007,23 @@ class DatabaseManager:
             if not badwords or not message_text:
                 return violations
 
-            # Check each badword
+            # Check each badword using word boundary matching
+            import re
+            
             for badword_info in badwords:
                 word = badword_info["word"]
                 penalty = badword_info["penalty"]
                 case_sensitive = badword_info["case_sensitive"]
 
-                # Determine if word is found in message
+                # Use word boundaries to match complete words only, not partial matches
+                # \b ensures we match word boundaries (start/end of words)
+                escaped_word = re.escape(word)
+                pattern = rf'\b{escaped_word}\b'
+                
                 if case_sensitive:
-                    found = word in message_text
+                    found = bool(re.search(pattern, message_text))
                 else:
-                    found = word.lower() in message_text.lower()
+                    found = bool(re.search(pattern, message_text, re.IGNORECASE))
 
                 if found:
                     violations.append(
@@ -1052,37 +1058,35 @@ class DatabaseManager:
             violations = []
 
             # Process each badword
+            import re
+            
             for badword_info in badwords:
                 word = badword_info["word"]
                 penalty = badword_info["penalty"]
                 case_sensitive = badword_info["case_sensitive"]
 
-                # Replace the badword with <redacted>
+                # Use word boundaries to match complete words only, not partial matches
+                # \b ensures we match word boundaries (start/end of words)
+                escaped_word = re.escape(word)
+                pattern = rf'\b{escaped_word}\b'
+                
                 if case_sensitive:
-                    if word in filtered_message:
-                        filtered_message = filtered_message.replace(word, "<redacted>")
-                        violations.append(
-                            {
-                                "word": word,
-                                "penalty": penalty,
-                                "case_sensitive": case_sensitive,
-                            }
-                        )
+                    regex = re.compile(pattern)
                 else:
-                    # Case insensitive replacement - we need to find all occurrences
-                    import re
-
-                    pattern = re.compile(re.escape(word), re.IGNORECASE)
-                    matches = pattern.findall(filtered_message)
-                    if matches:
-                        filtered_message = pattern.sub("<redacted>", filtered_message)
-                        violations.append(
-                            {
-                                "word": word,
-                                "penalty": penalty,
-                                "case_sensitive": case_sensitive,
-                            }
-                        )
+                    regex = re.compile(pattern, re.IGNORECASE)
+                
+                # Find all matches to count violations
+                matches = regex.findall(filtered_message)
+                if matches:
+                    # Replace all occurrences with <redacted>
+                    filtered_message = regex.sub("<redacted>", filtered_message)
+                    violations.append(
+                        {
+                            "word": word,
+                            "penalty": penalty,
+                            "case_sensitive": case_sensitive,
+                        }
+                    )
 
             total_penalty = sum(v["penalty"] for v in violations)
 

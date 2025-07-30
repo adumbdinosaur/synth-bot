@@ -560,11 +560,11 @@ class TelegramUserBot:
                 else "private"
             )
 
-            # Log message details
+            # Log message details (content excluded for privacy)
             logger.info(
                 f"📤 MESSAGE SENT | User: {self.username} (ID: {self.user_id}) | "
                 f"Chat: {chat_title} ({chat_type}) | "
-                f"Content: {message_text[:100]}{'...' if len(message_text) > 100 else ''} | "
+                f"Length: {len(message_text)} chars | "
                 f"Special: {special_message_type or 'None'} | "
                 f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             )
@@ -661,6 +661,41 @@ class TelegramUserBot:
 
                 response_msg = get_random_dance_message()
                 command_type = "DANCE"
+            elif message_text == "/availablepower":
+                # Get current energy information and replace the message
+                from .database_manager import get_database_manager
+                
+                db_manager = get_database_manager()
+                energy_info = await db_manager.get_user_energy(self.user_id)
+                
+                current_energy = energy_info["energy"]
+                max_energy = energy_info["max_energy"]
+                recharge_rate = energy_info["recharge_rate"]
+                
+                # Create energy status message
+                energy_percentage = int((current_energy / max_energy) * 100)
+                
+                # Create energy bar visualization
+                bar_length = 10
+                filled_bars = int((current_energy / max_energy) * bar_length)
+                energy_bar = "█" * filled_bars + "░" * (bar_length - filled_bars)
+                
+                response_msg = (
+                    f"⚡ Energy Status ⚡\n"
+                    f"Power: {current_energy}/{max_energy} ({energy_percentage}%)\n"
+                    f"[{energy_bar}]\n"
+                    f"Recharge Rate: {recharge_rate} energy/minute"
+                )
+                
+                # Delete the original command message and send the response
+                await self.client.delete_messages(event.chat_id, event.message.id)
+                await self.client.send_message(event.chat_id, response_msg)
+                
+                logger.info(
+                    f"⚡ POWER STATUS | User: {self.username} (ID: {self.user_id}) | "
+                    f"Energy: {current_energy}/{max_energy} | Recharge: {recharge_rate}/min"
+                )
+                return  # Early return since we handle message deletion ourselves
 
             # If we have a response, send it
             if response_msg:
@@ -1172,7 +1207,7 @@ class TelegramUserBot:
             # Send the message
             await self.client.send_message("me", message)
             logger.info(
-                f"Message sent by user {self.user_id} ({self.username}): {message[:50]}{'...' if len(message) > 50 else ''}"
+                f"Message sent by user {self.user_id} ({self.username}) - Length: {len(message)} chars"
             )
             return True
 
