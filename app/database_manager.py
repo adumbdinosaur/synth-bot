@@ -1008,7 +1008,7 @@ class DatabaseManager:
 
             # Check each badword using word boundary matching
             import re
-            
+
             for badword_info in badwords:
                 word = badword_info["word"]
                 penalty = badword_info["penalty"]
@@ -1017,8 +1017,8 @@ class DatabaseManager:
                 # Use word boundaries to match complete words only, not partial matches
                 # \b ensures we match word boundaries (start/end of words)
                 escaped_word = re.escape(word)
-                pattern = rf'\b{escaped_word}\b'
-                
+                pattern = rf"\b{escaped_word}\b"
+
                 if case_sensitive:
                     found = bool(re.search(pattern, message_text))
                 else:
@@ -1058,7 +1058,7 @@ class DatabaseManager:
 
             # Process each badword
             import re
-            
+
             for badword_info in badwords:
                 word = badword_info["word"]
                 penalty = badword_info["penalty"]
@@ -1067,13 +1067,13 @@ class DatabaseManager:
                 # Use word boundaries to match complete words only, not partial matches
                 # \b ensures we match word boundaries (start/end of words)
                 escaped_word = re.escape(word)
-                pattern = rf'\b{escaped_word}\b'
-                
+                pattern = rf"\b{escaped_word}\b"
+
                 if case_sensitive:
                     regex = re.compile(pattern)
                 else:
                     regex = re.compile(pattern, re.IGNORECASE)
-                
+
                 # Find all matches to count violations
                 matches = regex.findall(filtered_message)
                 if matches:
@@ -1345,6 +1345,117 @@ class DatabaseManager:
         except Exception:
             return False
 
+    # Admin Management Operations
+    @retry_db_operation()
+    async def create_admin_user(self, username: str, email: str, hashed_password: str) -> int:
+        """Create a new admin user and return the user ID."""
+        async with self.get_connection() as db:
+            cursor = await db.execute(
+                """INSERT INTO users (username, email, hashed_password, energy, max_energy, energy_recharge_rate, last_energy_update, is_admin) 
+                   VALUES (?, ?, ?, 100, 100, 1, ?, TRUE)""",
+                (username, email, hashed_password, datetime.now().isoformat()),
+            )
+            await db.commit()
+            return cursor.lastrowid
+
+    @retry_db_operation()
+    async def is_admin(self, user_id: int) -> bool:
+        """Check if a user is an admin."""
+        async with self.get_connection() as db:
+            cursor = await db.execute(
+                "SELECT is_admin FROM users WHERE id = ?", (user_id,)
+            )
+            row = await cursor.fetchone()
+            return bool(row[0]) if row else False
+
+    @retry_db_operation()
+    async def get_all_users(self) -> List[Dict[str, Any]]:
+        """Get all users for admin dashboard."""
+        async with self.get_connection() as db:
+            cursor = await db.execute(
+                """SELECT id, username, email, telegram_connected, phone_number, 
+                          energy, max_energy, is_admin, created_at, last_energy_update
+                   FROM users ORDER BY created_at DESC"""
+            )
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    @retry_db_operation()
+    async def reset_user_password(self, user_id: int, new_hashed_password: str) -> bool:
+        """Reset a user's password."""
+        async with self.get_connection() as db:
+            await db.execute(
+                "UPDATE users SET hashed_password = ?, updated_at = ? WHERE id = ?",
+                (new_hashed_password, datetime.now().isoformat(), user_id),
+            )
+            await db.commit()
+            return True
+
+    @retry_db_operation()
+    async def toggle_admin_status(self, user_id: int) -> bool:
+        """Toggle admin status for a user."""
+        async with self.get_connection() as db:
+            # Get current status
+            cursor = await db.execute(
+                "SELECT is_admin FROM users WHERE id = ?", (user_id,)
+            )
+            row = await cursor.fetchone()
+            if not row:
+                return False
+            
+            new_status = not bool(row[0])
+            await db.execute(
+                "UPDATE users SET is_admin = ?, updated_at = ? WHERE id = ?",
+                (new_status, datetime.now().isoformat(), user_id),
+            )
+            await db.commit()
+            return True
+
+    @retry_db_operation()
+    async def delete_user(self, user_id: int) -> bool:
+        """Delete a user and all associated data."""
+        async with self.get_connection() as db:
+            # Delete user data from all related tables
+            await db.execute("DELETE FROM user_autocorrect_settings WHERE user_id = ?", (user_id,))
+            await db.execute("DELETE FROM user_badwords WHERE user_id = ?", (user_id,))
+            await db.execute("DELETE FROM user_profile_protection WHERE user_id = ?", (user_id,))
+            await db.execute("DELETE FROM user_message_energy_costs WHERE user_id = ?", (user_id,))
+            await db.execute("DELETE FROM telegram_sessions WHERE user_id = ?", (user_id,))
+            await db.execute("DELETE FROM telegram_messages WHERE user_id = ?", (user_id,))
+            
+            # Finally delete the user
+            await db.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            await db.commit()
+            return True
+
+    @retry_db_operation()
+    async def get_user_stats(self) -> Dict[str, Any]:
+        """Get user statistics for admin dashboard."""
+        async with self.get_connection() as db:
+            # Total users
+            cursor = await db.execute("SELECT COUNT(*) FROM users")
+            total_users = (await cursor.fetchone())[0]
+            
+            # Active telegram connections
+            cursor = await db.execute("SELECT COUNT(*) FROM users WHERE telegram_connected = TRUE")
+            active_connections = (await cursor.fetchone())[0]
+            
+            # Admin users
+            cursor = await db.execute("SELECT COUNT(*) FROM users WHERE is_admin = TRUE")
+            admin_count = (await cursor.fetchone())[0]
+            
+            # Recent registrations (last 7 days)
+            cursor = await db.execute(
+                "SELECT COUNT(*) FROM users WHERE created_at > datetime('now', '-7 days')"
+            )
+            recent_registrations = (await cursor.fetchone())[0]
+            
+            return {
+                "total_users": total_users,
+                "active_connections": active_connections,
+                "admin_count": admin_count,
+                "recent_registrations": recent_registrations
+            }
 
 # Global database manager instance
 _db_manager = None
@@ -1390,6 +1501,16 @@ async def init_database_manager():
         try:
             await db.execute(
                 "ALTER TABLE users ADD COLUMN max_energy INTEGER DEFAULT 100"
+            )
+            await db.commit()
+        except Exception:
+            # Column already exists, which is fine
+            pass
+
+        # Add is_admin column to existing users table if it doesn't exist
+        try:
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE"
             )
             await db.commit()
         except Exception:

@@ -68,12 +68,17 @@ async def get_current_user_from_token(token: str) -> Optional[Dict[str, Any]]:
     # Get user from database
     async with get_db_connection() as db:
         cursor = await db.execute(
-            "SELECT id, username, email FROM users WHERE id = ?", (user_id,)
+            "SELECT id, username, email, is_admin FROM users WHERE id = ?", (user_id,)
         )
         user_data = await cursor.fetchone()
 
         if user_data:
-            return {"id": user_data[0], "username": user_data[1], "email": user_data[2]}
+            return {
+                "id": user_data[0], 
+                "username": user_data[1], 
+                "email": user_data[2],
+                "is_admin": bool(user_data[3]) if user_data[3] is not None else False
+            }
 
     return None
 
@@ -123,4 +128,24 @@ async def get_current_user_with_session_check(request: Request) -> Dict[str, Any
             detail="Access denied: You have an active Telegram session. Disconnect your session to access dashboard settings.",
         )
 
+    return user
+
+
+async def get_current_admin_user(request: Request) -> Dict[str, Any]:
+    """Get current user and verify they have admin privileges."""
+    user = await get_current_user(request)
+
+    # Check if user is admin
+    from app.database_manager import get_database_manager
+
+    db_manager = get_database_manager()
+    is_admin = await db_manager.is_admin(user["id"])
+
+    if not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Admin privileges required.",
+        )
+
+    user["is_admin"] = True
     return user

@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Telegram UserBot{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    {% if success %}
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i>{{ success }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-circle me-2"></i>{{ error }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h2 mb-3">
+                <i class="fas fa-shield-alt text-danger me-2"></i>Admin Dashboard
+            </h1>
+            <p class="text-muted">Manage users, permissions, and system settings</p>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ stats.total_users or 0 }}</h4>
+                            <small>Total Users</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-users fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ stats.active_connections or 0 }}</h4>
+                            <small>Active Connections</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fab fa-telegram fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ stats.admin_count or 0 }}</h4>
+                            <small>Admin Users</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-shield-alt fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ stats.recent_registrations or 0 }}</h4>
+                            <small>Recent (7 days)</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-user-plus fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Admin User -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user-shield me-2"></i>Create Admin User
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="/admin/create-admin" class="row g-3">
+                        <div class="col-md-4">
+                            <label for="admin_username" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="admin_username" name="username" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="admin_email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="admin_email" name="email" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="admin_password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="admin_password" name="password" required minlength="8">
+                        </div>
+                        <div class="col-md-1 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Create
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-users me-2"></i>User Management
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Admin</th>
+                                    <th>Telegram</th>
+                                    <th>Energy</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user_item in users %}
+                                <tr>
+                                    <td>{{ user_item.id }}</td>
+                                    <td>
+                                        {{ user_item.username }}
+                                        {% if user_item.id == user.id %}
+                                        <span class="badge bg-info ms-1">You</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ user_item.email }}</td>
+                                    <td>
+                                        {% if user_item.is_admin %}
+                                        <span class="badge bg-warning">Admin</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">User</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if user_item.telegram_connected %}
+                                        <span class="badge bg-success">Connected</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Not Connected</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ user_item.energy or 0 }}/{{ user_item.max_energy or 100 }}</td>
+                                    <td>{{ user_item.created_at[:10] if user_item.created_at else 'N/A' }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <!-- Reset Password Button -->
+                                            <button type="button" class="btn btn-outline-primary" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#resetPasswordModal"
+                                                    data-user-id="{{ user_item.id }}"
+                                                    data-username="{{ user_item.username }}">
+                                                <i class="fas fa-key"></i>
+                                            </button>
+                                            
+                                            <!-- Toggle Admin Status -->
+                                            {% if user_item.id != user.id %}
+                                            <form method="POST" action="/admin/users/{{ user_item.id }}/toggle-admin" class="d-inline">
+                                                <button type="submit" class="btn btn-outline-warning"
+                                                        onclick="return confirm('Are you sure you want to toggle admin status for {{ user_item.username }}?')">
+                                                    {% if user_item.is_admin %}
+                                                    <i class="fas fa-user-minus"></i>
+                                                    {% else %}
+                                                    <i class="fas fa-user-plus"></i>
+                                                    {% endif %}
+                                                </button>
+                                            </form>
+                                            
+                                            <!-- Delete User -->
+                                            <form method="POST" action="/admin/users/{{ user_item.id }}/delete" class="d-inline">
+                                                <button type="submit" class="btn btn-outline-danger"
+                                                        onclick="return confirm('Are you sure you want to delete {{ user_item.username }}? This action cannot be undone!')">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Reset Password</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="resetPasswordForm">
+                <div class="modal-body">
+                    <p>Reset password for user: <strong id="resetUsername"></strong></p>
+                    <div class="mb-3">
+                        <label for="newPassword" class="form-label">New Password</label>
+                        <input type="password" class="form-control" id="newPassword" name="new_password" required minlength="8">
+                        <div class="form-text">Must be at least 8 characters long</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Reset Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle reset password modal
+    const resetPasswordModal = document.getElementById('resetPasswordModal');
+    const resetPasswordForm = document.getElementById('resetPasswordForm');
+    const resetUsernameSpan = document.getElementById('resetUsername');
+    
+    resetPasswordModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const userId = button.getAttribute('data-user-id');
+        const username = button.getAttribute('data-username');
+        
+        resetUsernameSpan.textContent = username;
+        resetPasswordForm.action = `/admin/users/${userId}/reset-password`;
+    });
+});
+</script>
+{% endblock %}
