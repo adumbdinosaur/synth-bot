@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome - Telegram UserBot{% endblock %}
+
+{% block content %}
+<!-- Login-focused Hero Section -->
+<section class="hero-section">
+    <div class="container">
+        <div class="row align-items-center min-vh-100">
+            <div class="col-lg-6 mx-auto text-center">
+                <div class="mb-5">
+                    <i class="fas fa-paper-plane text-white mb-4" style="font-size: 100px; opacity: 0.9;"></i>
+                    <h1 class="display-3 fw-bold mb-4">
+                        Telegram UserBot
+                    </h1>
+                    <p class="lead mb-5 fs-4">
+                        Secure web interface for Telegram userbot management with real-time monitoring and profile
+                        protection.
+                    </p>
+                </div>
+
+                <div class="d-grid gap-3 d-md-flex justify-content-md-center">
+                    <a href="/login" class="btn btn-light btn-lg px-5 py-3">
+                        <i class="fas fa-sign-in-alt me-2"></i>Sign In
+                    </a>
+                    <a href="/register" class="btn btn-outline-light btn-lg px-5 py-3">
+                        <i class="fas fa-user-plus me-2"></i>Create Account
+                    </a>
+                </div>
+
+                <div class="mt-5">
+                    <p class="text-white-50">
+                        <i class="fas fa-shield-alt me-2"></i>
+                        Secure • Private • Real-time Monitoring
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Quick Features Section -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-md-3 text-center">
+                <div class="p-3">
+                    <i class="fas fa-shield-alt text-primary mb-3" style="font-size: 2.5rem;"></i>
+                    <h6 class="fw-bold">Secure Authentication</h6>
+                    <p class="text-muted small">Multi-layer security with JWT tokens and bcrypt hashing</p>
+                </div>
+            </div>
+            <div class="col-md-3 text-center">
+                <div class="p-3">
+                    <i class="fas fa-eye text-success mb-3" style="font-size: 2.5rem;"></i>
+                    <h6 class="fw-bold">Real-time Monitoring</h6>
+                    <p class="text-muted small">Track and log your Telegram messages in real-time</p>
+                </div>
+            </div>
+            <div class="col-md-3 text-center">
+                <div class="p-3">
+                    <i class="fas fa-user-lock text-warning mb-3" style="font-size: 2.5rem;"></i>
+                    <h6 class="fw-bold">Profile Protection</h6>
+                    <p class="text-muted small">Advanced profile protection with energy-based restrictions</p>
+                </div>
+            </div>
+            <div class="col-md-3 text-center">
+                <div class="p-3">
+                    <i class="fas fa-ticket-alt text-info mb-3" style="font-size: 2.5rem;"></i>
+                    <h6 class="fw-bold">Invite-Only</h6>
+                    <p class="text-muted small">Exclusive access with invite codes for enhanced security</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Call to Action -->
+<section class="py-5 bg-primary text-white">
+    <div class="container text-center">
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <h3 class="mb-3">Ready to Get Started?</h3>
+                <p class="lead mb-4">
+                    Join our secure platform and take control of your Telegram userbot management today.
+                </p>
+                <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                    <a href="/register" class="btn btn-light btn-lg me-md-2">
+                        <i class="fas fa-rocket me-2"></i>Get Started Now
+                    </a>
+                    <a href="/login" class="btn btn-outline-light btn-lg">
+                        <i class="fas fa-sign-in-alt me-2"></i>Already Have Account?
+                    </a>
+                </div>
+                <div class="mt-4">
+                    <small class="text-white-75">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Registration requires a valid invite code
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .hero-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+    }
+
+    .btn-lg {
+        font-size: 1.1rem;
+        font-weight: 500;
+    }
+
+    .feature-hover:hover {
+        transform: translateY(-5px);
+        transition: transform 0.3s ease;
+    }
+</style>
+{% endblock %}

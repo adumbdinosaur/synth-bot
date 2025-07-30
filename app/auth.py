@@ -105,3 +105,22 @@ async def get_current_user(request: Request) -> Dict[str, Any]:
         )
 
     return user
+
+
+async def get_current_user_with_session_check(request: Request) -> Dict[str, Any]:
+    """Get current user and check if they have active Telegram sessions."""
+    user = await get_current_user(request)
+
+    # Check if user has active Telegram session
+    from app.database_manager import get_database_manager
+
+    db_manager = get_database_manager()
+    has_active_session = await db_manager.has_active_telegram_session(user["id"])
+
+    if has_active_session:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: You have an active Telegram session. Disconnect your session to access dashboard settings.",
+        )
+
+    return user

@@ -23,6 +23,7 @@ from app.database_manager import init_database_manager, get_database_manager
 from app.auth import (
     create_access_token,
     get_current_user,
+    get_current_user_with_session_check,
     verify_password,
     get_password_hash,
 )
@@ -129,6 +130,16 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             )
         # For web requests, redirect to login
         return RedirectResponse(url="/login", status_code=302)
+    elif exc.status_code == 403:
+        # Check if this is a session-related restriction
+        if "active Telegram session" in str(exc.detail):
+            # For API requests, return JSON
+            if request.url.path.startswith("/api/"):
+                return JSONResponse(status_code=403, content={"detail": exc.detail})
+            # For web requests, show blocked page
+            return templates.TemplateResponse(
+                "dashboard_blocked.html", {"request": request, "message": exc.detail}
+            )
 
     # For other HTTP exceptions, let FastAPI handle them normally
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
@@ -165,7 +176,33 @@ async def health_check():
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    # Check if user is already authenticated
+    try:
+        # Try to get the current user without raising exceptions
+        token = request.cookies.get("access_token")
+        if token:
+            from app.auth import get_current_user_from_token
+
+            user = await get_current_user_from_token(token)
+            if user:
+                # User is authenticated, redirect to dashboard
+                return RedirectResponse(url="/dashboard", status_code=302)
+    except Exception:
+        # If authentication fails, continue to show landing page
+        pass
+
+    # User is not authenticated, show login-focused landing page
+    return templates.TemplateResponse("landing.html", {"request": request})
+
+
+@app.get("/home", response_class=HTMLResponse)
+async def home_authenticated(
+    request: Request, current_user: dict = Depends(get_current_user)
+):
+    # This is the original home page, now only for authenticated users
+    return templates.TemplateResponse(
+        "index.html", {"request": request, "user": current_user}
+    )
 
 
 @app.get("/register", response_class=HTMLResponse)
@@ -179,9 +216,18 @@ async def register(
     username: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
+    invite_code: str = Form(...),
 ):
     try:
         db_manager = get_database_manager()
+
+        # Validate invite code
+        is_valid_code = await db_manager.validate_invite_code(invite_code)
+        if not is_valid_code:
+            return templates.TemplateResponse(
+                "register.html",
+                {"request": request, "error": "Invalid or expired invite code"},
+            )
 
         # Check if user already exists
         existing_user = await db_manager.get_user_by_username(username)
@@ -190,6 +236,9 @@ async def register(
                 "register.html",
                 {"request": request, "error": "Username or email already exists"},
             )
+
+        # Use the invite code (increment usage count)
+        await db_manager.use_invite_code(invite_code)
 
         # Create new user
         hashed_password = get_password_hash(password)
@@ -672,6 +721,13 @@ async def telegram_disconnect(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail="Disconnection failed")
 
 
+@app.get("/logout")
+async def logout_get():
+    response = RedirectResponse(url="/", status_code=302)
+    response.delete_cookie("access_token")
+    return response
+
+
 @app.post("/logout")
 async def logout():
     response = RedirectResponse(url="/", status_code=302)
@@ -907,7 +963,7 @@ async def update_profile_protection_settings(
 
 @app.get("/badwords", response_class=HTMLResponse)
 async def badwords_page(
-    request: Request, current_user: dict = Depends(get_current_user)
+    request: Request, current_user: dict = Depends(get_current_user_with_session_check)
 ):
     """Badwords management page."""
     try:
@@ -1040,7 +1096,9 @@ async def update_badword(
 
 # Public Dashboard Routes
 @app.get("/public", response_class=HTMLResponse)
-async def public_dashboard(request: Request):
+async def public_dashboard(
+    request: Request, current_user: dict = Depends(get_current_user_with_session_check)
+):
     """Public dashboard showing users who have enabled public control."""
     try:
         db_manager = get_database_manager()
@@ -1067,7 +1125,9 @@ async def public_dashboard(request: Request):
 
 
 @app.get("/public/sessions", response_class=HTMLResponse)
-async def public_sessions_dashboard(request: Request):
+async def public_sessions_dashboard(
+    request: Request, current_user: dict = Depends(get_current_user_with_session_check)
+):
     """Public dashboard showing all active Telegram sessions."""
     try:
         db_manager = get_database_manager()
@@ -1110,7 +1170,11 @@ async def public_sessions_dashboard(request: Request):
 
 
 @app.get("/public/sessions/{user_id}", response_class=HTMLResponse)
-async def public_session_info(request: Request, user_id: int):
+async def public_session_info(
+    request: Request,
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
     """Public session info page with energy cost management."""
     try:
         db_manager = get_database_manager()
@@ -1217,6 +1281,7 @@ async def public_session_info(request: Request, user_id: int):
 async def update_session_energy_costs(
     request: Request,
     user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
     text_cost: int = Form(None),
     photo_cost: int = Form(None),
     video_cost: int = Form(None),
@@ -1290,6 +1355,7 @@ async def update_session_energy_costs(
 async def update_session_recharge_rate(
     request: Request,
     user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
     recharge_rate: int = Form(...),
 ):
     """Update energy recharge rate for a specific user via public dashboard."""
@@ -1339,6 +1405,7 @@ async def update_session_recharge_rate(
 async def add_user_energy(
     request: Request,
     user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
     amount: int = Form(...),
 ):
     """Add energy to a user via public dashboard."""
@@ -1387,6 +1454,7 @@ async def add_user_energy(
 async def remove_user_energy(
     request: Request,
     user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
     amount: int = Form(...),
 ):
     """Remove energy from a user via public dashboard."""
@@ -1428,6 +1496,7 @@ async def remove_user_energy(
 async def set_user_energy_level(
     request: Request,
     user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
     energy_level: int = Form(...),
 ):
     """Set exact energy level for a user via public dashboard."""
@@ -1469,6 +1538,7 @@ async def set_user_energy_level(
 async def update_user_max_energy_level(
     request: Request,
     user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
     max_energy: int = Form(...),
 ):
     """Update maximum energy for a user via public dashboard."""
@@ -1510,6 +1580,7 @@ async def update_user_max_energy_level(
 async def update_user_profile(
     request: Request,
     user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
     first_name: str = Form(None),
     last_name: str = Form(None),
     bio: str = Form(None),
@@ -1621,7 +1692,10 @@ async def update_user_profile(
 
 @app.post("/public/sessions/{user_id}/profile/revert-cost")
 async def update_profile_revert_cost(
-    request: Request, user_id: int, revert_cost: int = Form(...)
+    request: Request,
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    revert_cost: int = Form(...),
 ):
     """Update the energy cost for reverting profile changes."""
     try:
@@ -1667,6 +1741,7 @@ async def update_profile_revert_cost(
 async def public_set_energy(
     request: Request,
     user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
     energy: int = Form(...),
 ):
     """Allow public visitors to set energy for users who have enabled it."""
@@ -1713,6 +1788,7 @@ async def public_set_energy(
 async def public_trigger_profile_change(
     request: Request,
     user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
 ):
     """Trigger a profile change for users who have enabled public profile control."""
     try:
@@ -1774,6 +1850,7 @@ async def public_trigger_profile_change(
 async def public_set_profile(
     request: Request,
     user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
     first_name: str = Form(None),
     last_name: str = Form(None),
     bio: str = Form(None),
@@ -1902,6 +1979,7 @@ async def public_profile_form(request: Request, user_id: int):
 async def public_add_badword(
     request: Request,
     user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
     word: str = Form(...),
     penalty: int = Form(5),
     case_sensitive: bool = Form(False),
@@ -1960,6 +2038,7 @@ async def public_add_badword(
 async def public_remove_badword(
     request: Request,
     user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
     word: str = Form(...),
 ):
     """Remove a badword for a user via public dashboard."""
@@ -2000,6 +2079,7 @@ async def public_remove_badword(
 async def public_update_badword(
     request: Request,
     user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
     word: str = Form(...),
     penalty: int = Form(...),
 ):
@@ -2050,6 +2130,7 @@ async def public_update_badword(
 async def update_autocorrect_settings(
     request: Request,
     user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
     enabled: bool = Form(False),
     penalty_per_correction: int = Form(5),
 ):

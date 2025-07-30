@@ -1252,26 +1252,119 @@ class DatabaseManager:
             f"Autocorrect used for user {user_id}: {corrections_count} corrections made"
         )
 
+    @retry_db_operation()
+    async def validate_invite_code(self, code: str) -> bool:
+        """Validate an invite code."""
+        async with self.get_connection() as db:
+            cursor = await db.execute(
+                """
+                SELECT id, max_uses, current_uses, is_active 
+                FROM invite_codes 
+                WHERE code = ? AND is_active = TRUE
+                """,
+                (code,),
+            )
+            invite_data = await cursor.fetchone()
+
+            if not invite_data:
+                return False
+
+            # Check if invite code has reached max uses
+            if invite_data[1] is not None and invite_data[2] >= invite_data[1]:
+                return False
+
+            return True
+
+    @retry_db_operation()
+    async def use_invite_code(self, code: str) -> bool:
+        """Use an invite code (increment usage count)."""
+        async with self.get_connection() as db:
+            # Validate the code within this connection to avoid deadlock
+            cursor = await db.execute(
+                """
+                SELECT id, max_uses, current_uses, is_active 
+                FROM invite_codes 
+                WHERE code = ? AND is_active = TRUE
+                """,
+                (code,),
+            )
+            invite_data = await cursor.fetchone()
+
+            if not invite_data:
+                return False
+
+            # Check if max uses exceeded
+            if (
+                invite_data["max_uses"] is not None
+                and invite_data["current_uses"] >= invite_data["max_uses"]
+            ):
+                return False
+
+            # Increment usage count
+            await db.execute(
+                "UPDATE invite_codes SET current_uses = current_uses + 1 WHERE code = ?",
+                (code,),
+            )
+            await db.commit()
+            return True
+
+    @retry_db_operation()
+    async def create_invite_code(self, code: str, max_uses: int = None) -> int:
+        """Create a new invite code."""
+        async with self.get_connection() as db:
+            cursor = await db.execute(
+                """
+                INSERT INTO invite_codes (code, max_uses, current_uses, is_active)
+                VALUES (?, ?, 0, TRUE)
+                """,
+                (code, max_uses),
+            )
+            await db.commit()
+            return cursor.lastrowid
+
+    @retry_db_operation()
+    async def has_active_telegram_session(self, user_id: int) -> bool:
+        """Check if user has an active and connected Telegram session."""
+        try:
+            from app.telegram_client import get_telegram_manager
+
+            telegram_manager = get_telegram_manager()
+            if not telegram_manager:
+                return False
+
+            client = await telegram_manager.get_client(user_id)
+            if client is None:
+                return False
+
+            is_connected = client.is_connected  # Property, not method
+            is_auth = await client.is_fully_authenticated()
+            return is_connected and is_auth
+        except Exception:
+            return False
+
 
 # Global database manager instance
-_db_manager: Optional[DatabaseManager] = None
+_db_manager = None
 
 
 def get_database_manager() -> DatabaseManager:
     """Get the global database manager instance."""
     global _db_manager
     if _db_manager is None:
-        database_url = os.getenv("DATABASE_URL", "sqlite:///./app.db")
-        database_path = database_url.replace("sqlite:///", "")
-        _db_manager = DatabaseManager(database_path)
+        raise RuntimeError(
+            "Database manager not initialized. Call init_database_manager() first."
+        )
     return _db_manager
 
 
 async def init_database_manager():
     """Initialize the database manager and create tables."""
-    db_manager = get_database_manager()
+    global _db_manager
 
-    async with db_manager.get_connection() as db:
+    database_path = os.path.join(os.getcwd(), "app.db")
+    _db_manager = DatabaseManager(database_path)
+
+    async with _db_manager.get_connection() as db:
         # Users table
         await db.execute("""
             CREATE TABLE IF NOT EXISTS users (
@@ -1349,14 +1442,15 @@ async def init_database_manager():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
                 profile_change_penalty INTEGER DEFAULT 10,
-                original_first_name VARCHAR(50),
-                original_last_name VARCHAR(50),
+                original_first_name TEXT,
+                original_last_name TEXT,
                 original_bio TEXT,
                 original_profile_photo_id TEXT,
                 profile_locked_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id)
+                FOREIGN KEY (user_id) REFERENCES users (id),
+                UNIQUE(user_id)
             )
         """)
 
@@ -1380,101 +1474,52 @@ async def init_database_manager():
             CREATE TABLE IF NOT EXISTS user_autocorrect_settings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
-                enabled BOOLEAN DEFAULT FALSE,
-                penalty_per_correction INTEGER DEFAULT 5,
+                enabled BOOLEAN DEFAULT TRUE,
+                autocorrect_mode VARCHAR(20) DEFAULT 'moderate',
+                preserve_case BOOLEAN DEFAULT TRUE,
+                preserve_emojis BOOLEAN DEFAULT TRUE,
+                preserve_urls BOOLEAN DEFAULT TRUE,
+                preserve_mentions BOOLEAN DEFAULT TRUE,
+                preserve_hashtags BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id),
-                UNIQUE(user_id)
+                FOREIGN KEY (user_id) REFERENCES users (id)
             )
         """)
 
-        await db.commit()
-
-    # Run migration for existing databases
-    await migrate_energy_columns(db_manager)
-
-
-async def migrate_energy_columns(db_manager: DatabaseManager):
-    """Add energy columns to existing users table if they don't exist."""
-    async with db_manager.get_connection() as db:
-        # Check if energy column exists
-        cursor = await db.execute("PRAGMA table_info(users)")
-        columns = await cursor.fetchall()
-        column_names = [col[1] for col in columns]
-
-        if "energy" not in column_names:
-            logger.info("Adding energy column to users table...")
-            await db.execute("ALTER TABLE users ADD COLUMN energy INTEGER DEFAULT 100")
-
-        if "energy_recharge_rate" not in column_names:
-            logger.info("Adding energy_recharge_rate column to users table...")
-            await db.execute(
-                "ALTER TABLE users ADD COLUMN energy_recharge_rate INTEGER DEFAULT 1"
+        # Invite codes table
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS invite_codes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code VARCHAR(255) UNIQUE NOT NULL,
+                is_active BOOLEAN DEFAULT TRUE,
+                max_uses INTEGER DEFAULT NULL,
+                current_uses INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
+        """)
 
-        if "last_energy_update" not in column_names:
-            logger.info("Adding last_energy_update column to users table...")
-            await db.execute(
-                "ALTER TABLE users ADD COLUMN last_energy_update TIMESTAMP"
-            )
-            # Update existing users to have current timestamp
-            await db.execute(
-                "UPDATE users SET last_energy_update = datetime('now') WHERE last_energy_update IS NULL"
-            )
+        # Initialize the permanent invite code if it doesn't exist
+        permanent_invite_code = "peterpepperpickedapepper"
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM invite_codes WHERE code = ?", (permanent_invite_code,)
+        )
+        count = await cursor.fetchone()
 
-        await db.commit()
-        logger.info("Energy system database migration completed")
-
-    # Autocorrect Settings Operations
-    @retry_db_operation()
-    async def get_autocorrect_settings(self, user_id: int) -> Dict[str, Any]:
-        """Get autocorrect settings for a user."""
-        async with self.get_connection() as db:
-            cursor = await db.execute(
-                "SELECT * FROM user_autocorrect_settings WHERE user_id = ?",
-                (user_id,),
-            )
-            row = await cursor.fetchone()
-            if row:
-                return dict(row)
-            else:
-                # Return default settings if none exist
-                return {
-                    "user_id": user_id,
-                    "enabled": False,
-                    "penalty_per_correction": 5,
-                }
-
-    @retry_db_operation()
-    async def update_autocorrect_settings(
-        self, user_id: int, enabled: bool, penalty_per_correction: int
-    ):
-        """Update autocorrect settings for a user."""
-        async with self.get_connection() as db:
+        if count[0] == 0:
             await db.execute(
                 """
-                INSERT OR REPLACE INTO user_autocorrect_settings 
-                (user_id, enabled, penalty_per_correction, updated_at)
-                VALUES (?, ?, ?, ?)
-            """,
-                (user_id, enabled, penalty_per_correction, datetime.now().isoformat()),
+                INSERT INTO invite_codes (code, max_uses, current_uses, is_active)
+                VALUES (?, NULL, 0, TRUE)
+                """,
+                (permanent_invite_code,),
             )
-            await db.commit()
+            logger.info(
+                f"✅ Initialized permanent invite code: '{permanent_invite_code}'"
+            )
 
-    @retry_db_operation()
-    async def log_autocorrect_usage(
-        self,
-        user_id: int,
-        original_text: str,
-        corrected_text: str,
-        corrections_count: int,
-    ):
-        """Log autocorrect usage for analytics (optional)."""
-        # For now, we'll just log this to the logger, but we could add a table for this later
-        logger.info(
-            f"Autocorrect used for user {user_id}: {corrections_count} corrections made"
-        )
+        await db.commit()
 
 
 # Standalone functions for backward compatibility

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Access Restricted - Telegram UserBot{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow border-warning">
+                <div class="card-body p-5 text-center">
+                    <div class="mb-4">
+                        <i class="fas fa-shield-alt text-warning mb-3" style="font-size: 4rem;"></i>
+                        <h2 class="card-title fw-bold text-warning">Dashboard Access Restricted</h2>
+                    </div>
+
+                    <div class="alert alert-warning" role="alert">
+                        <h5 class="alert-heading">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Active Telegram Session Detected
+                        </h5>
+                        <p class="mb-0">
+                            You currently have an active and connected Telegram session.
+                            For security reasons, dashboard settings are restricted while your Telegram session is
+                            active.
+                        </p>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6 class="fw-bold">To access dashboard settings:</h6>
+                        <ol class="text-start mt-3">
+                            <li class="mb-2">
+                                <strong>Disconnect your Telegram session</strong> from the active sessions page
+                            </li>
+                            <li class="mb-2">
+                                <strong>Wait for the session to fully disconnect</strong> (may take a few moments)
+                            </li>
+                            <li class="mb-2">
+                                <strong>Return to the dashboard</strong> to access your settings
+                            </li>
+                        </ol>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <a href="/public-sessions" class="btn btn-primary">
+                            <i class="fas fa-users me-2"></i>View Active Sessions
+                        </a>
+                        <a href="/logout" class="btn btn-outline-secondary">
+                            <i class="fas fa-sign-out-alt me-2"></i>Logout
+                        </a>
+                    </div>
+
+                    <div class="mt-4 text-muted">
+                        <small>
+                            <i class="fas fa-info-circle me-1"></i>
+                            This restriction helps protect your account and settings while your Telegram bot is active.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
