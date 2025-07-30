@@ -4,33 +4,33 @@
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
 
 :root {
-    /* Cyberpunk Color Palette */
+    /* Cyberpunk Color Palette - Toned Down */
     --cyber-dark: #0a0a0a;
     --cyber-darker: #050505;
     --cyber-grey: #1a1a1a;
     --cyber-light-grey: #2a2a2a;
-    --cyber-blue: #00d4ff;
-    --cyber-cyan: #00ffff;
-    --cyber-purple: #b829d4;
-    --cyber-pink: #ff0080;
-    --cyber-green: #00ff41;
-    --cyber-orange: #ff6600;
-    --cyber-red: #ff0040;
-    --cyber-yellow: #ffff00;
+    --cyber-blue: #00a8cc;
+    --cyber-cyan: #00ccdd;
+    --cyber-purple: #9925b8;
+    --cyber-pink: #cc0066;
+    --cyber-green: #00cc33;
+    --cyber-orange: #cc5500;
+    --cyber-red: #cc0033;
+    --cyber-yellow: #cccc00;
     
     /* RPTR Corporation Colors */
-    --rptr-primary: #00d4ff;
-    --rptr-secondary: #b829d4;
-    --rptr-accent: #ff0080;
-    --rptr-warning: #ff6600;
-    --rptr-success: #00ff41;
-    --rptr-danger: #ff0040;
+    --rptr-primary: #00a8cc;
+    --rptr-secondary: #9925b8;
+    --rptr-accent: #cc0066;
+    --rptr-warning: #cc5500;
+    --rptr-success: #00cc33;
+    --rptr-danger: #cc0033;
     
     /* Gradients */
     --primary-gradient: linear-gradient(135deg, var(--cyber-blue) 0%, var(--cyber-purple) 50%, var(--cyber-pink) 100%);
     --dark-gradient: linear-gradient(135deg, var(--cyber-darker) 0%, var(--cyber-grey) 100%);
-    --neon-glow: 0 0 5px currentColor, 0 0 10px currentColor, 0 0 15px currentColor;
-    --box-shadow-cyber: 0 0 20px rgba(0, 212, 255, 0.3), 0 0 40px rgba(184, 41, 212, 0.2);
+    --neon-glow: 0 0 3px currentColor, 0 0 6px currentColor, 0 0 9px currentColor;
+    --box-shadow-cyber: 0 0 15px rgba(0, 168, 204, 0.25), 0 0 30px rgba(153, 37, 184, 0.15);
     
     /* Typography */
     --font-primary: 'Rajdhani', monospace;
@@ -83,7 +83,7 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--cyber-cyan);
     text-transform: uppercase;
     letter-spacing: 1px;
-    text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+    text-shadow: 0 0 5px rgba(0, 204, 221, 0.3);
 }
 
 /* RPTR Corporation Branding */
@@ -95,7 +95,6 @@ h1, h2, h3, h4, h5, h6 {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    text-shadow: var(--neon-glow);
     letter-spacing: 2px;
 }
 
@@ -128,7 +127,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .navbar-nav .nav-link:hover {
     color: var(--cyber-cyan) !important;
-    text-shadow: 0 0 5px var(--cyber-cyan);
+    text-shadow: 0 0 3px rgba(0, 204, 221, 0.4);
 }
 
 /* Buttons */
@@ -163,7 +162,7 @@ h1, h2, h3, h4, h5, h6 {
     background: var(--primary-gradient);
     border: 2px solid var(--cyber-blue);
     color: white;
-    box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+    box-shadow: 0 0 10px rgba(0, 168, 204, 0.3);
 }
 
 .btn-gradient:hover, .btn-primary:hover {
@@ -183,7 +182,7 @@ h1, h2, h3, h4, h5, h6 {
 .btn-secondary:hover {
     background: var(--cyber-purple);
     color: white;
-    box-shadow: 0 0 15px rgba(184, 41, 212, 0.4);
+    box-shadow: 0 0 10px rgba(153, 37, 184, 0.3);
 }
 
 .btn-danger {
@@ -195,7 +194,7 @@ h1, h2, h3, h4, h5, h6 {
 .btn-danger:hover {
     background: var(--cyber-red);
     color: white;
-    box-shadow: 0 0 15px rgba(255, 0, 64, 0.4);
+    box-shadow: 0 0 10px rgba(204, 0, 51, 0.3);
 }
 
 .btn-success {
@@ -207,7 +206,7 @@ h1, h2, h3, h4, h5, h6 {
 .btn-success:hover {
     background: var(--cyber-green);
     color: var(--cyber-dark);
-    box-shadow: 0 0 15px rgba(0, 255, 65, 0.4);
+    box-shadow: 0 0 10px rgba(0, 204, 51, 0.3);
 }
 
 .btn-warning {
@@ -219,7 +218,7 @@ h1, h2, h3, h4, h5, h6 {
 .btn-warning:hover {
     background: var(--cyber-orange);
     color: white;
-    box-shadow: 0 0 15px rgba(255, 102, 0, 0.4);
+    box-shadow: 0 0 10px rgba(204, 85, 0, 0.3);
 }
 
 /* Cards */
@@ -377,7 +376,7 @@ h1, h2, h3, h4, h5, h6 {
     border-radius: 50%;
     display: inline-block;
     margin-right: 8px;
-    box-shadow: 0 0 10px currentColor;
+    box-shadow: 0 0 6px currentColor;
     animation: pulse 2s infinite;
 }
 
@@ -453,12 +452,12 @@ h1, h2, h3, h4, h5, h6 {
 
 .text-cyber-cyan {
     color: var(--cyber-cyan);
-    text-shadow: 0 0 5px var(--cyber-cyan);
+    text-shadow: 0 0 3px rgba(0, 204, 221, 0.4);
 }
 
 .text-cyber-purple {
     color: var(--cyber-purple);
-    text-shadow: 0 0 5px var(--cyber-purple);
+    text-shadow: 0 0 3px rgba(153, 37, 184, 0.4);
 }
 
 .text-muted {

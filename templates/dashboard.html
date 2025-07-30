@@ -69,7 +69,7 @@
                             {% endif %}
                         </div>
                         <div class="flex-grow-1 ms-3">
-                            <h6 class="card-title mb-1">Neural Link</h6>
+                            <h6 class="card-title mb-1">Neural Interface</h6>
                             {% if telegram_connected %}
                             <p class="card-text text-cyber-green mb-0">
                                 <strong>SYNCHRONIZED</strong><br>
@@ -167,7 +167,7 @@
         </div>
     </div>
 
-    <!-- Telegram Connection Section -->
+    <!-- Neural Interface Connection Section -->
     {% if not telegram_connected %}
     <div class="row mb-4">
         <div class="col-12">
@@ -177,16 +177,16 @@
                         <div class="col-md-8">
                             <h5 class="card-title text-warning mb-2">
                                 <i class="fas fa-exclamation-triangle me-2"></i>
-                                Telegram Not Connected
+                                Neural Interface Not Connected
                             </h5>
                             <p class="card-text mb-0">
-                                Connect your Telegram account to start monitoring your messages.
-                                This will require phone verification and optional 2FA authentication.
+                                Connect your Neural Interface to start monitoring your synthetic entity.
+                                This will require neural verification and optional security authentication.
                             </p>
                         </div>
                         <div class="col-md-4 text-md-end">
                             <a href="/telegram/connect" class="btn btn-warning">
-                                <i class="fas fa-link me-2"></i>Connect Telegram
+                                <i class="fas fa-link me-2"></i>Connect Neural Interface
                             </a>
                         </div>
                     </div>
@@ -203,10 +203,10 @@
                         <div class="col-md-6">
                             <h5 class="card-title text-success mb-2">
                                 <i class="fas fa-check-circle me-2"></i>
-                                Telegram Connected
+                                Neural Interface Connected
                             </h5>
                             <p class="card-text mb-1">
-                                Your Telegram account ({{ phone_number }}) is connected and monitoring messages.
+                                Your Neural Interface ({{ phone_number }}) is connected and monitoring entity behavior.
                             </p>
                             {% if has_session_files %}
                             <small class="text-muted">
@@ -218,15 +218,15 @@
                             <div class="btn-group-vertical btn-group-sm" role="group">
                                 <form action="/telegram/delete-session" method="post" class="d-inline mb-1">
                                     <button type="submit" class="btn btn-outline-warning btn-sm"
-                                        onclick="return confirm('This will delete your Telegram session files and disconnect your account. You will need to re-verify with a new code. Continue?')"
+                                        onclick="return confirm('This will delete your Neural Interface session and disconnect your entity. You will need to re-verify with a new code. Continue?')"
                                         title="Clear session data and force re-authentication">
                                         <i class="fas fa-trash me-1"></i>Delete Session & Re-verify
                                     </button>
                                 </form>
                                 <form action="/telegram/disconnect" method="post" class="d-inline">
                                     <button type="submit" class="btn btn-outline-danger btn-sm"
-                                        onclick="return confirm('Are you sure you want to disconnect Telegram? This will stop message monitoring.')"
-                                        title="Disconnect from Telegram (keeps session files)">
+                                        onclick="return confirm('Are you sure you want to disconnect Neural Interface? This will stop entity monitoring.')"
+                                        title="Disconnect from Neural Interface (keeps session files)">
                                         <i class="fas fa-unlink me-1"></i>Disconnect
                                     </button>
                                 </form>
