@@ -53,6 +53,15 @@ docs/
 sessions/*.session
 sessions/*.session-journal
 
+# Database files (will be created/mounted as volumes in production)
+app.db
+*.db
+*.sqlite
+*.sqlite3
+data/app.db
+data/*.db
+data/*.sqlite
+
 # Temporary files
 temp/*
 logs/*

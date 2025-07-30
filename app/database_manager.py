@@ -1599,6 +1599,7 @@ async def init_database_manager():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
                 enabled BOOLEAN DEFAULT TRUE,
+                penalty_per_correction INTEGER DEFAULT 5,
                 autocorrect_mode VARCHAR(20) DEFAULT 'moderate',
                 preserve_case BOOLEAN DEFAULT TRUE,
                 preserve_emojis BOOLEAN DEFAULT TRUE,
@@ -1610,6 +1611,16 @@ async def init_database_manager():
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
         """)
+
+        # Add penalty_per_correction column to existing user_autocorrect_settings table if it doesn't exist
+        try:
+            await db.execute(
+                "ALTER TABLE user_autocorrect_settings ADD COLUMN penalty_per_correction INTEGER DEFAULT 5"
+            )
+            await db.commit()
+        except Exception:
+            # Column already exists, which is fine
+            pass
 
         # Invite codes table
         await db.execute("""
