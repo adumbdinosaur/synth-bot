@@ -24,8 +24,13 @@
 
         /* Cyberpunk scanner line effect */
         @keyframes scanner {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100vw); }
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(100vw);
+            }
         }
 
         .scanner-line {
@@ -69,25 +74,47 @@
         }
 
         @keyframes glitch-1 {
-            0%, 14%, 15%, 49%, 50%, 99%, 100% {
+
+            0%,
+            14%,
+            15%,
+            49%,
+            50%,
+            99%,
+            100% {
                 transform: translate(0, 0);
             }
-            1%, 13% {
+
+            1%,
+            13% {
                 transform: translate(-1px, 1px);
             }
-            16%, 48% {
+
+            16%,
+            48% {
                 transform: translate(1px, -1px);
             }
         }
 
         @keyframes glitch-2 {
-            0%, 20%, 21%, 62%, 63%, 99%, 100% {
+
+            0%,
+            20%,
+            21%,
+            62%,
+            63%,
+            99%,
+            100% {
                 transform: translate(0, 0);
             }
-            1%, 19% {
+
+            1%,
+            19% {
                 transform: translate(1px, 1px);
             }
-            22%, 61% {
+
+            22%,
+            61% {
                 transform: translate(-1px, -1px);
             }
         }
@@ -98,7 +125,7 @@
 <body>
     <!-- Cyberpunk scanner line effect -->
     <div class="scanner-line"></div>
-    
+
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">

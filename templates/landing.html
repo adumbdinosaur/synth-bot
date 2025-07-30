@@ -14,18 +14,24 @@
                         RPTR CORPORATION
                     </h1>
                     <p class="lead mb-5 fs-4">
-                        Access your assigned synthetic lifeform control interface. Monitor behavioral patterns, 
+                        Access your assigned synthetic lifeform control interface. Monitor behavioral patterns,
                         regulate energy consumption, and maintain identity protocols.
                     </p>
                 </div>
 
                 <div class="d-grid gap-3 d-md-flex justify-content-md-center">
+                    {% if user %}
+                    <a href="/dashboard" class="btn btn-gradient btn-lg px-5 py-3">
+                        <i class="fas fa-tachometer-alt me-2"></i>Access Dashboard
+                    </a>
+                    {% else %}
                     <a href="/login" class="btn btn-gradient btn-lg px-5 py-3">
                         <i class="fas fa-key me-2"></i>Access Terminal
                     </a>
                     <a href="/register" class="btn btn-secondary btn-lg px-5 py-3">
                         <i class="fas fa-user-plus me-2"></i>Request Clearance
                     </a>
+                    {% endif %}
                 </div>
 
                 <div class="mt-5">
@@ -82,15 +88,25 @@
             <div class="col-lg-8 mx-auto">
                 <h3 class="mb-3 text-gradient">Authorization Required</h3>
                 <p class="lead mb-4">
-                    Request access to the RPTR Corporation synthetic control network. Manage your assigned entity and monitor neural activity.
+                    Request access to the RPTR Corporation synthetic control network. Manage your assigned entity and
+                    monitor neural activity.
                 </p>
                 <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                    {% if user %}
+                    <a href="/dashboard" class="btn btn-gradient btn-lg me-md-2">
+                        <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+                    </a>
+                    <a href="/public/sessions" class="btn btn-secondary btn-lg">
+                        <i class="fas fa-broadcast-tower me-2"></i>View Active Sessions
+                    </a>
+                    {% else %}
                     <a href="/register" class="btn btn-gradient btn-lg me-md-2">
                         <i class="fas fa-rocket me-2"></i>Request Access
                     </a>
                     <a href="/login" class="btn btn-secondary btn-lg">
                         <i class="fas fa-terminal me-2"></i>Access Control Panel
                     </a>
+                    {% endif %}
                 </div>
                 <div class="mt-4">
                     <small class="text-muted">
