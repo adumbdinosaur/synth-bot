@@ -310,6 +310,35 @@ async def dashboard(
     try:
         db_manager = get_database_manager()
 
+        # Check if user has active Telegram session
+        has_active_session = await db_manager.has_active_telegram_session(
+            current_user["id"]
+        )
+
+        # If user has active session, show restricted dashboard
+        if has_active_session:
+            # Get minimal info for restricted view
+            energy_manager = EnergyManager()
+            energy_info = await energy_manager.get_user_energy(current_user["id"])
+
+            # Get user data for recharge rate
+            user_data = await db_manager.get_user_by_id(current_user["id"])
+            recharge_rate = user_data.get("energy_recharge_rate", 1) if user_data else 1
+
+            return templates.TemplateResponse(
+                "dashboard_restricted.html",
+                {
+                    "request": request,
+                    "user": current_user,
+                    "energy_level": energy_info["energy"],
+                    "max_energy": energy_info["max_energy"],
+                    "recharge_rate": recharge_rate,
+                    "message": message,
+                    "message_type": message_type or "info",
+                },
+            )
+
+        # Regular dashboard for users without active sessions
         # Get user's Telegram connection status
         user_data = await db_manager.get_user_by_id(current_user["id"])
 
@@ -820,7 +849,7 @@ async def telegram_delete_session(
 
 @app.get("/energy-settings", response_class=HTMLResponse)
 async def energy_settings_page(
-    request: Request, current_user: dict = Depends(get_current_user)
+    request: Request, current_user: dict = Depends(get_current_user_with_session_check)
 ):
     """Energy settings configuration page."""
     try:
@@ -859,7 +888,7 @@ async def energy_settings_page(
 @app.post("/energy-settings")
 async def update_energy_settings(
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_with_session_check),
 ):
     """Update energy cost settings."""
     try:
@@ -892,7 +921,7 @@ async def update_energy_settings(
 
 @app.get("/profile-protection", response_class=HTMLResponse)
 async def profile_protection_page(
-    request: Request, current_user: dict = Depends(get_current_user)
+    request: Request, current_user: dict = Depends(get_current_user_with_session_check)
 ):
     """Profile protection settings page."""
     try:
@@ -931,7 +960,7 @@ async def profile_protection_page(
 @app.post("/profile-protection")
 async def update_profile_protection_settings(
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_with_session_check),
 ):
     """Update profile protection settings."""
     try:
@@ -1006,7 +1035,7 @@ async def add_badword(
     word: str = Form(...),
     penalty: int = Form(5),
     case_sensitive: bool = Form(False),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_with_session_check),
 ):
     """Add a new badword."""
     try:
@@ -1041,7 +1070,7 @@ async def add_badword(
 async def remove_badword(
     request: Request,
     word: str = Form(...),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_with_session_check),
 ):
     """Remove a badword."""
     try:
@@ -2162,4 +2191,81 @@ async def update_autocorrect_settings(
         return RedirectResponse(
             url=f"/public/sessions/{user_id}?error=Failed to update autocorrect settings",
             status_code=303,
+        )
+
+
+@app.post("/disconnect-session")
+async def disconnect_session(
+    request: Request, current_user: dict = Depends(get_current_user)
+):
+    """Disconnect active Telegram session for users with restricted dashboard access."""
+    try:
+        user_id = current_user["id"]
+        username = current_user["username"]
+
+        # Disconnect any active Telegram client for this user
+        session_disconnected = False
+        try:
+            telegram_manager = get_telegram_manager()
+            if telegram_manager:
+                client = await telegram_manager.get_client(user_id)
+                if client is not None:
+                    if client.is_connected:
+                        await client.disconnect()
+                        session_disconnected = True
+                        logger.info(
+                            f"Disconnected active Telegram client for user {user_id} ({username})"
+                        )
+
+                    # Remove from manager
+                    if (
+                        hasattr(telegram_manager, "clients")
+                        and user_id in telegram_manager.clients
+                    ):
+                        del telegram_manager.clients[user_id]
+                        logger.info(
+                            f"Removed client from manager for user {user_id} ({username})"
+                        )
+        except Exception as e:
+            logger.error(f"Error disconnecting client for user {user_id}: {e}")
+
+        # Also delete session files to prevent auto-reconnection
+        sessions_dir = "sessions"
+        deleted_files = []
+
+        if os.path.exists(sessions_dir):
+            for filename in os.listdir(sessions_dir):
+                if filename.startswith(f"user_{user_id}_") and filename.endswith(
+                    ".session"
+                ):
+                    file_path = os.path.join(sessions_dir, filename)
+                    try:
+                        os.remove(file_path)
+                        deleted_files.append(filename)
+                        logger.info(
+                            f"Deleted session file: {filename} for user {user_id} ({username})"
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to delete session file {filename}: {e}")
+
+        if session_disconnected or deleted_files:
+            message = "Telegram session disconnected successfully. You now have full access to dashboard features."
+            message_type = "success"
+            logger.info(
+                f"Session disconnection completed for user {user_id} ({username})"
+            )
+        else:
+            message = "No active session found to disconnect."
+            message_type = "info"
+            logger.info(f"No active session found for user {user_id} ({username})")
+
+        return RedirectResponse(
+            url=f"/dashboard?message={message}&type={message_type}", status_code=302
+        )
+
+    except Exception as e:
+        logger.error(f"Error disconnecting session for user {current_user['id']}: {e}")
+        return RedirectResponse(
+            url=f"/dashboard?message=Failed to disconnect session: {str(e)}&type=error",
+            status_code=302,
         )

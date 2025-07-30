@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Restricted View{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    {% if message %}
+    <div class="alert alert-{{ 'success' if message_type == 'success' else 'info' if message_type == 'info' else 'danger' }} alert-dismissible fade show"
+        role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-12">
+            <div
+                class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">
+                    <i class="fas fa-tachometer-alt text-primary me-2"></i>
+                    Dashboard - Session Active
+                </h1>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session Active Warning -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-warning" role="alert">
+                <h4 class="alert-heading">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Active Telegram Session Detected
+                </h4>
+                <p>
+                    You currently have an active Telegram session running. While your session is active,
+                    access to energy settings, badwords, autocorrect, and other configuration options is restricted
+                    for security and stability reasons.
+                </p>
+                <hr>
+                <p class="mb-0">
+                    <strong>To access full dashboard features:</strong> Please disconnect your Telegram session using
+                    the button below.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Current Status - Read Only -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card border-primary mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-battery-half me-2"></i>
+                        Current Energy Level
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="fs-4 fw-bold">{{ energy_level }}/{{ max_energy }}</span>
+                        <span class="badge bg-primary fs-6">Energy Points</span>
+                    </div>
+                    <div class="progress mb-3" style="height: 20px;">
+                        <div class="progress-bar bg-primary" role="progressbar"
+                            style="width: {{ (energy_level / max_energy * 100) if max_energy > 0 else 0 }}%"
+                            aria-valuenow="{{ energy_level }}" aria-valuemin="0" aria-valuemax="{{ max_energy }}">
+                        </div>
+                    </div>
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Energy regenerates at {{ recharge_rate }} point{{ 's' if recharge_rate != 1 else '' }} per
+                        minute
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card border-warning mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-cog me-2"></i>
+                        Session Management
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Your Telegram session is currently active and connected.
+                        Disconnect to access full dashboard functionality.
+                    </p>
+                    <div class="d-grid gap-2">
+                        <form method="post" action="/disconnect-session"
+                            onsubmit="return confirm('Are you sure you want to disconnect your Telegram session? This will stop all automated activities.');">
+                            <button type="submit" class="btn btn-danger btn-lg w-100">
+                                <i class="fas fa-sign-out-alt me-2"></i>
+                                Disconnect Telegram Session
+                            </button>
+                        </form>
+                    </div>
+                    <small class="text-muted mt-2 d-block">
+                        <i class="fas fa-warning me-1"></i>
+                        This will stop all automated Telegram activities for your account.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Information Cards -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Restricted Access Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold text-danger">Currently Unavailable:</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-times text-danger me-2"></i>Energy settings modification</li>
+                                <li><i class="fas fa-times text-danger me-2"></i>Badwords management</li>
+                                <li><i class="fas fa-times text-danger me-2"></i>Autocorrect settings</li>
+                                <li><i class="fas fa-times text-danger me-2"></i>Profile protection settings</li>
+                                <li><i class="fas fa-times text-danger me-2"></i>Public dashboard access</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-bold text-success">Available:</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success me-2"></i>View current energy level</li>
+                                <li><i class="fas fa-check text-success me-2"></i>View recharge rate</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Session management</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Account information</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
