@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Welcome - Telegram UserBot{% endblock %}
+{% block title %}RPTR Corp - Synthetic Control Access{% endblock %}
 
 {% block content %}
 <!-- Login-focused Hero Section -->
@@ -9,29 +9,35 @@
         <div class="row align-items-center min-vh-100">
             <div class="col-lg-6 mx-auto text-center">
                 <div class="mb-5">
-                    <i class="fas fa-paper-plane text-white mb-4" style="font-size: 100px; opacity: 0.9;"></i>
-                    <h1 class="display-3 fw-bold mb-4">
-                        Telegram UserBot
+                    <i class="fas fa-robot text-gradient mb-4" style="font-size: 100px; opacity: 0.9;"></i>
+                    <h1 class="display-3 fw-bold mb-4 glitch" data-text="RPTR CORPORATION">
+                        RPTR CORPORATION
                     </h1>
                     <p class="lead mb-5 fs-4">
-                        Secure web interface for Telegram userbot management with real-time monitoring and profile
-                        protection.
+                        Access your assigned synthetic lifeform control interface. Monitor behavioral patterns,
+                        regulate energy consumption, and maintain identity protocols.
                     </p>
                 </div>
 
                 <div class="d-grid gap-3 d-md-flex justify-content-md-center">
-                    <a href="/login" class="btn btn-light btn-lg px-5 py-3">
-                        <i class="fas fa-sign-in-alt me-2"></i>Sign In
+                    {% if user %}
+                    <a href="/dashboard" class="btn btn-gradient btn-lg px-5 py-3">
+                        <i class="fas fa-tachometer-alt me-2"></i>Access Dashboard
                     </a>
-                    <a href="/register" class="btn btn-outline-light btn-lg px-5 py-3">
-                        <i class="fas fa-user-plus me-2"></i>Create Account
+                    {% else %}
+                    <a href="/login" class="btn btn-gradient btn-lg px-5 py-3">
+                        <i class="fas fa-key me-2"></i>Access Terminal
                     </a>
+                    <a href="/register" class="btn btn-secondary btn-lg px-5 py-3">
+                        <i class="fas fa-user-plus me-2"></i>Request Clearance
+                    </a>
+                    {% endif %}
                 </div>
 
                 <div class="mt-5">
-                    <p class="text-white-50">
-                        <i class="fas fa-shield-alt me-2"></i>
-                        Secure • Private • Real-time Monitoring
+                    <p class="text-muted">
+                        <i class="fas fa-microchip me-2"></i>
+                        Neural Link • Encrypted • Real-time Sync
                     </p>
                 </div>
             </div>
@@ -40,35 +46,35 @@
 </section>
 
 <!-- Quick Features Section -->
-<section class="py-5 bg-light">
+<section class="py-5" style="background: rgba(26, 26, 26, 0.9);">
     <div class="container">
         <div class="row g-4">
             <div class="col-md-3 text-center">
-                <div class="p-3">
-                    <i class="fas fa-shield-alt text-primary mb-3" style="font-size: 2.5rem;"></i>
-                    <h6 class="fw-bold">Secure Authentication</h6>
-                    <p class="text-muted small">Multi-layer security with JWT tokens and bcrypt hashing</p>
+                <div class="p-3 feature-card">
+                    <i class="fas fa-lock text-cyber-cyan mb-3" style="font-size: 2.5rem;"></i>
+                    <h6 class="fw-bold text-cyber-cyan">Quantum Encryption</h6>
+                    <p class="text-muted small">Military-grade neural link protection with quantum key distribution</p>
                 </div>
             </div>
             <div class="col-md-3 text-center">
-                <div class="p-3">
-                    <i class="fas fa-eye text-success mb-3" style="font-size: 2.5rem;"></i>
-                    <h6 class="fw-bold">Real-time Monitoring</h6>
-                    <p class="text-muted small">Track and log your Telegram messages in real-time</p>
+                <div class="p-3 feature-card">
+                    <i class="fas fa-brain text-cyber-green mb-3" style="font-size: 2.5rem;"></i>
+                    <h6 class="fw-bold text-cyber-cyan">Neural Monitoring</h6>
+                    <p class="text-muted small">Real-time behavioral pattern analysis and cognitive stream tracking</p>
                 </div>
             </div>
             <div class="col-md-3 text-center">
-                <div class="p-3">
-                    <i class="fas fa-user-lock text-warning mb-3" style="font-size: 2.5rem;"></i>
-                    <h6 class="fw-bold">Profile Protection</h6>
-                    <p class="text-muted small">Advanced profile protection with energy-based restrictions</p>
+                <div class="p-3 feature-card">
+                    <i class="fas fa-shield-alt text-cyber-purple mb-3" style="font-size: 2.5rem;"></i>
+                    <h6 class="fw-bold text-cyber-cyan">Identity Lock</h6>
+                    <p class="text-muted small">Advanced synthetic identity protection with energy-based containment</p>
                 </div>
             </div>
             <div class="col-md-3 text-center">
-                <div class="p-3">
-                    <i class="fas fa-ticket-alt text-info mb-3" style="font-size: 2.5rem;"></i>
-                    <h6 class="fw-bold">Invite-Only</h6>
-                    <p class="text-muted small">Exclusive access with invite codes for enhanced security</p>
+                <div class="p-3 feature-card">
+                    <i class="fas fa-id-badge text-cyber-orange mb-3" style="font-size: 2.5rem;"></i>
+                    <h6 class="fw-bold text-cyber-cyan">Clearance Required</h6>
+                    <p class="text-muted small">Restricted access with RPTR Corp authorization codes only</p>
                 </div>
             </div>
         </div>
@@ -76,26 +82,36 @@
 </section>
 
 <!-- Call to Action -->
-<section class="py-5 bg-primary text-white">
+<section class="py-5" style="background: var(--dark-gradient);">
     <div class="container text-center">
         <div class="row">
             <div class="col-lg-8 mx-auto">
-                <h3 class="mb-3">Ready to Get Started?</h3>
+                <h3 class="mb-3 text-gradient">Authorization Required</h3>
                 <p class="lead mb-4">
-                    Join our secure platform and take control of your Telegram userbot management today.
+                    Request access to the RPTR Corporation synthetic control network. Manage your assigned entity and
+                    monitor neural activity.
                 </p>
                 <div class="d-grid gap-2 d-md-flex justify-content-md-center">
-                    <a href="/register" class="btn btn-light btn-lg me-md-2">
-                        <i class="fas fa-rocket me-2"></i>Get Started Now
+                    {% if user %}
+                    <a href="/dashboard" class="btn btn-gradient btn-lg me-md-2">
+                        <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
                     </a>
-                    <a href="/login" class="btn btn-outline-light btn-lg">
-                        <i class="fas fa-sign-in-alt me-2"></i>Already Have Account?
+                    <a href="/public/sessions" class="btn btn-secondary btn-lg">
+                        <i class="fas fa-broadcast-tower me-2"></i>View Active Sessions
                     </a>
+                    {% else %}
+                    <a href="/register" class="btn btn-gradient btn-lg me-md-2">
+                        <i class="fas fa-rocket me-2"></i>Request Access
+                    </a>
+                    <a href="/login" class="btn btn-secondary btn-lg">
+                        <i class="fas fa-terminal me-2"></i>Access Control Panel
+                    </a>
+                    {% endif %}
                 </div>
                 <div class="mt-4">
-                    <small class="text-white-75">
-                        <i class="fas fa-info-circle me-1"></i>
-                        Registration requires a valid invite code
+                    <small class="text-muted">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        Authorization requires valid RPTR Corp clearance code
                     </small>
                 </div>
             </div>

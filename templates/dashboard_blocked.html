@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Access Restricted - Telegram UserBot{% endblock %}
+{% block title %}Access Restricted - RPTR Corp{% endblock %}
 
 {% block content %}
 <div class="container py-5">
@@ -16,11 +16,11 @@
                     <div class="alert alert-warning" role="alert">
                         <h5 class="alert-heading">
                             <i class="fas fa-exclamation-triangle me-2"></i>
-                            Active Telegram Session Detected
+                            Neural Interface Active
                         </h5>
                         <p class="mb-0">
-                            You currently have an active and connected Telegram session.
-                            For security reasons, dashboard settings are restricted while your Telegram session is
+                            You currently have an active and connected Neural Interface session.
+                            For security reasons, dashboard settings are restricted while your Neural Interface is
                             active.
                         </p>
                     </div>
@@ -29,7 +29,7 @@
                         <h6 class="fw-bold">To access dashboard settings:</h6>
                         <ol class="text-start mt-3">
                             <li class="mb-2">
-                                <strong>Disconnect your Telegram session</strong> from the active sessions page
+                                <strong>Disconnect your Neural Interface session</strong> from the active sessions page
                             </li>
                             <li class="mb-2">
                                 <strong>Wait for the session to fully disconnect</strong> (may take a few moments)
@@ -41,7 +41,10 @@
                     </div>
 
                     <div class="d-grid gap-2">
-                        <a href="/public-sessions" class="btn btn-primary">
+                        <a href="/dashboard" class="btn btn-primary">
+                            <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+                        </a>
+                        <a href="/public/sessions" class="btn btn-outline-secondary">
                             <i class="fas fa-users me-2"></i>View Active Sessions
                         </a>
                         <a href="/logout" class="btn btn-outline-secondary">

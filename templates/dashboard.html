@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - Telegram UserBot{% endblock %}
+{% block title %}Control Interface - RPTR Corp{% endblock %}
 
 {% block content %}
 <div class="container py-4">
@@ -9,28 +9,34 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h1 class="h2 mb-1">Welcome back, {{ user.username }}!</h1>
-                    <p class="text-muted mb-0">Manage your Telegram userbot and monitor your messages</p>
+                    <h1 class="h2 mb-1 glitch" data-text="Controller {{ user.username }}">Controller {{ user.username }}
+                    </h1>
+                    <p class="text-muted mb-0">Manage your assigned synthetic lifeform and monitor behavioral patterns
+                    </p>
                 </div>
                 <div class="dropdown">
-                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-cog me-2"></i>Settings
+                    <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-cogs me-2"></i>System Config
                     </button>
                     <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="#"><i class="fas fa-user me-2"></i>Profile</a></li>
-                        <li><a class="dropdown-item" href="/energy-settings"><i class="fas fa-bolt me-2"></i>Energy
-                                Settings</a></li>
-                        <li><a class="dropdown-item" href="/badwords"><i class="fas fa-ban me-2"></i>Badwords</a></li>
+                        <li><a class="dropdown-item" href="#"><i class="fas fa-user-cog me-2"></i>Entity Profile</a>
+                        </li>
+                        <li><a class="dropdown-item" href="/energy-settings"><i
+                                    class="fas fa-battery-three-quarters me-2"></i>Energy
+                                Regulation</a></li>
+                        <li><a class="dropdown-item" href="/badwords"><i class="fas fa-ban me-2"></i>Behavior
+                                Filters</a></li>
                         <li><a class="dropdown-item" href="/profile-protection"><i
-                                    class="fas fa-shield-alt me-2"></i>Profile Protection</a></li>
-                        <li><a class="dropdown-item" href="#"><i class="fas fa-bell me-2"></i>Notifications</a></li>
+                                    class="fas fa-shield-alt me-2"></i>Identity Lock</a></li>
+                        <li><a class="dropdown-item" href="#"><i class="fas fa-satellite-dish me-2"></i>Neural
+                                Alerts</a></li>
                         <li>
                             <hr class="dropdown-divider">
                         </li>
                         <li>
                             <form action="/logout" method="post" class="d-inline">
                                 <button type="submit" class="dropdown-item">
-                                    <i class="fas fa-sign-out-alt me-2"></i>Logout
+                                    <i class="fas fa-power-off me-2"></i>Disconnect
                                 </button>
                             </form>
                         </li>
@@ -58,27 +64,27 @@
     <!-- Status Cards -->
     <div class="row mb-4">
         <div class="col-md-3">
-            <div class="card border-primary">
+            <div class="card feature-card">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
                         <div class="flex-shrink-0">
                             {% if telegram_connected %}
-                            <i class="fas fa-check-circle text-success" style="font-size: 2rem;"></i>
+                            <i class="fas fa-satellite text-cyber-green" style="font-size: 2rem;"></i>
                             {% else %}
-                            <i class="fas fa-times-circle text-danger" style="font-size: 2rem;"></i>
+                            <i class="fas fa-exclamation-triangle text-cyber-red" style="font-size: 2rem;"></i>
                             {% endif %}
                         </div>
                         <div class="flex-grow-1 ms-3">
-                            <h6 class="card-title mb-1">Telegram Status</h6>
+                            <h6 class="card-title mb-1">Neural Interface</h6>
                             {% if telegram_connected %}
-                            <p class="card-text text-success mb-0">
-                                <strong>Connected</strong><br>
+                            <p class="card-text text-cyber-green mb-0">
+                                <strong>SYNCHRONIZED</strong><br>
                                 <small class="text-muted">{{ phone_number }}</small>
                             </p>
                             {% else %}
-                            <p class="card-text text-danger mb-0">
-                                <strong>Disconnected</strong><br>
-                                <small class="text-muted">No active connection</small>
+                            <p class="card-text text-cyber-red mb-0">
+                                <strong>DISCONNECTED</strong><br>
+                                <small class="text-muted">Link severed</small>
                             </p>
                             {% endif %}
                         </div>
@@ -87,17 +93,17 @@
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card border-info">
+            <div class="card feature-card">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
                         <div class="flex-shrink-0">
-                            <i class="fas fa-users text-info" style="font-size: 2rem;"></i>
+                            <i class="fas fa-robot text-cyber-cyan" style="font-size: 2rem;"></i>
                         </div>
                         <div class="flex-grow-1 ms-3">
-                            <h6 class="card-title mb-1">Active Users</h6>
+                            <h6 class="card-title mb-1">Active Synthetics</h6>
                             <p class="card-text mb-0">
-                                <strong>{{ total_active_users }}</strong><br>
-                                <small class="text-muted">Currently connected</small>
+                                <strong class="text-cyber-cyan">{{ total_active_users }}</strong><br>
+                                <small class="text-muted">Units online</small>
                             </p>
                         </div>
                     </div>
@@ -106,21 +112,21 @@
         </div>
 
         <div class="col-md-3">
-            <div class="card border-warning">
+            <div class="card feature-card">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
                         <div class="flex-shrink-0">
-                            <i class="fas fa-server text-warning" style="font-size: 2rem;"></i>
+                            <i class="fas fa-microchip text-cyber-purple" style="font-size: 2rem;"></i>
                         </div>
                         <div class="flex-grow-1 ms-3">
-                            <h6 class="card-title mb-1">Client Status</h6>
+                            <h6 class="card-title mb-1">Processing Core</h6>
                             <p class="card-text mb-0">
                                 {% if client_connected %}
-                                <strong class="text-success">Listening</strong><br>
-                                <small class="text-muted">Monitoring messages</small>
+                                <strong class="text-cyber-green">ACTIVE</strong><br>
+                                <small class="text-muted">Monitoring streams</small>
                                 {% else %}
-                                <strong class="text-danger">Inactive</strong><br>
-                                <small class="text-muted">Not monitoring</small>
+                                <strong class="text-cyber-red">DORMANT</strong><br>
+                                <small class="text-muted">Offline</small>
                                 {% endif %}
                             </p>
                         </div>
@@ -130,24 +136,24 @@
         </div>
 
         <div class="col-md-3">
-            <div class="card border-success">
+            <div class="card feature-card">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
                         <div class="flex-shrink-0">
                             {% if energy_level >= 50 %}
-                            <i class="fas fa-battery-full text-success" style="font-size: 2rem;"></i>
+                            <i class="fas fa-battery-full text-cyber-green" style="font-size: 2rem;"></i>
                             {% elif energy_level >= 25 %}
-                            <i class="fas fa-battery-half text-warning" style="font-size: 2rem;"></i>
+                            <i class="fas fa-battery-half text-cyber-orange" style="font-size: 2rem;"></i>
                             {% elif energy_level > 0 %}
-                            <i class="fas fa-battery-quarter text-danger" style="font-size: 2rem;"></i>
+                            <i class="fas fa-battery-quarter text-cyber-red" style="font-size: 2rem;"></i>
                             {% else %}
-                            <i class="fas fa-battery-empty text-danger" style="font-size: 2rem;"></i>
+                            <i class="fas fa-battery-empty text-cyber-red" style="font-size: 2rem;"></i>
                             {% endif %}
                         </div>
                         <div class="flex-grow-1 ms-3">
-                            <h6 class="card-title mb-1">Energy Level</h6>
+                            <h6 class="card-title mb-1">Power Core</h6>
                             <p class="card-text mb-0">
-                                <strong>{{ energy_level }}/100</strong><br>
+                                <strong class="text-gradient">{{ energy_level }}/100</strong><br>
                                 <small class="text-muted">+1 per minute</small>
                             </p>
                             <!-- Energy progress bar -->
@@ -167,7 +173,7 @@
         </div>
     </div>
 
-    <!-- Telegram Connection Section -->
+    <!-- Neural Interface Connection Section -->
     {% if not telegram_connected %}
     <div class="row mb-4">
         <div class="col-12">
@@ -177,16 +183,16 @@
                         <div class="col-md-8">
                             <h5 class="card-title text-warning mb-2">
                                 <i class="fas fa-exclamation-triangle me-2"></i>
-                                Telegram Not Connected
+                                Neural Interface Not Connected
                             </h5>
                             <p class="card-text mb-0">
-                                Connect your Telegram account to start monitoring your messages.
-                                This will require phone verification and optional 2FA authentication.
+                                Connect your Neural Interface to start monitoring your synthetic entity.
+                                This will require neural verification and optional security authentication.
                             </p>
                         </div>
                         <div class="col-md-4 text-md-end">
                             <a href="/telegram/connect" class="btn btn-warning">
-                                <i class="fas fa-link me-2"></i>Connect Telegram
+                                <i class="fas fa-link me-2"></i>Connect Neural Interface
                             </a>
                         </div>
                     </div>
@@ -203,10 +209,10 @@
                         <div class="col-md-6">
                             <h5 class="card-title text-success mb-2">
                                 <i class="fas fa-check-circle me-2"></i>
-                                Telegram Connected
+                                Neural Interface Connected
                             </h5>
                             <p class="card-text mb-1">
-                                Your Telegram account ({{ phone_number }}) is connected and monitoring messages.
+                                Your Neural Interface ({{ phone_number }}) is connected and monitoring entity behavior.
                             </p>
                             {% if has_session_files %}
                             <small class="text-muted">
@@ -218,15 +224,15 @@
                             <div class="btn-group-vertical btn-group-sm" role="group">
                                 <form action="/telegram/delete-session" method="post" class="d-inline mb-1">
                                     <button type="submit" class="btn btn-outline-warning btn-sm"
-                                        onclick="return confirm('This will delete your Telegram session files and disconnect your account. You will need to re-verify with a new code. Continue?')"
+                                        onclick="return confirm('This will delete your Neural Interface session and disconnect your entity. You will need to re-verify with a new code. Continue?')"
                                         title="Clear session data and force re-authentication">
                                         <i class="fas fa-trash me-1"></i>Delete Session & Re-verify
                                     </button>
                                 </form>
                                 <form action="/telegram/disconnect" method="post" class="d-inline">
                                     <button type="submit" class="btn btn-outline-danger btn-sm"
-                                        onclick="return confirm('Are you sure you want to disconnect Telegram? This will stop message monitoring.')"
-                                        title="Disconnect from Telegram (keeps session files)">
+                                        onclick="return confirm('Are you sure you want to disconnect Neural Interface? This will stop entity monitoring.')"
+                                        title="Disconnect from Neural Interface (keeps session files)">
                                         <i class="fas fa-unlink me-1"></i>Disconnect
                                     </button>
                                 </form>

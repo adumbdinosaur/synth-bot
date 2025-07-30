@@ -4,49 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Telegram UserBot{% endblock %}</title>
+    <title>{% block title %}RPTR Corp - Synthetic Control Interface{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
     <style>
-        .navbar-brand {
-            font-weight: bold;
-        }
-
-        .hero-section {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 80px 0;
-        }
-
-        .feature-card {
-            transition: transform 0.3s ease;
-            border: none;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        .feature-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .btn-gradient {
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            border: none;
-            color: white;
-        }
-
-        .btn-gradient:hover {
-            background: linear-gradient(45deg, #764ba2, #667eea);
-            color: white;
-        }
-
-        .footer {
-            background-color: #2c3e50;
-            color: white;
-            padding: 40px 0;
-            margin-top: 60px;
-        }
-
-        .alert-container {
+        /* Additional inline styles for enhanced cyberpunk effects */
+        .notification-area {
             position: fixed;
             top: 20px;
             right: 20px;
@@ -54,25 +18,123 @@
             max-width: 400px;
         }
 
-        .message-card {
-            border-left: 4px solid #007bff;
-            background-color: #f8f9fa;
-        }
-
         .loading {
             display: none;
+        }
+
+        /* Cyberpunk scanner line effect */
+        @keyframes scanner {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(100vw);
+            }
+        }
+
+        .scanner-line {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 2px;
+            height: 100vh;
+            background: linear-gradient(to bottom, transparent, var(--cyber-cyan), transparent);
+            opacity: 0.3;
+            animation: scanner 8s linear infinite;
+            z-index: -1;
+        }
+
+        /* Glitch effect for headers */
+        .glitch {
+            position: relative;
+            display: inline-block;
+        }
+
+        .glitch::before,
+        .glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .glitch::before {
+            animation: glitch-1 0.5s infinite;
+            color: var(--cyber-pink);
+            z-index: -1;
+        }
+
+        .glitch::after {
+            animation: glitch-2 0.5s infinite;
+            color: var(--cyber-cyan);
+            z-index: -2;
+        }
+
+        @keyframes glitch-1 {
+
+            0%,
+            14%,
+            15%,
+            49%,
+            50%,
+            99%,
+            100% {
+                transform: translate(0, 0);
+            }
+
+            1%,
+            13% {
+                transform: translate(-1px, 1px);
+            }
+
+            16%,
+            48% {
+                transform: translate(1px, -1px);
+            }
+        }
+
+        @keyframes glitch-2 {
+
+            0%,
+            20%,
+            21%,
+            62%,
+            63%,
+            99%,
+            100% {
+                transform: translate(0, 0);
+            }
+
+            1%,
+            19% {
+                transform: translate(1px, 1px);
+            }
+
+            22%,
+            61% {
+                transform: translate(-1px, -1px);
+            }
         }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
 
 <body>
+    <!-- Cyberpunk scanner line effect -->
+    <div class="scanner-line"></div>
+
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand" href="/">
-                <i class="fas fa-paper-plane me-2"></i>
-                Telegram UserBot
+            <a class="navbar-brand rptr-logo" href="/">
+                <i class="fas fa-robot me-2"></i>
+                RPTR CORP
+                <small class="d-block" style="font-size: 0.6em; font-weight: 400; letter-spacing: 0.5px; opacity: 0.8;">
+                    Synthetic Control Interface
+                </small>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -134,12 +196,12 @@
         <div class="container">
             <div class="row">
                 <div class="col-md-6">
-                    <h5>Telegram UserBot</h5>
-                    <p class="mb-0">Secure web interface for Telegram userbot management</p>
+                    <h5>RPTR CORPORATION</h5>
+                    <p class="mb-0">Synthetic Control Interface • Neural Management System</p>
                 </div>
                 <div class="col-md-6 text-md-end">
                     <p class="mb-0">
-                        <small>&copy; 2025 Telegram UserBot. Built with FastAPI & Telethon.</small>
+                        <small>&copy; 2025 RPTR Corp. Built with FastAPI & Neural Telemetry.</small>
                     </p>
                 </div>
             </div>

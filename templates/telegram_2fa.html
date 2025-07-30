@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Two-Factor Authentication - Telegram UserBot{% endblock %}
+{% block title %}Security Authentication - RPTR Corp{% endblock %}
 
 {% block content %}
 <div class="container py-5">
@@ -22,30 +22,33 @@
 
                     <div class="alert alert-info" role="alert">
                         <i class="fas fa-info-circle me-2"></i>
-                        Your verification code was accepted! Now please enter your Telegram cloud password to complete
+                        Your verification code was accepted! Now please enter your Neural Interface security key to
+                        complete
                         the authentication process.
                     </div>
 
                     <form id="tfaForm" action="/telegram/verify-2fa" method="post">
                         <div class="mb-4">
-                            <label for="password" class="form-label fw-bold">Cloud Password</label>
+                            <label for="password" class="form-label fw-bold">Security Key</label>
                             <div class="input-group">
                                 <span class="input-group-text">
                                     <i class="fas fa-lock"></i>
                                 </span>
                                 <input type="password" class="form-control" id="password" name="password" required
-                                    placeholder="Enter your Telegram cloud password" autocomplete="current-password">
+                                    placeholder="Enter your Neural Interface security key"
+                                    autocomplete="current-password">
                                 <button class="btn btn-outline-secondary" type="button" id="togglePassword">
                                     <i class="fas fa-eye"></i>
                                 </button>
                             </div>
                             <div class="form-text">
-                                This is the password you set for two-factor authentication in Telegram settings
+                                This is the security key you set for two-factor authentication in your Neural Interface
+                                settings
                             </div>
                         </div>
 
                         <button type="submit" class="btn btn-warning w-100 py-2 mb-3">
-                            <i class="fas fa-unlock me-2"></i>Verify Password & Complete
+                            <i class="fas fa-unlock me-2"></i>Verify Key & Complete
                         </button>
                     </form>
 
