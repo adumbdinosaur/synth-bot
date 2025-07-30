@@ -18,7 +18,7 @@
     --cyber-purple: #7986cb;
     --cyber-pink: #ba68c8;
     --cyber-green: #66bb6a;
-    --cyber-orange: #ff8a65;
+    --cyber-orange: #8e24aa;
     --cyber-red: #ef5350;
     --cyber-yellow: #ffc947;
 
@@ -26,7 +26,7 @@
     --rptr-primary: #4a9eff;
     --rptr-secondary: #7986cb;
     --rptr-accent: #64b5f6;
-    --rptr-warning: #ff8a65;
+    --rptr-warning: #8e24aa;
     --rptr-success: #66bb6a;
     --rptr-danger: #ef5350;
 
@@ -234,7 +234,7 @@ h6 {
 .btn-warning:hover {
     background: var(--cyber-orange);
     color: white;
-    box-shadow: 0 0 10px rgba(255, 138, 101, 0.3);
+    box-shadow: 0 0 10px rgba(142, 36, 170, 0.3);
 }
 
 /* Cards */
@@ -470,7 +470,7 @@ h6 {
 }
 
 .alert-warning {
-    background: rgba(255, 138, 101, 0.1);
+    background: rgba(142, 36, 170, 0.1);
     border-left-color: var(--cyber-orange);
     color: var(--cyber-orange);
 }
@@ -498,7 +498,7 @@ h6 {
 }
 
 .alert.alert-warning {
-    background-color: rgba(255, 138, 101, 0.1) !important;
+    background-color: rgba(142, 36, 170, 0.1) !important;
     border-left-color: var(--cyber-orange) !important;
     color: var(--cyber-orange) !important;
 }
