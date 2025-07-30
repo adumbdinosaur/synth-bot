@@ -11,7 +11,7 @@
     --cyber-light-grey: #2d2d2d;
     --cyber-text: #e8e8e8;
     --cyber-text-muted: #a0a0a0;
-    
+
     /* Primary Colors - Blue-based harmony */
     --cyber-blue: #4a9eff;
     --cyber-cyan: #64b5f6;
@@ -20,8 +20,8 @@
     --cyber-green: #66bb6a;
     --cyber-orange: #ff8a65;
     --cyber-red: #ef5350;
-    --cyber-yellow: #ffcc02;
-    
+    --cyber-yellow: #ffc947;
+
     /* RPTR Corporation Colors */
     --rptr-primary: #4a9eff;
     --rptr-secondary: #7986cb;
@@ -29,13 +29,13 @@
     --rptr-warning: #ff8a65;
     --rptr-success: #66bb6a;
     --rptr-danger: #ef5350;
-    
+
     /* Gradients */
     --primary-gradient: linear-gradient(135deg, var(--cyber-blue) 0%, var(--cyber-cyan) 50%, var(--cyber-purple) 100%);
     --dark-gradient: linear-gradient(135deg, var(--cyber-darker) 0%, var(--cyber-grey) 100%);
     --neon-glow: 0 0 3px currentColor, 0 0 6px currentColor, 0 0 9px currentColor;
     --box-shadow-cyber: 0 0 15px rgba(74, 158, 255, 0.25), 0 0 30px rgba(121, 134, 203, 0.15);
-    
+
     /* Typography */
     --font-primary: 'Rajdhani', monospace;
     --font-header: 'Orbitron', monospace;
@@ -48,7 +48,7 @@
 
 body {
     background: var(--cyber-dark);
-    background-image: 
+    background-image:
         radial-gradient(circle at 20% 80%, rgba(74, 158, 255, 0.08) 0%, transparent 50%),
         radial-gradient(circle at 80% 20%, rgba(121, 134, 203, 0.08) 0%, transparent 50%),
         radial-gradient(circle at 40% 40%, rgba(100, 181, 246, 0.05) 0%, transparent 50%);
@@ -67,7 +67,7 @@ body::before {
     left: 0;
     width: 100%;
     height: 100%;
-    background-image: 
+    background-image:
         linear-gradient(rgba(74, 158, 255, 0.03) 1px, transparent 1px),
         linear-gradient(90deg, rgba(74, 158, 255, 0.03) 1px, transparent 1px);
     background-size: 20px 20px;
@@ -76,12 +76,22 @@ body::before {
 }
 
 @keyframes grid-move {
-    0% { transform: translate(0, 0); }
-    100% { transform: translate(20px, 20px); }
+    0% {
+        transform: translate(0, 0);
+    }
+
+    100% {
+        transform: translate(20px, 20px);
+    }
 }
 
 /* Typography */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
     font-family: var(--font-header);
     font-weight: 700;
     color: var(--cyber-cyan);
@@ -107,7 +117,7 @@ h1, h2, h3, h4, h5, h6 {
     background: rgba(10, 10, 10, 0.95) !important;
     backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--cyber-blue);
-    box-shadow: 0 2px 20px rgba(0, 212, 255, 0.2);
+    box-shadow: 0 2px 20px rgba(74, 158, 255, 0.2);
 }
 
 .navbar-brand {
@@ -162,14 +172,16 @@ h1, h2, h3, h4, h5, h6 {
     left: 100%;
 }
 
-.btn-gradient, .btn-primary {
+.btn-gradient,
+.btn-primary {
     background: var(--primary-gradient);
     border: 2px solid var(--cyber-blue);
     color: white;
     box-shadow: 0 0 10px rgba(74, 158, 255, 0.3);
 }
 
-.btn-gradient:hover, .btn-primary:hover {
+.btn-gradient:hover,
+.btn-primary:hover {
     background: var(--primary-gradient);
     color: white;
     transform: translateY(-2px);
@@ -268,6 +280,12 @@ h1, h2, h3, h4, h5, h6 {
     letter-spacing: 1px;
 }
 
+.card-header.bg-warning {
+    background-color: var(--cyber-orange) !important;
+    color: white !important;
+    border-bottom-color: var(--cyber-orange) !important;
+}
+
 .card-body {
     color: #e0e0e0;
 }
@@ -314,7 +332,7 @@ h1, h2, h3, h4, h5, h6 {
 /* Hero Section */
 .hero-section {
     background: var(--dark-gradient);
-    background-image: 
+    background-image:
         radial-gradient(circle at 30% 20%, rgba(74, 158, 255, 0.15) 0%, transparent 50%),
         radial-gradient(circle at 70% 80%, rgba(121, 134, 203, 0.15) 0%, transparent 50%);
     min-height: 70vh;
@@ -331,7 +349,7 @@ h1, h2, h3, h4, h5, h6 {
     left: 0;
     right: 0;
     bottom: 0;
-    background-image: 
+    background-image:
         linear-gradient(45deg, rgba(74, 158, 255, 0.05) 1px, transparent 1px),
         linear-gradient(-45deg, rgba(121, 134, 203, 0.05) 1px, transparent 1px);
     background-size: 30px 30px;
@@ -339,8 +357,13 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @keyframes hero-grid {
-    0% { transform: translate(0, 0); }
-    100% { transform: translate(30px, 30px); }
+    0% {
+        transform: translate(0, 0);
+    }
+
+    100% {
+        transform: translate(30px, 30px);
+    }
 }
 
 /* Forms */
@@ -385,8 +408,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.6;
+    }
 }
 
 .status-connected {
@@ -409,8 +439,13 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 /* Alerts */
@@ -444,6 +479,69 @@ h1, h2, h3, h4, h5, h6 {
     background: rgba(74, 158, 255, 0.1);
     border-left-color: var(--cyber-blue);
     color: var(--cyber-blue);
+}
+
+/* Bootstrap Component Overrides for Better Visibility */
+.badge.bg-warning {
+    background-color: var(--cyber-orange) !important;
+    color: white !important;
+}
+
+.card-header.bg-warning {
+    background-color: var(--cyber-orange) !important;
+    color: white !important;
+    border-bottom-color: var(--cyber-orange) !important;
+}
+
+.progress-bar.bg-warning {
+    background-color: var(--cyber-orange) !important;
+}
+
+.alert.alert-warning {
+    background-color: rgba(255, 138, 101, 0.1) !important;
+    border-left-color: var(--cyber-orange) !important;
+    color: var(--cyber-orange) !important;
+}
+
+/* Fix Bootstrap info backgrounds to use harmonious colors */
+.card-header.bg-info {
+    background-color: var(--cyber-blue) !important;
+    color: white !important;
+    border-bottom-color: var(--cyber-blue) !important;
+}
+
+.alert.alert-info {
+    background-color: rgba(74, 158, 255, 0.1) !important;
+    border-left-color: var(--cyber-blue) !important;
+    color: var(--cyber-blue) !important;
+}
+
+/* Ensure good contrast for primary elements */
+.card-header.bg-primary {
+    background-color: var(--cyber-blue) !important;
+    color: white !important;
+}
+
+.progress-bar.bg-primary {
+    background-color: var(--cyber-blue) !important;
+}
+
+/* Fix any remaining yellow text visibility issues */
+.text-warning {
+    color: var(--cyber-orange) !important;
+}
+
+.text-info {
+    color: var(--cyber-cyan) !important;
+}
+
+/* Additional contrast improvements */
+.border-warning {
+    border-color: var(--cyber-orange) !important;
+}
+
+.text-dark {
+    color: #1a1a1a !important;
 }
 
 /* Text Styles */
