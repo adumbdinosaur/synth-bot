@@ -216,7 +216,10 @@ class ProfileManager:
 
         # Compare key fields
         for key in ["first_name", "last_name", "bio"]:
-            if current_profile.get(key, "") != self.original_profile.get(key, ""):
+            # Normalize None values to empty strings for proper comparison
+            current_val = current_profile.get(key) or ""
+            original_val = self.original_profile.get(key) or ""
+            if current_val != original_val:
                 return True
 
         # Check profile photo (normalize None values for comparison)
@@ -238,8 +241,9 @@ class ProfileManager:
             # Log the change
             changes = []
             for key in ["first_name", "last_name", "bio"]:
-                original_val = self.original_profile.get(key, "")
-                current_val = current_profile.get(key, "")
+                # Normalize None values to empty strings for proper comparison
+                original_val = self.original_profile.get(key) or ""
+                current_val = current_profile.get(key) or ""
                 if original_val != current_val:
                     changes.append(f"{key}: '{original_val}' → '{current_val}'")
 
@@ -290,12 +294,12 @@ class ProfileManager:
 
             logger.info("🔄 Reverting profile to original state...")
 
-            # Revert name and bio
+            # Revert name and bio (handle None values)
             await self.client(
                 UpdateProfileRequest(
-                    first_name=self.original_profile["first_name"],
-                    last_name=self.original_profile["last_name"],
-                    about=self.original_profile["bio"],
+                    first_name=self.original_profile.get("first_name") or "",
+                    last_name=self.original_profile.get("last_name") or "",
+                    about=self.original_profile.get("bio") or "",
                 )
             )
 
