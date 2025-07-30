@@ -71,6 +71,49 @@ async def lifespan(app: FastAPI):
     await init_database_manager()
     logger.info("Database initialized successfully")
 
+    # Create default admin account if none exists
+    logger.info("Checking for admin accounts...")
+    try:
+        db_manager = get_database_manager()
+        users = await db_manager.get_all_users()
+        admin_users = [user for user in users if user.get('is_admin')]
+        
+        if not admin_users:
+            logger.info("No admin accounts found. Creating default admin account...")
+            
+            # Check if username 'admin' already exists as regular user
+            existing_admin_user = await db_manager.get_user_by_username('admin')
+            if existing_admin_user:
+                # Promote existing 'admin' user to admin status
+                await db_manager.toggle_admin_status(existing_admin_user['id'])
+                logger.info("✅ Promoted existing 'admin' user to admin status")
+            else:
+                # Create new admin user
+                admin_password = "Vru3s^C&DUdSUea5NbJK"
+                admin_email = "admin@localhost"
+                hashed_password = get_password_hash(admin_password)
+                
+                admin_user_id = await db_manager.create_admin_user(
+                    username='admin',
+                    email=admin_email, 
+                    hashed_password=hashed_password
+                )
+                
+                # Initialize default settings for admin user
+                await db_manager.init_user_energy_costs(admin_user_id)
+                from app.database_manager import init_user_profile_protection
+                await init_user_profile_protection(admin_user_id)
+                
+                logger.info(f"✅ Created default admin account: admin (ID: {admin_user_id})")
+                logger.info("🔑 Admin credentials - Username: admin, Password: Vru3s^C&DUdSUea5NbJK")
+        else:
+            logger.info(f"✅ Found {len(admin_users)} existing admin account(s)")
+            
+    except Exception as e:
+        logger.error(f"❌ Error setting up admin account: {e}")
+        import traceback
+        traceback.print_exc()
+
     # Log startup message
     logger.info("🚀 Telegram UserBot application started")
     telegram_manager = get_telegram_manager()
@@ -296,6 +339,7 @@ async def login(
         )
         return response
     except Exception as e:
+        logger.error(f"Login error: {e}")
         return templates.TemplateResponse(
             "login.html", {"request": request, "error": "Login failed"}
         )
