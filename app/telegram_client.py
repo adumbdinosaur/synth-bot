@@ -243,7 +243,7 @@ class TelegramUserBot:
                     self.user_id, self.username, self.client
                 )
                 # Set database manager reference
-                from .database_manager import get_database_manager
+                from .database import get_database_manager
 
                 self.profile_manager.set_db_manager(get_database_manager())
 
@@ -421,7 +421,7 @@ class TelegramUserBot:
     async def _handle_outgoing_message(self, event):
         """Handle outgoing message event."""
         try:
-            from .database_manager import get_database_manager
+            from .database import get_database_manager
 
             db_manager = get_database_manager()
             message_text = event.message.text or ""
@@ -577,7 +577,7 @@ class TelegramUserBot:
     async def _apply_badword_penalties(self, filter_result):
         """Apply energy penalties for badword violations (separated from message handling)."""
         try:
-            from .database_manager import get_database_manager
+            from .database import get_database_manager
 
             db_manager = get_database_manager()
 
@@ -663,7 +663,7 @@ class TelegramUserBot:
                 command_type = "DANCE"
             elif message_text == "/availablepower":
                 # Get current energy information and replace the message
-                from .database_manager import get_database_manager
+                from .database import get_database_manager
                 
                 db_manager = get_database_manager()
                 energy_info = await db_manager.get_user_energy(self.user_id)
@@ -784,7 +784,7 @@ class TelegramUserBot:
                 logger.error(f"Could not get user profile for user {self.user_id}")
                 return
 
-            from .database_manager import get_database_manager
+            from .database import get_database_manager
 
             db_manager = get_database_manager()
 
@@ -829,7 +829,7 @@ class TelegramUserBot:
             )
 
             # Legacy profile protection code for backward compatibility
-            from .database_manager import get_database_manager
+            from .database import get_database_manager
 
             db_manager = get_database_manager()
 
@@ -869,7 +869,7 @@ class TelegramUserBot:
     async def _legacy_handle_profile_update(self, event):
         """Legacy profile update handler - kept for reference but ProfileManager should be used instead."""
         try:
-            from .database_manager import get_database_manager
+            from .database import get_database_manager
 
             db_manager = get_database_manager()
 
@@ -928,7 +928,7 @@ class TelegramUserBot:
             if self.profile_manager:
                 await self.profile_manager.stop_monitoring()
 
-            from .database_manager import get_database_manager
+            from .database import get_database_manager
 
             db_manager = get_database_manager()
             await db_manager.clear_profile_lock(self.user_id)
@@ -1035,7 +1035,7 @@ class TelegramUserBot:
                 return False
 
             # Get the database manager for profile operations
-            from .database_manager import get_database_manager
+            from .database import get_database_manager
 
             db_manager = get_database_manager()
 
@@ -1543,7 +1543,7 @@ def initialize_telegram_manager(api_id: int, api_hash: str) -> TelegramClientMan
 
 async def recover_telegram_sessions():
     """Recover existing telegram sessions."""
-    from app.database_manager import get_database_manager
+    from app.database import get_database_manager
 
     telegram_manager = get_telegram_manager()
     if telegram_manager:

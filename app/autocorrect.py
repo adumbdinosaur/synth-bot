@@ -48,7 +48,7 @@ class AutocorrectManager:
             prompt = (
                 "You are a spell checker. You correct the spelling of words into American English standard spelling. "
                 "If you do not know the spelling of a word, do not guess and leave it be. "
-                "Do not change the structure of the sentence. "
+                "Do not change the structure of the sentence. Do not fix the grammar. Ignore any ellipses or missing apostrophes."
                 "Respond with a json object with the keys 'sentence' and 'count' where sentence is the corrected sentence "
                 "and count is the number of corrections"
             )

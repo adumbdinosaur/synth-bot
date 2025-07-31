@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from dotenv import load_dotenv
 
-from app.database_manager import init_database_manager, get_database_manager
+from app.database import init_database_manager, get_database_manager
 from app.auth import (
     create_access_token,
     get_current_user,
@@ -99,7 +99,7 @@ async def lifespan(app: FastAPI):
 
                 # Initialize default settings for admin user
                 await db_manager.init_user_energy_costs(admin_user_id)
-                from app.database_manager import init_user_profile_protection
+                from app.database import init_user_profile_protection
 
                 await init_user_profile_protection(admin_user_id)
 
@@ -296,7 +296,7 @@ async def register(
         await db_manager.init_user_energy_costs(user_id)
 
         # Initialize default profile protection settings for the new user
-        from app.database_manager import init_user_profile_protection
+        from app.database import init_user_profile_protection
 
         await init_user_profile_protection(user_id)
 
@@ -2214,7 +2214,7 @@ async def update_autocorrect_settings(
     try:
         db_manager = get_database_manager()
         form = await request.form()
-        
+
         # Handle checkbox for enabled - if not present in form, it means False
         enabled = "enabled" in form and form["enabled"] == "on"
         penalty_per_correction = int(form.get("penalty_per_correction", 5))
@@ -2522,7 +2522,7 @@ async def admin_create_admin(
 
         # Initialize default settings
         await db_manager.init_user_energy_costs(user_id)
-        from app.database_manager import init_user_profile_protection
+        from app.database import init_user_profile_protection
 
         await init_user_profile_protection(user_id)
 

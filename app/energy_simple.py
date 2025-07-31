@@ -1,6 +1,6 @@
 import logging
 from typing import Dict, Any
-from .database_manager import get_database_manager
+from .database import get_database_manager
 
 logger = logging.getLogger(__name__)
 

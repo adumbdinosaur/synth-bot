@@ -6,7 +6,7 @@ from fastapi.security import HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from app.database_manager import get_db_connection
+from app.database import get_db_connection
 
 # Security settings
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this")
@@ -117,7 +117,7 @@ async def get_current_user_with_session_check(request: Request) -> Dict[str, Any
     user = await get_current_user(request)
 
     # Check if user has active Telegram session
-    from app.database_manager import get_database_manager
+    from app.database import get_database_manager
 
     db_manager = get_database_manager()
     has_active_session = await db_manager.has_active_telegram_session(user["id"])
@@ -136,7 +136,7 @@ async def get_current_admin_user(request: Request) -> Dict[str, Any]:
     user = await get_current_user(request)
 
     # Check if user is admin
-    from app.database_manager import get_database_manager
+    from app.database import get_database_manager
 
     db_manager = get_database_manager()
     is_admin = await db_manager.is_admin(user["id"])

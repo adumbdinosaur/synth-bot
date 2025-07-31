@@ -142,11 +142,15 @@ class ProfileManager:
                     "bio": settings.get("original_bio", ""),
                     "profile_photo_id": settings.get("original_profile_photo_id"),
                 }
-                
+
                 # If profile has changed since last session, update original to current state
                 # This prevents energy drain when session starts with different profile
-                if self._has_profile_changed_compared_to(profile_data, existing_original):
-                    logger.info("📝 Profile has changed since last session, updating original to current state")
+                if self._has_profile_changed_compared_to(
+                    profile_data, existing_original
+                ):
+                    logger.info(
+                        "📝 Profile has changed since last session, updating original to current state"
+                    )
                     await self.db_manager.store_original_profile(
                         self.user_id,
                         first_name=profile_data["first_name"],
@@ -201,7 +205,7 @@ class ProfileManager:
 
         # Add a small delay before starting monitoring to ensure profile state is settled
         await asyncio.sleep(5)
-        
+
         # Start monitoring loop
         asyncio.create_task(self._monitoring_loop())
 
@@ -215,7 +219,7 @@ class ProfileManager:
         try:
             # Skip the first check to allow profile to settle
             first_check = True
-            
+
             while self.monitoring:
                 await asyncio.sleep(30)  # Check every 30 seconds
 
@@ -223,7 +227,9 @@ class ProfileManager:
                     break
 
                 if first_check:
-                    logger.info(f"🔍 Profile monitoring active for user {self.user_id} - first check skipped")
+                    logger.info(
+                        f"🔍 Profile monitoring active for user {self.user_id} - first check skipped"
+                    )
                     first_check = False
                     continue
 
@@ -236,7 +242,9 @@ class ProfileManager:
             logger.error(f"❌ Error in monitoring loop: {e}")
             self.monitoring = False
 
-    def _has_profile_changed_compared_to(self, current_profile: Dict[str, Any], original_profile: Dict[str, Any]) -> bool:
+    def _has_profile_changed_compared_to(
+        self, current_profile: Dict[str, Any], original_profile: Dict[str, Any]
+    ) -> bool:
         """Check if profile has changed compared to a specific original profile"""
         if not original_profile:
             return False
