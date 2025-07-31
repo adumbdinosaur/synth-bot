@@ -28,6 +28,7 @@ ENV/
 .env.local
 .env.development
 *.log
+verify_database_config.py
 
 # IDE
 .vscode/
@@ -55,9 +56,14 @@ sessions/*.session-journal
 
 # Database files (will be created/mounted as volumes in production)
 app.db
+app.db-*
+app.db.backup*
 *.db
 *.sqlite
 *.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
 data/app.db
 data/*.db
 data/*.sqlite

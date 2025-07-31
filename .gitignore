@@ -29,6 +29,7 @@ sessions/
 # Database
 *.db
 *.sqlite
+*.db.backup*
 
 # Nix
 result

@@ -1,11 +1,11 @@
 version: '3.8'
 
 services:
-  telegram-userbot:
-    image: registry.rptr.dev/synth-bot:latest
+  synthbot:
+    image: registry.rptr.dev/synth-bot:main-8545623
     container_name: telegram-userbot-app
     ports:
-      - "8000:8000"
+      - "9999:9999"
     volumes:
       - telegram_sessions:/app/sessions
       - telegram_data:/app/data
@@ -21,15 +21,10 @@ services:
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
       - DEBUG=${DEBUG:-False}
       - HOST=${HOST:-0.0.0.0}
-      - PORT=${PORT:-8000}
+      - PORT=${PORT:-9999}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
     networks:
       - app-nw
     logging:

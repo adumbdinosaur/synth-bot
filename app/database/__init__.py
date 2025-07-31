@@ -35,7 +35,22 @@ async def init_database_manager():
     from .manager import get_database_manager, set_database_path
     import os
 
-    database_path = os.path.join(os.getcwd(), "app.db")
+    # Use DATABASE_URL environment variable if available, otherwise fall back to default
+    database_url = os.getenv("DATABASE_URL", "sqlite:///./app.db")
+
+    # Extract the path from sqlite URL
+    if database_url.startswith("sqlite:///"):
+        database_path = database_url[10:]  # Remove 'sqlite:///' prefix
+        # Convert relative path to absolute if needed
+        if database_path.startswith("./"):
+            database_path = os.path.join(os.getcwd(), database_path[2:])
+    else:
+        # Fallback to old behavior
+        database_path = os.path.join(os.getcwd(), "app.db")
+
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(database_path), exist_ok=True)
+
     set_database_path(database_path)
 
     db_manager = get_database_manager()

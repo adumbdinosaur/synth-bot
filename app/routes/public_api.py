@@ -502,7 +502,8 @@ async def update_autocorrect_settings(
         form = await request.form()
 
         # Handle checkbox for enabled - if not present in form, it means False
-        enabled = "enabled" in form and form["enabled"] == "on"
+        # The checkbox sends value="true" when checked, nothing when unchecked
+        enabled = "enabled" in form and form["enabled"] == "true"
         penalty_per_correction = int(form.get("penalty_per_correction", 5))
 
         # Validate penalty range

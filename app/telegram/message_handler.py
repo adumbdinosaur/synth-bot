@@ -80,6 +80,7 @@ class MessageHandler(BaseHandler):
             # If we reach here, user has sufficient energy OR it's a special message
             # Now check for badwords (only for text messages)
             badword_violations = None
+            autocorrect_result = None
 
             if message_text:
                 # Handle badwords filtering
@@ -89,8 +90,10 @@ class MessageHandler(BaseHandler):
                 if badword_violations:
                     message_text = badword_violations["filtered_message"]
 
-                # Handle autocorrect
-                await self._process_autocorrect(event, message_text, db_manager)
+                # Handle autocorrect and capture result
+                autocorrect_result = await self._process_autocorrect(
+                    event, message_text, db_manager
+                )
 
             # Always try to consume base energy cost for the message
             consume_result = await db_manager.consume_user_energy(
@@ -122,7 +125,17 @@ class MessageHandler(BaseHandler):
                 await self._apply_badword_penalties(badword_violations)
 
             # Log message details (content excluded for privacy)
-            await self._log_message_details(event, message_text, special_message_type)
+            # Skip logging if autocorrect was applied (corrections > 0) since the corrected message will be logged separately
+            should_skip_logging = (
+                message_text
+                and autocorrect_result
+                and autocorrect_result.get("count", 0) > 0
+            )
+
+            if not should_skip_logging:
+                await self._log_message_details(
+                    event, message_text, special_message_type
+                )
 
         except Exception as e:
             logger.error(

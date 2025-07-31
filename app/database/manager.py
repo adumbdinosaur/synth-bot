@@ -277,7 +277,22 @@ def get_database_manager() -> DatabaseManager:
     """Get the global database manager instance."""
     global _database_manager
     if _database_manager is None:
-        database_path = "app.db"  # Default path
+        import os
+
+        # Use DATABASE_URL environment variable if available
+        database_url = os.getenv("DATABASE_URL", "sqlite:///./app.db")
+
+        # Extract the path from sqlite URL
+        if database_url.startswith("sqlite:///"):
+            database_path = database_url[10:]  # Remove 'sqlite:///' prefix
+            # Convert relative path to absolute if needed
+            if database_path.startswith("./"):
+                database_path = os.path.join(os.getcwd(), database_path[2:])
+        else:
+            database_path = "app.db"  # Fallback
+
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(database_path), exist_ok=True)
         _database_manager = DatabaseManager(database_path)
     return _database_manager
 
