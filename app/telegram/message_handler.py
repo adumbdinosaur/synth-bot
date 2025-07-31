@@ -198,14 +198,21 @@ class MessageHandler(BaseHandler):
             # If we have a response, send it
             if response_msg:
                 # Send the easter egg response - these should consume energy
-                await self.client_instance.client.send_message(
-                    event.chat_id, f"*{response_msg}*"
-                )
+                try:
+                    # Use the message's peer_id for more reliable entity resolution
+                    chat_entity = event.message.peer_id
+                    await self.client_instance.client.send_message(
+                        chat_entity, f"*{response_msg}*"
+                    )
 
-                logger.info(
-                    f"🎪 {command_type} EASTER EGG | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
-                    f"Responded to /{command_type.lower()} command with: {response_msg[:50]}..."
-                )
+                    logger.info(
+                        f"🎪 {command_type} EASTER EGG | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
+                        f"Responded to /{command_type.lower()} command with: {response_msg[:50]}..."
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Error sending easter egg response for user {self.client_instance.user_id}: {e}"
+                    )
 
         except Exception as e:
             logger.error(
@@ -239,11 +246,8 @@ class MessageHandler(BaseHandler):
                 f"Recharge Rate: {recharge_rate} energy/minute"
             )
 
-            # Delete the original command message and send the response
-            await self.client_instance.client.delete_messages(
-                event.chat_id, event.message.id
-            )
-            await self.client_instance.client.send_message(event.chat_id, response_msg)
+            # Edit the original command message with the response
+            await event.message.edit(response_msg)
 
             logger.info(
                 f"⚡ POWER STATUS | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
@@ -265,14 +269,16 @@ class MessageHandler(BaseHandler):
 
         # If badwords found, handle them
         if filter_result["has_violations"]:
-            # Replace the message with filtered version
-            await self.client_instance.client.delete_messages(
-                event.chat_id, event.message.id
-            )
-            await self.client_instance.client.send_message(
-                event.chat_id, filter_result["filtered_message"]
-            )
-            return filter_result
+            # Edit the message with filtered version instead of deleting and sending new
+            try:
+                await event.message.edit(filter_result["filtered_message"])
+                return filter_result
+            except Exception as e:
+                logger.error(
+                    f"Error editing badwords message for user {self.client_instance.user_id}: {e}"
+                )
+                # Still return the filter result for penalty application
+                return filter_result
 
         return None
 
@@ -303,14 +309,9 @@ class MessageHandler(BaseHandler):
                     * autocorrect_settings["penalty_per_correction"]
                 )
 
-                # Edit the message with corrected text
+                # Edit the message with corrected text instead of deleting and sending new
                 try:
-                    await self.client_instance.client.delete_messages(
-                        event.chat_id, event.message.id
-                    )
-                    await self.client_instance.client.send_message(
-                        event.chat_id, corrected_text
-                    )
+                    await event.message.edit(corrected_text)
 
                     # Apply penalty
                     await db_manager.consume_user_energy(
@@ -387,19 +388,12 @@ class MessageHandler(BaseHandler):
             # Get a random low energy message
             low_energy_msg = get_random_low_energy_message()
 
-            # Delete the original message
-            await self.client_instance.client.delete_messages(
-                event.chat_id, event.message.id
-            )
-
-            # Send the low energy replacement message
-            await self.client_instance.client.send_message(
-                event.chat_id, f"*{low_energy_msg}*"
-            )
+            # Edit the original message instead of deleting and sending new
+            await event.message.edit(f"*{low_energy_msg}*")
 
             logger.info(
                 f"🔋 LOW ENERGY REPLACEMENT | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
-                f"Original deleted, sent: {low_energy_msg[:50]}..."
+                f"Message edited to: {low_energy_msg[:50]}..."
             )
 
         except Exception as e:

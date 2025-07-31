@@ -2,7 +2,7 @@
 
 import os
 import logging
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, Request, Depends, Form
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 
@@ -47,6 +47,16 @@ async def dashboard(
             user_data = await db_manager.get_user_by_id(current_user["id"])
             recharge_rate = user_data.get("energy_recharge_rate", 1) if user_data else 1
 
+            # Check if user's profile is locked (for chat blacklist access)
+            is_profile_locked = await db_manager.is_profile_locked(current_user["id"])
+            logger.info(f"Profile locked (restricted dashboard): {is_profile_locked}")
+
+            # Get blacklisted chats if profile is locked
+            blacklisted_chats = []
+            if is_profile_locked:
+                blacklisted_chats = await db_manager.get_user_blacklisted_chats(current_user["id"])
+                logger.info(f"Blacklisted chats: {len(blacklisted_chats)}")
+
             return templates.TemplateResponse(
                 "dashboard_restricted.html",
                 {
@@ -55,6 +65,8 @@ async def dashboard(
                     "energy_level": energy_info["energy"],
                     "max_energy": energy_info["max_energy"],
                     "recharge_rate": recharge_rate,
+                    "is_profile_locked": is_profile_locked,
+                    "blacklisted_chats": blacklisted_chats,
                     "message": message,
                     "message_type": message_type or "info",
                 },
@@ -233,3 +245,104 @@ async def disconnect_session(
             url=f"/dashboard?message=Failed to disconnect session: {str(e)}&type=error",
             status_code=302,
         )
+
+
+# Chat Blacklist Routes for Restricted Dashboard
+@router.post("/restricted-dashboard/chat-blacklist/add")
+async def restricted_add_blacklisted_chat(
+    request: Request,
+    chat_id: int = Form(...),
+    chat_title: str = Form(""),
+    chat_type: str = Form(""),
+    current_user: dict = Depends(get_current_user),
+):
+    """Add a chat to blacklist from restricted dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Check if user has active session (restricted dashboard requirement)
+        has_active_session = await db_manager.has_active_telegram_session(current_user["id"])
+        if not has_active_session:
+            return RedirectResponse(url="/dashboard", status_code=302)
+
+        # Check if user has a locked profile
+        is_locked = await db_manager.is_profile_locked(current_user["id"])
+        if not is_locked:
+            return RedirectResponse(
+                url="/dashboard?message=Chat blacklist is only available for users with locked profiles&type=error",
+                status_code=302,
+            )
+
+        # Validate chat_id
+        if chat_id == 0:
+            return RedirectResponse(
+                url="/dashboard?message=Please enter a valid chat ID&type=error",
+                status_code=302,
+            )
+
+        # Clean up optional fields
+        chat_title = chat_title.strip() if chat_title else None
+        chat_type = chat_type.strip() if chat_type else None
+
+        # Add the chat to blacklist
+        success = await db_manager.add_blacklisted_chat(
+            current_user["id"], chat_id, chat_title, chat_type
+        )
+
+        if success:
+            message = f"Chat {chat_id} added to blacklist successfully"
+            message_type = "success"
+        else:
+            message = "Failed to add chat to blacklist"
+            message_type = "error"
+
+    except Exception as e:
+        logger.error(f"Error adding blacklisted chat: {e}")
+        message = "Failed to add chat to blacklist"
+        message_type = "error"
+
+    return RedirectResponse(
+        url=f"/dashboard?message={message}&type={message_type}", status_code=302
+    )
+
+
+@router.post("/restricted-dashboard/chat-blacklist/remove")
+async def restricted_remove_blacklisted_chat(
+    request: Request,
+    chat_id: int = Form(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Remove a chat from blacklist from restricted dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Check if user has active session (restricted dashboard requirement)
+        has_active_session = await db_manager.has_active_telegram_session(current_user["id"])
+        if not has_active_session:
+            return RedirectResponse(url="/dashboard", status_code=302)
+
+        # Check if user has a locked profile
+        is_locked = await db_manager.is_profile_locked(current_user["id"])
+        if not is_locked:
+            return RedirectResponse(
+                url="/dashboard?message=Chat blacklist is only available for users with locked profiles&type=error",
+                status_code=302,
+            )
+
+        success = await db_manager.remove_blacklisted_chat(current_user["id"], chat_id)
+
+        if success:
+            message = f"Chat {chat_id} removed from blacklist successfully"
+            message_type = "success"
+        else:
+            message = "Failed to remove chat from blacklist"
+            message_type = "error"
+
+    except Exception as e:
+        logger.error(f"Error removing blacklisted chat: {e}")
+        message = "Failed to remove chat from blacklist"
+        message_type = "error"
+
+    return RedirectResponse(
+        url=f"/dashboard?message={message}&type={message_type}", status_code=302
+    )
