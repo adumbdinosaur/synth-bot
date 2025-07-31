@@ -136,13 +136,29 @@ class ProfileManager:
                 self.original_profile = profile_data.copy()
             else:
                 # Load existing original profile
-                self.original_profile = {
+                existing_original = {
                     "first_name": settings.get("original_first_name", ""),
                     "last_name": settings.get("original_last_name", ""),
                     "bio": settings.get("original_bio", ""),
                     "profile_photo_id": settings.get("original_profile_photo_id"),
                 }
-                logger.info("📂 Loaded existing original profile data")
+                
+                # If profile has changed since last session, update original to current state
+                # This prevents energy drain when session starts with different profile
+                if self._has_profile_changed_compared_to(profile_data, existing_original):
+                    logger.info("📝 Profile has changed since last session, updating original to current state")
+                    await self.db_manager.store_original_profile(
+                        self.user_id,
+                        first_name=profile_data["first_name"],
+                        last_name=profile_data["last_name"],
+                        bio=profile_data["bio"],
+                        profile_photo_id=profile_data["profile_photo_id"],
+                    )
+                    self.original_profile = profile_data.copy()
+                    logger.info("💾 Updated original profile to current state")
+                else:
+                    self.original_profile = existing_original
+                    logger.info("📂 Loaded existing original profile data")
 
                 # Ensure we have the original profile photo file
                 if self.original_profile["profile_photo_id"]:
@@ -183,6 +199,9 @@ class ProfileManager:
         self.monitoring = True
         logger.info(f"👁️ Started profile monitoring for user {self.user_id}")
 
+        # Add a small delay before starting monitoring to ensure profile state is settled
+        await asyncio.sleep(5)
+        
         # Start monitoring loop
         asyncio.create_task(self._monitoring_loop())
 
@@ -194,11 +213,19 @@ class ProfileManager:
     async def _monitoring_loop(self):
         """Main monitoring loop to detect profile changes"""
         try:
+            # Skip the first check to allow profile to settle
+            first_check = True
+            
             while self.monitoring:
                 await asyncio.sleep(30)  # Check every 30 seconds
 
                 if not self.monitoring:
                     break
+
+                if first_check:
+                    logger.info(f"🔍 Profile monitoring active for user {self.user_id} - first check skipped")
+                    first_check = False
+                    continue
 
                 current = await self.get_current_profile()
                 if current and self._has_profile_changed(current):
@@ -208,6 +235,32 @@ class ProfileManager:
         except Exception as e:
             logger.error(f"❌ Error in monitoring loop: {e}")
             self.monitoring = False
+
+    def _has_profile_changed_compared_to(self, current_profile: Dict[str, Any], original_profile: Dict[str, Any]) -> bool:
+        """Check if profile has changed compared to a specific original profile"""
+        if not original_profile:
+            return False
+
+        # Compare key fields
+        for key in ["first_name", "last_name", "bio"]:
+            # Normalize None values to empty strings for proper comparison
+            current_val = current_profile.get(key) or ""
+            original_val = original_profile.get(key) or ""
+            if current_val != original_val:
+                return True
+
+        # Check profile photo (normalize None values for comparison)
+        current_photo = current_profile.get("profile_photo_id")
+        original_photo = original_profile.get("profile_photo_id")
+
+        # Normalize None/empty values to None for consistent comparison
+        current_photo = current_photo if current_photo else None
+        original_photo = original_photo if original_photo else None
+
+        if current_photo != original_photo:
+            return True
+
+        return False
 
     def _has_profile_changed(self, current_profile: Dict[str, Any]) -> bool:
         """Check if profile has changed from original"""

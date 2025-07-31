@@ -2209,12 +2209,15 @@ async def update_autocorrect_settings(
     request: Request,
     user_id: int,
     current_user: dict = Depends(get_current_user_with_session_check),
-    enabled: bool = Form(False),
-    penalty_per_correction: int = Form(5),
 ):
     """Update autocorrect settings for a specific user."""
     try:
         db_manager = get_database_manager()
+        form = await request.form()
+        
+        # Handle checkbox for enabled - if not present in form, it means False
+        enabled = "enabled" in form and form["enabled"] == "on"
+        penalty_per_correction = int(form.get("penalty_per_correction", 5))
 
         # Validate penalty range
         if penalty_per_correction < 1 or penalty_per_correction > 50:
