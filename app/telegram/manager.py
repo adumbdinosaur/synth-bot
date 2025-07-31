@@ -68,6 +68,18 @@ class TelegramClientManager:
             return True
         return False
 
+    async def disconnect_all(self) -> None:
+        """Disconnect all clients."""
+        logger.info(f"Disconnecting {len(self.clients)} Telegram clients...")
+        for user_id, client in list(self.clients.items()):
+            try:
+                await client.disconnect()
+                logger.info(f"✅ Disconnected client for user {user_id}")
+            except Exception as e:
+                logger.error(f"❌ Error disconnecting client for user {user_id}: {e}")
+        self.clients.clear()
+        logger.info("All clients disconnected")
+
     async def get_connected_users(self) -> List[Dict[str, Any]]:
         """Get list of currently connected users."""
         connected = []

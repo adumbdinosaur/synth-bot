@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from fastapi import HTTPException, status, Request
@@ -6,7 +7,7 @@ from fastapi.security import HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from app.database import get_db_connection
+logger = logging.getLogger(__name__)
 
 # Security settings
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this")
@@ -57,30 +58,33 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
 
 async def get_current_user_from_token(token: str) -> Optional[Dict[str, Any]]:
     """Get current user from token."""
-    payload = verify_token(token)
-    if not payload:
-        return None
+    try:
+        payload = verify_token(token)
+        if not payload:
+            return None
 
-    user_id = payload.get("id")
-    if not user_id:
-        return None
+        user_id = payload.get("id")
+        if not user_id:
+            return None
 
-    # Get user from database
-    async with get_db_connection() as db:
-        cursor = await db.execute(
-            "SELECT id, username, email, is_admin FROM users WHERE id = ?", (user_id,)
-        )
-        user_data = await cursor.fetchone()
+        # Get user from database using the database manager
+        from app.database.manager import get_database_manager
+
+        db_manager = get_database_manager()
+        user_data = await db_manager.users.get_user_by_id(int(user_id))
 
         if user_data:
             return {
-                "id": user_data[0],
-                "username": user_data[1],
-                "email": user_data[2],
-                "is_admin": bool(user_data[3]) if user_data[3] is not None else False,
+                "id": user_data["id"],
+                "username": user_data["username"],
+                "email": user_data["email"],
+                "is_admin": bool(user_data.get("is_admin", False)),
             }
 
-    return None
+        return None
+    except Exception as e:
+        logger.error(f"Error getting current user from token: {e}")
+        return None
 
 
 async def get_current_user(request: Request) -> Dict[str, Any]:

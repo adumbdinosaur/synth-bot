@@ -156,7 +156,9 @@ class BadwordsManager(BaseDatabaseManager):
                 return {
                     "filtered_message": message,
                     "found_badwords": [],
+                    "violations": [],  # For compatibility
                     "total_penalty": 0,
+                    "has_violations": False,
                 }
 
             filtered_message = message
@@ -179,7 +181,9 @@ class BadwordsManager(BaseDatabaseManager):
             return {
                 "filtered_message": filtered_message,
                 "found_badwords": found_badwords,
+                "violations": found_badwords,  # For compatibility
                 "total_penalty": total_penalty,
+                "has_violations": len(found_badwords) > 0,
             }
 
         except Exception as e:
@@ -187,5 +191,7 @@ class BadwordsManager(BaseDatabaseManager):
             return {
                 "filtered_message": message,
                 "found_badwords": [],
+                "violations": [],  # For compatibility
                 "total_penalty": 0,
+                "has_violations": False,
             }

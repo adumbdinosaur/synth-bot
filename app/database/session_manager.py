@@ -103,7 +103,11 @@ class SessionManager(BaseDatabaseManager):
                             "email": row[2],
                             "energy": current_energy,
                             "max_energy": max_energy,
-                            "energy_percentage": int((current_energy / max_energy * 100)) if max_energy > 0 else 0,
+                            "energy_percentage": int(
+                                (current_energy / max_energy * 100)
+                            )
+                            if max_energy > 0
+                            else 0,
                             "energy_recharge_rate": recharge_rate,
                             "last_energy_update": last_update,
                             "telegram_connected": bool(row[7]),
@@ -121,22 +125,53 @@ class SessionManager(BaseDatabaseManager):
     async def has_active_telegram_session(self, user_id: int) -> bool:
         """Check if a user has an active Telegram session."""
         try:
+            # First check if user is marked as telegram_connected
             async with self.get_connection() as db:
                 cursor = await db.execute(
-                    """SELECT ts.session_data, u.telegram_connected 
-                       FROM users u 
-                       LEFT JOIN telegram_sessions ts ON u.id = ts.user_id 
-                       WHERE u.id = ?""",
+                    "SELECT telegram_connected FROM users WHERE id = ?",
                     (user_id,),
                 )
                 row = await cursor.fetchone()
 
-                if not row:
+                if not row or not row[0]:
                     return False
 
-                session_data, telegram_connected = row
-                # User has active session if they're marked as connected AND have session data
-                return bool(telegram_connected) and session_data is not None
+            # Also check real-time state from Telegram manager
+            try:
+                from app.telegram_client import get_telegram_manager
+
+                telegram_manager = get_telegram_manager()
+
+                if telegram_manager:
+                    # Check if user has an active client
+                    client = await telegram_manager.get_client(user_id)
+                    if client and client.is_connected:
+                        return True
+
+                    # Also check connected users list
+                    connected_users = await telegram_manager.get_connected_users()
+                    user_is_connected = any(
+                        user["user_id"] == user_id for user in connected_users
+                    )
+                    if user_is_connected:
+                        return True
+
+            except Exception as telegram_error:
+                logger.warning(
+                    f"Could not check Telegram manager state for user {user_id}: {telegram_error}"
+                )
+                # Fall back to database check only
+                pass
+
+            # Fallback: check telegram_sessions table
+            async with self.get_connection() as db:
+                cursor = await db.execute(
+                    "SELECT session_data FROM telegram_sessions WHERE user_id = ?",
+                    (user_id,),
+                )
+                session_row = await cursor.fetchone()
+                return session_row is not None and session_row[0] is not None
+
         except Exception as e:
             logger.error(f"Error checking active session for user {user_id}: {e}")
             return False

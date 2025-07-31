@@ -15,34 +15,34 @@ logger = logging.getLogger(__name__)
 class MessageHandler(BaseHandler):
     """Handles message-related operations for Telegram userbot."""
 
-    def __init__(self, userbot):
-        super().__init__(userbot)
+    def __init__(self, client_instance):
+        super().__init__(client_instance)
         self._message_handler_registered = False
 
     async def register_handlers(self):
         """Register message event handlers."""
-        if not self.userbot.client or self._message_handler_registered:
+        if not self.client_instance.client or self._message_handler_registered:
             return False
 
         try:
 
-            @self.userbot.client.on(events.NewMessage(outgoing=True))
+            @self.client_instance.client.on(events.NewMessage(outgoing=True))
             async def outgoing_message_handler(event):
                 await self._handle_outgoing_message(event)
 
-            @self.userbot.client.on(events.NewMessage(incoming=True))
+            @self.client_instance.client.on(events.NewMessage(incoming=True))
             async def incoming_message_handler(event):
                 await self._handle_incoming_message(event)
 
             self._message_handler_registered = True
             logger.info(
-                f"Message handlers registered for user {self.userbot.user_id} ({self.userbot.username})"
+                f"Message handlers registered for user {self.client_instance.user_id} ({self.client_instance.username})"
             )
             return True
 
         except Exception as e:
             logger.error(
-                f"Failed to register message handlers for user {self.userbot.user_id}: {e}"
+                f"Failed to register message handlers for user {self.client_instance.user_id}: {e}"
             )
             return False
 
@@ -62,11 +62,11 @@ class MessageHandler(BaseHandler):
 
             # Get energy cost for this message type
             energy_cost = await db_manager.get_message_energy_cost(
-                self.userbot.user_id, energy_message_type
+                self.client_instance.user_id, energy_message_type
             )
 
             # Get current energy level BEFORE any processing
-            energy_info = await db_manager.get_user_energy(self.userbot.user_id)
+            energy_info = await db_manager.get_user_energy(self.client_instance.user_id)
             current_energy = energy_info["energy"]
 
             # Check if user has sufficient energy BEFORE trying to consume it
@@ -94,24 +94,26 @@ class MessageHandler(BaseHandler):
 
             # Always try to consume base energy cost for the message
             consume_result = await db_manager.consume_user_energy(
-                self.userbot.user_id, energy_cost
+                self.client_instance.user_id, energy_cost
             )
 
             if consume_result["success"]:
                 new_energy = consume_result["energy"]
                 # Get max energy for proper logging
-                energy_info = await db_manager.get_user_energy(self.userbot.user_id)
+                energy_info = await db_manager.get_user_energy(
+                    self.client_instance.user_id
+                )
                 max_energy = energy_info["max_energy"]
-                
+
                 logger.info(
-                    f"⚡ ENERGY CONSUMED | User: {self.userbot.username} (ID: {self.userbot.user_id}) | "
+                    f"⚡ ENERGY CONSUMED | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
                     f"Message type: {energy_message_type} (cost: {energy_cost}) | "
                     f"Energy: {new_energy}/{max_energy} (-{energy_cost}) | "
                     f"Special: {special_message_type or 'None'}"
                 )
             else:
                 logger.warning(
-                    f"⚡ ENERGY CONSUMPTION FAILED | User: {self.userbot.username} (ID: {self.userbot.user_id}) | "
+                    f"⚡ ENERGY CONSUMPTION FAILED | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
                     f"Required: {energy_cost}, Available: {current_energy}"
                 )
 
@@ -124,7 +126,7 @@ class MessageHandler(BaseHandler):
 
         except Exception as e:
             logger.error(
-                f"Error handling message for user {self.userbot.user_id} ({self.userbot.username}): {e}"
+                f"Error handling message for user {self.client_instance.user_id} ({self.client_instance.username}): {e}"
             )
 
     async def _handle_incoming_message(self, event):
@@ -162,18 +164,18 @@ class MessageHandler(BaseHandler):
             # If we have a response, send it
             if response_msg:
                 # Send the easter egg response - these should consume energy
-                await self.userbot.client.send_message(
+                await self.client_instance.client.send_message(
                     event.chat_id, f"*{response_msg}*"
                 )
 
                 logger.info(
-                    f"🎪 {command_type} EASTER EGG | User: {self.userbot.username} (ID: {self.userbot.user_id}) | "
+                    f"🎪 {command_type} EASTER EGG | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
                     f"Responded to /{command_type.lower()} command with: {response_msg[:50]}..."
                 )
 
         except Exception as e:
             logger.error(
-                f"Error handling incoming message for user {self.userbot.user_id} ({self.userbot.username}): {e}"
+                f"Error handling incoming message for user {self.client_instance.user_id} ({self.client_instance.username}): {e}"
             )
 
     async def _handle_power_status_command(self, event):
@@ -182,7 +184,7 @@ class MessageHandler(BaseHandler):
             from ..database import get_database_manager
 
             db_manager = get_database_manager()
-            energy_info = await db_manager.get_user_energy(self.userbot.user_id)
+            energy_info = await db_manager.get_user_energy(self.client_instance.user_id)
 
             current_energy = energy_info["energy"]
             max_energy = energy_info["max_energy"]
@@ -204,17 +206,19 @@ class MessageHandler(BaseHandler):
             )
 
             # Delete the original command message and send the response
-            await self.userbot.client.delete_messages(event.chat_id, event.message.id)
-            await self.userbot.client.send_message(event.chat_id, response_msg)
+            await self.client_instance.client.delete_messages(
+                event.chat_id, event.message.id
+            )
+            await self.client_instance.client.send_message(event.chat_id, response_msg)
 
             logger.info(
-                f"⚡ POWER STATUS | User: {self.userbot.username} (ID: {self.userbot.user_id}) | "
+                f"⚡ POWER STATUS | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
                 f"Energy: {current_energy}/{max_energy} | Recharge: {recharge_rate}/min"
             )
 
         except Exception as e:
             logger.error(
-                f"Error handling power status command for user {self.userbot.user_id}: {e}"
+                f"Error handling power status command for user {self.client_instance.user_id}: {e}"
             )
 
     async def _process_badwords(
@@ -222,14 +226,16 @@ class MessageHandler(BaseHandler):
     ) -> Optional[Dict[str, Any]]:
         """Process badwords filtering for a message."""
         filter_result = await db_manager.filter_badwords_from_message(
-            self.userbot.user_id, message_text
+            self.client_instance.user_id, message_text
         )
 
         # If badwords found, handle them
         if filter_result["has_violations"]:
             # Replace the message with filtered version
-            await self.userbot.client.delete_messages(event.chat_id, event.message.id)
-            await self.userbot.client.send_message(
+            await self.client_instance.client.delete_messages(
+                event.chat_id, event.message.id
+            )
+            await self.client_instance.client.send_message(
                 event.chat_id, filter_result["filtered_message"]
             )
             return filter_result
@@ -242,7 +248,7 @@ class MessageHandler(BaseHandler):
         """Process autocorrect for a message."""
         # Check autocorrect settings and apply if enabled
         autocorrect_settings = await db_manager.get_autocorrect_settings(
-            self.userbot.user_id
+            self.client_instance.user_id
         )
         if not autocorrect_settings["enabled"] or not message_text:
             return None
@@ -265,39 +271,41 @@ class MessageHandler(BaseHandler):
 
                 # Edit the message with corrected text
                 try:
-                    await self.userbot.client.delete_messages(
+                    await self.client_instance.client.delete_messages(
                         event.chat_id, event.message.id
                     )
-                    await self.userbot.client.send_message(
+                    await self.client_instance.client.send_message(
                         event.chat_id, corrected_text
                     )
 
                     # Apply penalty
-                    await db_manager.consume_user_energy(self.userbot.user_id, penalty)
+                    await db_manager.consume_user_energy(
+                        self.client_instance.user_id, penalty
+                    )
 
                     # Log the autocorrection
                     await db_manager.log_autocorrect_usage(
-                        self.userbot.user_id,
+                        self.client_instance.user_id,
                         message_text,
                         corrected_text,
                         autocorrect_result["count"],
                     )
 
                     logger.info(
-                        f"📝 AUTOCORRECT | User: {self.userbot.username} (ID: {self.userbot.user_id}) | "
+                        f"📝 AUTOCORRECT | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
                         f"Corrections: {autocorrect_result['count']} | Penalty: {penalty} | "
                         f"Original: '{message_text[:50]}...' -> Corrected: '{corrected_text[:50]}...'"
                     )
                 except Exception as e:
                     logger.error(
-                        f"Error applying autocorrect for user {self.userbot.user_id}: {e}"
+                        f"Error applying autocorrect for user {self.client_instance.user_id}: {e}"
                     )
 
             return autocorrect_result
 
         except Exception as e:
             logger.error(
-                f"Error in autocorrect processing for user {self.userbot.user_id}: {e}"
+                f"Error in autocorrect processing for user {self.client_instance.user_id}: {e}"
             )
             return None
 
@@ -314,30 +322,28 @@ class MessageHandler(BaseHandler):
 
             # Apply energy penalty
             penalty_result = await db_manager.consume_user_energy(
-                self.userbot.user_id, total_penalty
+                self.client_instance.user_id, total_penalty
             )
 
             # Get max energy for proper logging
-            energy_info = await db_manager.get_user_energy(self.userbot.user_id)
+            energy_info = await db_manager.get_user_energy(self.client_instance.user_id)
             max_energy = energy_info["max_energy"]
 
             # Log the violation
             violation_log = f"Badwords detected: {', '.join(violated_words)} | Total penalty: {total_penalty}"
             if penalty_result["success"]:
-                violation_log += (
-                    f" | Energy: {penalty_result['energy']}/{max_energy} (-{total_penalty})"
-                )
+                violation_log += f" | Energy: {penalty_result['energy']}/{max_energy} (-{total_penalty})"
             else:
                 violation_log += f" | Insufficient energy: {penalty_result.get('current_energy', 0)}/{max_energy}"
 
             logger.warning(
-                f"🚫 BADWORD VIOLATION | User: {self.userbot.username} (ID: {self.userbot.user_id}) | "
+                f"🚫 BADWORD VIOLATION | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
                 f"{violation_log} | Badwords replaced with <redacted>"
             )
 
         except Exception as e:
             logger.error(
-                f"Error applying badword penalties for user {self.userbot.user_id}: {e}"
+                f"Error applying badword penalties for user {self.client_instance.user_id}: {e}"
             )
 
     async def _replace_with_low_energy_message(self, event):
@@ -349,19 +355,23 @@ class MessageHandler(BaseHandler):
             low_energy_msg = get_random_low_energy_message()
 
             # Delete the original message
-            await self.userbot.client.delete_messages(event.chat_id, event.message.id)
+            await self.client_instance.client.delete_messages(
+                event.chat_id, event.message.id
+            )
 
             # Send the low energy replacement message
-            await self.userbot.client.send_message(event.chat_id, f"*{low_energy_msg}*")
+            await self.client_instance.client.send_message(
+                event.chat_id, f"*{low_energy_msg}*"
+            )
 
             logger.info(
-                f"🔋 LOW ENERGY REPLACEMENT | User: {self.userbot.username} (ID: {self.userbot.user_id}) | "
+                f"🔋 LOW ENERGY REPLACEMENT | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
                 f"Original deleted, sent: {low_energy_msg[:50]}..."
             )
 
         except Exception as e:
             logger.error(
-                f"Error replacing message with low energy version for user {self.userbot.user_id}: {e}"
+                f"Error replacing message with low energy version for user {self.client_instance.user_id}: {e}"
             )
 
     async def _log_message_details(
@@ -382,7 +392,7 @@ class MessageHandler(BaseHandler):
 
             # Log message details (content excluded for privacy)
             logger.info(
-                f"📤 MESSAGE SENT | User: {self.userbot.username} (ID: {self.userbot.user_id}) | "
+                f"📤 MESSAGE SENT | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
                 f"Chat: {chat_title} ({chat_type}) | "
                 f"Length: {len(message_text)} chars | "
                 f"Special: {special_message_type or 'None'} | "
@@ -391,7 +401,7 @@ class MessageHandler(BaseHandler):
 
         except Exception as e:
             logger.error(
-                f"Error logging message details for user {self.userbot.user_id}: {e}"
+                f"Error logging message details for user {self.client_instance.user_id}: {e}"
             )
 
     def _get_message_type(self, message) -> str:

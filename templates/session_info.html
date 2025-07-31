@@ -136,7 +136,8 @@
                                                 </h5>
                                                 <div class="progress mb-2" style="height: 25px;">
                                                     <div class="progress-bar bg-{% if session.energy_percentage > 70 %}success{% elif session.energy_percentage > 30 %}warning{% else %}danger{% endif %}"
-                                                        role="progressbar" style="width: {{ session.energy_percentage }}%">
+                                                        role="progressbar"
+                                                        style="width: {{ session.energy_percentage }}%">
                                                         {{ session.energy }}/{{ session.max_energy }}
                                                     </div>
                                                 </div>

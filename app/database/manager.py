@@ -66,6 +66,9 @@ class DatabaseManager(BaseDatabaseManager):
     async def create_user(self, username: str, email: str, hashed_password: str):
         return await self.users.create_user(username, email, hashed_password)
 
+    async def get_all_users(self):
+        return await self.users.get_all_users()
+
     async def update_user_telegram_info(
         self, user_id: int, phone_number: str, connected: bool = True
     ):
@@ -75,6 +78,9 @@ class DatabaseManager(BaseDatabaseManager):
 
     async def create_admin_user(self, username: str, email: str, hashed_password: str):
         return await self.users.create_admin_user(username, email, hashed_password)
+
+    async def toggle_admin_status(self, user_id: int) -> bool:
+        return await self.users.toggle_admin_status(user_id)
 
     async def is_admin(self, user_id: int):
         return await self.users.is_admin(user_id)

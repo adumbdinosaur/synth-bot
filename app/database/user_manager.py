@@ -76,3 +76,29 @@ class UserManager(BaseDatabaseManager):
             )
             row = await cursor.fetchone()
             return bool(row[0]) if row else False
+
+    async def get_all_users(self) -> list:
+        """Get all users from the database."""
+        async with self.get_connection() as db:
+            cursor = await db.execute("SELECT * FROM users")
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows] if rows else []
+
+    async def toggle_admin_status(self, user_id: int) -> bool:
+        """Toggle admin status for a user."""
+        async with self.get_connection() as db:
+            # Get current status
+            cursor = await db.execute(
+                "SELECT is_admin FROM users WHERE id = ?", (user_id,)
+            )
+            row = await cursor.fetchone()
+            if not row:
+                return False
+
+            new_status = not bool(row[0])
+            await db.execute(
+                "UPDATE users SET is_admin = ?, updated_at = ? WHERE id = ?",
+                (new_status, datetime.now().isoformat(), user_id),
+            )
+            await db.commit()
+            return True

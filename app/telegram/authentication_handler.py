@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 class AuthenticationHandler(BaseHandler):
     """Handles authentication-related operations for Telegram userbot."""
 
-    def __init__(self, userbot):
-        super().__init__(userbot)
+    def __init__(self, client_instance):
+        super().__init__(client_instance)
         self._auth_state = (
             "none"  # none, code_sent, code_verified, requires_2fa, authenticated
         )
@@ -29,13 +29,13 @@ class AuthenticationHandler(BaseHandler):
         """Send verification code to phone number. Returns dict with status and delivery method."""
         try:
             # Ensure any previous client is properly disconnected
-            if self.userbot.client:
+            if self.client_instance.client:
                 try:
-                    if self.userbot.client.is_connected():
-                        await self.userbot.client.disconnect()
+                    if self.client_instance.client.is_connected():
+                        await self.client_instance.client.disconnect()
                 except Exception:
                     pass
-                self.userbot.client = None
+                self.client_instance.client = None
 
             # Clean up any corrupted session files
             await self._cleanup_corrupted_session()
@@ -43,25 +43,25 @@ class AuthenticationHandler(BaseHandler):
             # Create client with unique session
             await self._create_telegram_client()
 
-            await self.userbot.client.connect()
-            logger.info(f"Telegram client connected for user {self.userbot.user_id}")
+            await self.client_instance.client.connect()
+            logger.info(f"Telegram client connected for user {self.client_instance.user_id}")
 
             # Check if already signed in
-            if await self.userbot.client.is_user_authorized():
+            if await self.client_instance.client.is_user_authorized():
                 logger.info(
-                    f"User {self.userbot.user_id} ({self.userbot.username}) already authorized"
+                    f"User {self.client_instance.user_id} ({self.client_instance.username}) already authorized"
                 )
                 self._auth_state = "authenticated"
                 return {"success": True, "already_authorized": True}
 
             # Send code request with detailed logging
             logger.info(
-                f"Attempting to send verification code to {self.userbot.phone_number} "
-                f"for user {self.userbot.user_id} ({self.userbot.username})"
+                f"Attempting to send verification code to {self.client_instance.phone_number} "
+                f"for user {self.client_instance.user_id} ({self.client_instance.username})"
             )
 
-            sent_code = await self.userbot.client.send_code_request(
-                self.userbot.phone_number
+            sent_code = await self.client_instance.client.send_code_request(
+                self.client_instance.phone_number
             )
             logger.info(f"Telegram API response for code request: {sent_code}")
 
@@ -69,8 +69,8 @@ class AuthenticationHandler(BaseHandler):
             delivery_info = self._parse_code_delivery_info(sent_code)
 
             logger.info(
-                f"Code request successful for {self.userbot.phone_number} - "
-                f"user {self.userbot.user_id} ({self.userbot.username})"
+                f"Code request successful for {self.client_instance.phone_number} - "
+                f"user {self.client_instance.user_id} ({self.client_instance.username})"
             )
             self._auth_state = "code_sent"
             return {
@@ -81,32 +81,32 @@ class AuthenticationHandler(BaseHandler):
 
         except AuthKeyDuplicatedError:
             logger.warning(
-                f"Auth key duplicated for user {self.userbot.user_id}, creating new session"
+                f"Auth key duplicated for user {self.client_instance.user_id}, creating new session"
             )
             # Remove existing session and try again
             try:
-                os.remove(f"{self.userbot.session_name}.session")
+                os.remove(f"{self.client_instance.session_name}.session")
             except FileNotFoundError:
                 pass
             return await self.send_code_request()
         except Exception as e:
             logger.error(
-                f"Failed to send code request for user {self.userbot.user_id} "
-                f"({self.userbot.username}): {e}"
+                f"Failed to send code request for user {self.client_instance.user_id} "
+                f"({self.client_instance.username}): {e}"
             )
-            if self.userbot.client:
+            if self.client_instance.client:
                 try:
-                    await self.userbot.client.disconnect()
+                    await self.client_instance.client.disconnect()
                 except Exception:
                     pass
-                self.userbot.client = None
+                self.client_instance.client = None
             return {"success": False, "error": str(e)}
 
     async def verify_code(self, code: str) -> Dict[str, Any]:
         """Verify SMS code. Returns dict with status and whether 2FA is needed."""
         try:
-            if not self.userbot.client:
-                logger.error(f"No client available for user {self.userbot.user_id}")
+            if not self.client_instance.client:
+                logger.error(f"No client available for user {self.client_instance.user_id}")
                 return {
                     "success": False,
                     "error": "No client available",
@@ -115,10 +115,10 @@ class AuthenticationHandler(BaseHandler):
 
             try:
                 # Try to sign in with just the code
-                await self.userbot.client.sign_in(self.userbot.phone_number, code)
+                await self.client_instance.client.sign_in(self.client_instance.phone_number, code)
                 logger.info(
-                    f"Successfully signed in user {self.userbot.user_id} "
-                    f"({self.userbot.username}) - no 2FA required"
+                    f"Successfully signed in user {self.client_instance.user_id} "
+                    f"({self.client_instance.username}) - no 2FA required"
                 )
                 self._auth_state = "authenticated"
                 return {"success": True, "requires_2fa": False}
@@ -126,15 +126,15 @@ class AuthenticationHandler(BaseHandler):
             except SessionPasswordNeededError:
                 # 2FA is enabled, password is required - this is actually partial success
                 logger.info(
-                    f"Code verified for user {self.userbot.user_id} "
-                    f"({self.userbot.username}) - 2FA password required"
+                    f"Code verified for user {self.client_instance.user_id} "
+                    f"({self.client_instance.username}) - 2FA password required"
                 )
                 self._auth_state = "requires_2fa"
                 return {"success": True, "requires_2fa": True, "code_verified": True}
 
             except PhoneCodeInvalidError:
                 logger.warning(
-                    f"Invalid phone code for user {self.userbot.user_id} ({self.userbot.username})"
+                    f"Invalid phone code for user {self.client_instance.user_id} ({self.client_instance.username})"
                 )
                 return {
                     "success": False,
@@ -144,30 +144,30 @@ class AuthenticationHandler(BaseHandler):
 
         except Exception as e:
             logger.error(
-                f"Code verification failed for user {self.userbot.user_id} "
-                f"({self.userbot.username}): {e}"
+                f"Code verification failed for user {self.client_instance.user_id} "
+                f"({self.client_instance.username}): {e}"
             )
             return {"success": False, "error": str(e), "requires_2fa": False}
 
     async def verify_2fa_password(self, password: str) -> bool:
         """Verify 2FA password after code verification."""
         try:
-            if not self.userbot.client:
-                logger.error(f"No client available for user {self.userbot.user_id}")
+            if not self.client_instance.client:
+                logger.error(f"No client available for user {self.client_instance.user_id}")
                 return False
 
-            await self.userbot.client.sign_in(password=password)
+            await self.client_instance.client.sign_in(password=password)
             logger.info(
-                f"Successfully signed in user {self.userbot.user_id} "
-                f"({self.userbot.username}) with 2FA"
+                f"Successfully signed in user {self.client_instance.user_id} "
+                f"({self.client_instance.username}) with 2FA"
             )
             self._auth_state = "authenticated"
             return True
 
         except Exception as e:
             logger.error(
-                f"2FA verification failed for user {self.userbot.user_id} "
-                f"({self.userbot.username}): {e}"
+                f"2FA verification failed for user {self.client_instance.user_id} "
+                f"({self.client_instance.username}): {e}"
             )
             return False
 
@@ -175,48 +175,48 @@ class AuthenticationHandler(BaseHandler):
         """Restore client from existing session file without sending new code."""
         try:
             # Check if session file exists
-            session_file = f"{self.userbot.session_name}.session"
+            session_file = f"{self.client_instance.session_name}.session"
             if not os.path.exists(session_file):
                 logger.warning(
-                    f"No session file found for user {self.userbot.user_id}: {session_file}"
+                    f"No session file found for user {self.client_instance.user_id}: {session_file}"
                 )
                 return False
 
             # Create client with existing session
             await self._create_telegram_client()
 
-            await self.userbot.client.connect()
+            await self.client_instance.client.connect()
             logger.info(
-                f"Telegram client connected for user {self.userbot.user_id} using existing session"
+                f"Telegram client connected for user {self.client_instance.user_id} using existing session"
             )
 
             # Check if already signed in
-            if await self.userbot.client.is_user_authorized():
+            if await self.client_instance.client.is_user_authorized():
                 logger.info(
-                    f"User {self.userbot.user_id} ({self.userbot.username}) "
+                    f"User {self.client_instance.user_id} ({self.client_instance.username}) "
                     f"restored from session - already authorized"
                 )
                 self._auth_state = "authenticated"
                 return True
             else:
                 logger.warning(
-                    f"Session file exists but user {self.userbot.user_id} is not authorized"
+                    f"Session file exists but user {self.client_instance.user_id} is not authorized"
                 )
-                await self.userbot.client.disconnect()
-                self.userbot.client = None
+                await self.client_instance.client.disconnect()
+                self.client_instance.client = None
                 return False
 
         except Exception as e:
             logger.error(
-                f"Failed to restore session for user {self.userbot.user_id} "
-                f"({self.userbot.username}): {e}"
+                f"Failed to restore session for user {self.client_instance.user_id} "
+                f"({self.client_instance.username}): {e}"
             )
-            if self.userbot.client:
+            if self.client_instance.client:
                 try:
-                    await self.userbot.client.disconnect()
+                    await self.client_instance.client.disconnect()
                 except Exception:
                     pass
-                self.userbot.client = None
+                self.client_instance.client = None
             return False
 
     def get_auth_state(self) -> str:
@@ -227,13 +227,13 @@ class AuthenticationHandler(BaseHandler):
         """Check if user is fully authenticated and ready to use."""
         return (
             self._auth_state == "authenticated"
-            and self.userbot.client
-            and await self.userbot.client.is_user_authorized()
+            and self.client_instance.client
+            and await self.client_instance.client.is_user_authorized()
         )
 
     async def _cleanup_corrupted_session(self):
         """Clean up any corrupted session files."""
-        session_file = f"{self.userbot.session_name}.session"
+        session_file = f"{self.client_instance.session_name}.session"
         if os.path.exists(session_file):
             try:
                 # Try to validate session file
@@ -247,7 +247,7 @@ class AuthenticationHandler(BaseHandler):
                 try:
                     os.remove(session_file)
                     logger.warning(
-                        f"Removed corrupted session file for user {self.userbot.user_id}"
+                        f"Removed corrupted session file for user {self.client_instance.user_id}"
                     )
                 except Exception:
                     pass
@@ -256,11 +256,11 @@ class AuthenticationHandler(BaseHandler):
         """Create Telegram client with proper configuration."""
         from telethon import TelegramClient
 
-        self.userbot.client = TelegramClient(
-            self.userbot.session_name,
-            self.userbot.api_id,
-            self.userbot.api_hash,
-            device_model=f"UserBot-{self.userbot.username}",
+        self.client_instance.client = TelegramClient(
+            self.client_instance.session_name,
+            self.client_instance.api_id,
+            self.client_instance.api_hash,
+            device_model=f"UserBot-{self.client_instance.username}",
             app_version="1.0.0",
             system_version="Linux",
         )
@@ -276,18 +276,18 @@ class AuthenticationHandler(BaseHandler):
             if type_name == "SentCodeTypeApp":
                 delivery_method = "telegram_app"
                 logger.info(
-                    f"Code sent via Telegram app for {self.userbot.phone_number}"
+                    f"Code sent via Telegram app for {self.client_instance.phone_number}"
                 )
             elif type_name == "SentCodeTypeSms":
                 delivery_method = "sms"
-                logger.info(f"Code sent via SMS for {self.userbot.phone_number}")
+                logger.info(f"Code sent via SMS for {self.client_instance.phone_number}")
             elif type_name == "SentCodeTypeCall":
                 delivery_method = "phone_call"
-                logger.info(f"Code sent via phone call for {self.userbot.phone_number}")
+                logger.info(f"Code sent via phone call for {self.client_instance.phone_number}")
             else:
                 delivery_method = type_name.lower()
                 logger.info(
-                    f"Code sent via {type_name} for {self.userbot.phone_number}"
+                    f"Code sent via {type_name} for {self.client_instance.phone_number}"
                 )
 
         # Get code length if available
