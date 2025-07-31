@@ -116,7 +116,8 @@
                         </div>
                         <div class="col-md-3">
                             <label for="admin_password" class="form-label">Password</label>
-                            <input type="password" class="form-control" id="admin_password" name="password" required minlength="8">
+                            <input type="password" class="form-control" id="admin_password" name="password" required
+                                minlength="8">
                         </div>
                         <div class="col-md-1 d-flex align-items-end">
                             <button type="submit" class="btn btn-primary">
@@ -183,19 +184,18 @@
                                     <td>
                                         <div class="btn-group btn-group-sm" role="group">
                                             <!-- Reset Password Button -->
-                                            <button type="button" class="btn btn-outline-primary" 
-                                                    data-bs-toggle="modal" 
-                                                    data-bs-target="#resetPasswordModal"
-                                                    data-user-id="{{ user_item.id }}"
-                                                    data-username="{{ user_item.username }}">
+                                            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal"
+                                                data-bs-target="#resetPasswordModal" data-user-id="{{ user_item.id }}"
+                                                data-username="{{ user_item.username }}">
                                                 <i class="fas fa-key"></i>
                                             </button>
-                                            
+
                                             <!-- Toggle Admin Status -->
                                             {% if user_item.id != user.id %}
-                                            <form method="POST" action="/admin/users/{{ user_item.id }}/toggle-admin" class="d-inline">
+                                            <form method="POST" action="/admin/users/{{ user_item.id }}/toggle-admin"
+                                                class="d-inline">
                                                 <button type="submit" class="btn btn-outline-warning"
-                                                        onclick="return confirm('Are you sure you want to toggle admin status for {{ user_item.username }}?')">
+                                                    onclick="return confirm('Are you sure you want to toggle admin status for {{ user_item.username }}?')">
                                                     {% if user_item.is_admin %}
                                                     <i class="fas fa-user-minus"></i>
                                                     {% else %}
@@ -203,11 +203,12 @@
                                                     {% endif %}
                                                 </button>
                                             </form>
-                                            
+
                                             <!-- Delete User -->
-                                            <form method="POST" action="/admin/users/{{ user_item.id }}/delete" class="d-inline">
+                                            <form method="POST" action="/admin/users/{{ user_item.id }}/delete"
+                                                class="d-inline">
                                                 <button type="submit" class="btn btn-outline-danger"
-                                                        onclick="return confirm('Are you sure you want to delete {{ user_item.username }}? This action cannot be undone!')">
+                                                    onclick="return confirm('Are you sure you want to delete {{ user_item.username }}? This action cannot be undone!')">
                                                     <i class="fas fa-trash"></i>
                                                 </button>
                                             </form>
@@ -238,7 +239,8 @@
                     <p>Reset password for user: <strong id="resetUsername"></strong></p>
                     <div class="mb-3">
                         <label for="newPassword" class="form-label">New Password</label>
-                        <input type="password" class="form-control" id="newPassword" name="new_password" required minlength="8">
+                        <input type="password" class="form-control" id="newPassword" name="new_password" required
+                            minlength="8">
                         <div class="form-text">Must be at least 8 characters long</div>
                     </div>
                 </div>
@@ -254,20 +256,20 @@
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Handle reset password modal
-    const resetPasswordModal = document.getElementById('resetPasswordModal');
-    const resetPasswordForm = document.getElementById('resetPasswordForm');
-    const resetUsernameSpan = document.getElementById('resetUsername');
-    
-    resetPasswordModal.addEventListener('show.bs.modal', function(event) {
-        const button = event.relatedTarget;
-        const userId = button.getAttribute('data-user-id');
-        const username = button.getAttribute('data-username');
-        
-        resetUsernameSpan.textContent = username;
-        resetPasswordForm.action = `/admin/users/${userId}/reset-password`;
+    document.addEventListener('DOMContentLoaded', function () {
+        // Handle reset password modal
+        const resetPasswordModal = document.getElementById('resetPasswordModal');
+        const resetPasswordForm = document.getElementById('resetPasswordForm');
+        const resetUsernameSpan = document.getElementById('resetUsername');
+
+        resetPasswordModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const userId = button.getAttribute('data-user-id');
+            const username = button.getAttribute('data-username');
+
+            resetUsernameSpan.textContent = username;
+            resetPasswordForm.action = `/admin/users/${userId}/reset-password`;
+        });
     });
-});
 </script>
 {% endblock %}

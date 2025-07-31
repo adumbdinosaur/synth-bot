@@ -1347,7 +1347,9 @@ class DatabaseManager:
 
     # Admin Management Operations
     @retry_db_operation()
-    async def create_admin_user(self, username: str, email: str, hashed_password: str) -> int:
+    async def create_admin_user(
+        self, username: str, email: str, hashed_password: str
+    ) -> int:
         """Create a new admin user and return the user ID."""
         async with self.get_connection() as db:
             cursor = await db.execute(
@@ -1402,7 +1404,7 @@ class DatabaseManager:
             row = await cursor.fetchone()
             if not row:
                 return False
-            
+
             new_status = not bool(row[0])
             await db.execute(
                 "UPDATE users SET is_admin = ?, updated_at = ? WHERE id = ?",
@@ -1416,13 +1418,23 @@ class DatabaseManager:
         """Delete a user and all associated data."""
         async with self.get_connection() as db:
             # Delete user data from all related tables
-            await db.execute("DELETE FROM user_autocorrect_settings WHERE user_id = ?", (user_id,))
+            await db.execute(
+                "DELETE FROM user_autocorrect_settings WHERE user_id = ?", (user_id,)
+            )
             await db.execute("DELETE FROM user_badwords WHERE user_id = ?", (user_id,))
-            await db.execute("DELETE FROM user_profile_protection WHERE user_id = ?", (user_id,))
-            await db.execute("DELETE FROM user_message_energy_costs WHERE user_id = ?", (user_id,))
-            await db.execute("DELETE FROM telegram_sessions WHERE user_id = ?", (user_id,))
-            await db.execute("DELETE FROM telegram_messages WHERE user_id = ?", (user_id,))
-            
+            await db.execute(
+                "DELETE FROM user_profile_protection WHERE user_id = ?", (user_id,)
+            )
+            await db.execute(
+                "DELETE FROM user_message_energy_costs WHERE user_id = ?", (user_id,)
+            )
+            await db.execute(
+                "DELETE FROM telegram_sessions WHERE user_id = ?", (user_id,)
+            )
+            await db.execute(
+                "DELETE FROM telegram_messages WHERE user_id = ?", (user_id,)
+            )
+
             # Finally delete the user
             await db.execute("DELETE FROM users WHERE id = ?", (user_id,))
             await db.commit()
@@ -1435,27 +1447,32 @@ class DatabaseManager:
             # Total users
             cursor = await db.execute("SELECT COUNT(*) FROM users")
             total_users = (await cursor.fetchone())[0]
-            
+
             # Active telegram connections
-            cursor = await db.execute("SELECT COUNT(*) FROM users WHERE telegram_connected = TRUE")
+            cursor = await db.execute(
+                "SELECT COUNT(*) FROM users WHERE telegram_connected = TRUE"
+            )
             active_connections = (await cursor.fetchone())[0]
-            
+
             # Admin users
-            cursor = await db.execute("SELECT COUNT(*) FROM users WHERE is_admin = TRUE")
+            cursor = await db.execute(
+                "SELECT COUNT(*) FROM users WHERE is_admin = TRUE"
+            )
             admin_count = (await cursor.fetchone())[0]
-            
+
             # Recent registrations (last 7 days)
             cursor = await db.execute(
                 "SELECT COUNT(*) FROM users WHERE created_at > datetime('now', '-7 days')"
             )
             recent_registrations = (await cursor.fetchone())[0]
-            
+
             return {
                 "total_users": total_users,
                 "active_connections": active_connections,
                 "admin_count": admin_count,
-                "recent_registrations": recent_registrations
+                "recent_registrations": recent_registrations,
             }
+
 
 # Global database manager instance
 _db_manager = None

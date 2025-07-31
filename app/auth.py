@@ -74,10 +74,10 @@ async def get_current_user_from_token(token: str) -> Optional[Dict[str, Any]]:
 
         if user_data:
             return {
-                "id": user_data[0], 
-                "username": user_data[1], 
+                "id": user_data[0],
+                "username": user_data[1],
                 "email": user_data[2],
-                "is_admin": bool(user_data[3]) if user_data[3] is not None else False
+                "is_admin": bool(user_data[3]) if user_data[3] is not None else False,
             }
 
     return None
