@@ -141,6 +141,9 @@ class DatabaseManager(BaseDatabaseManager):
     async def get_user_messages(self, user_id: int, limit: int = 100):
         return await self.energy.get_user_messages(user_id, limit)
 
+    async def get_recent_activity(self, user_id: int, limit: int = 5):
+        return await self.energy.get_recent_activity(user_id, limit)
+
     # Profile protection
     async def init_user_profile_protection(self, user_id: int):
         return await self.profiles.init_user_profile_protection(user_id)

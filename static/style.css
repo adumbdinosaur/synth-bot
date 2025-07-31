@@ -666,6 +666,68 @@ h6 {
     text-shadow: none;
 }
 
+/* Recent Activities Styling */
+.recent-activities-list {
+    background: rgba(26, 26, 26, 0.9);
+    border-radius: 4px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    border: 1px solid var(--cyber-light-grey);
+}
+
+.recent-activities-list li {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(45, 45, 45, 0.5);
+    color: var(--cyber-blue);
+    font-family: var(--font-primary);
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+}
+
+.recent-activities-list li:last-child {
+    border-bottom: none;
+}
+
+.recent-activities-list li:hover {
+    background: rgba(74, 158, 255, 0.1);
+    color: var(--cyber-cyan);
+    transform: translateX(4px);
+}
+
+.recent-activities-list li::before {
+    content: '⚡';
+    margin-right: 8px;
+    color: var(--cyber-cyan);
+    font-size: 0.9em;
+}
+
+.activity-placeholder {
+    text-align: center;
+    padding: 20px;
+    color: var(--cyber-text-muted);
+    font-style: italic;
+    background: rgba(26, 26, 26, 0.9);
+    border-radius: 4px;
+    border: 1px solid var(--cyber-light-grey);
+}
+
+.activity-loading {
+    text-align: center;
+    padding: 16px;
+    color: var(--cyber-cyan);
+    background: rgba(26, 26, 26, 0.9);
+    border-radius: 4px;
+    border: 1px solid var(--cyber-light-grey);
+}
+
+.activity-loading::after {
+    content: '...';
+    animation: pulse 1.5s infinite;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .hero-section {

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 
 from app.auth import get_current_user
 from app.telegram_client import get_telegram_manager
+from app.database import get_database_manager
 
 logger = logging.getLogger(__name__)
 
@@ -45,3 +46,18 @@ async def debug_telegram_config():
 async def health_check():
     """Basic health check endpoint."""
     return {"status": "healthy"}
+
+
+@router.get("/recent-activity")
+async def get_recent_activity(current_user: dict = Depends(get_current_user)):
+    """Get recent activity for the current user."""
+    try:
+        db_manager = get_database_manager()
+        activities = await db_manager.get_recent_activity(current_user["id"], limit=5)
+
+        return {"success": True, "activities": activities}
+    except Exception as e:
+        logger.error(
+            f"Error getting recent activity for user {current_user['id']}: {e}"
+        )
+        return {"success": False, "error": str(e), "activities": []}

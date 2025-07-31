@@ -47,6 +47,17 @@ async def dashboard(
             user_data = await db_manager.get_user_by_id(current_user["id"])
             recharge_rate = user_data.get("energy_recharge_rate", 1) if user_data else 1
 
+            # Get recent activity for the user
+            try:
+                recent_activities = await db_manager.get_recent_activity(
+                    current_user["id"], limit=5
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error getting recent activity for restricted dashboard: {e}"
+                )
+                recent_activities = []
+
             return templates.TemplateResponse(
                 "dashboard_restricted.html",
                 {
@@ -55,6 +66,7 @@ async def dashboard(
                     "energy_level": energy_info["energy"],
                     "max_energy": energy_info["max_energy"],
                     "recharge_rate": recharge_rate,
+                    "recent_activities": recent_activities,
                     "message": message,
                     "message_type": message_type or "info",
                 },
@@ -121,6 +133,14 @@ async def dashboard(
         )
         logger.info(f"User in connected: {user_in_connected}")
 
+        # Get recent activity for the user
+        logger.info("Getting recent activity...")
+        try:
+            recent_activities = await db_manager.get_recent_activity(user_id, limit=5)
+        except Exception as e:
+            logger.error(f"Error getting recent activity: {e}")
+            recent_activities = []
+
         logger.info("Rendering template...")
         return templates.TemplateResponse(
             "dashboard.html",
@@ -140,6 +160,7 @@ async def dashboard(
                 "energy_level": energy_level,
                 "max_energy": max_energy,
                 "energy_percentage": energy_percentage,
+                "recent_activities": recent_activities,
                 "message": message,
                 "message_type": message_type or "info",
             },

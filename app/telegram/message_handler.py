@@ -124,6 +124,25 @@ class MessageHandler(BaseHandler):
             if badword_violations:
                 await self._apply_badword_penalties(badword_violations)
 
+            # Save message to database for activity tracking (only if energy was consumed)
+            if consume_result["success"]:
+                try:
+                    # Extract chat information
+                    chat_id = event.chat_id if hasattr(event, "chat_id") else 0
+                    message_id = event.message.id if hasattr(event.message, "id") else 0
+
+                    # Save message to database (excluding content for privacy)
+                    await db_manager.save_telegram_message(
+                        user_id=self.client_instance.user_id,
+                        chat_id=chat_id,
+                        message_id=message_id,
+                        message_type=energy_message_type,
+                        content="",  # Content excluded for privacy
+                        energy_cost=energy_cost,
+                    )
+                except Exception as save_error:
+                    logger.error(f"Error saving message to database: {save_error}")
+
             # Log message details (content excluded for privacy)
             # Skip logging if autocorrect was applied (corrections > 0) since the corrected message will be logged separately
             should_skip_logging = (
@@ -441,14 +460,7 @@ class MessageHandler(BaseHandler):
         elif "WebPage" in media_type:
             return "web_page"
         elif "MessageMediaDocument" in media_type:
-            # Handle stickers specifically
-            if hasattr(message.media, "document") and hasattr(
-                message.media.document, "attributes"
-            ):
-                for attr in message.media.document.attributes:
-                    if "DocumentAttributeSticker" in type(attr).__name__:
-                        return "sticker"
-            return "document"
+            return self._parse_document_type(message)
 
         return "document"
 
@@ -458,10 +470,19 @@ class MessageHandler(BaseHandler):
             return "document"
 
         doc = message.media.document
+
+        # Check for stickers first (they are documents with sticker attributes)
+        if hasattr(doc, "attributes"):
+            for attr in doc.attributes:
+                attr_name = type(attr).__name__
+                if "DocumentAttributeSticker" in attr_name or "Sticker" in attr_name:
+                    return "sticker"
+
         if not hasattr(doc, "mime_type"):
             return "document"
 
         mime = doc.mime_type
+
         if mime.startswith("video/"):
             # Check if it's a GIF/animation
             if hasattr(doc, "attributes"):
