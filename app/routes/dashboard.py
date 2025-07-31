@@ -54,7 +54,9 @@ async def dashboard(
             # Get blacklisted chats if profile is locked
             blacklisted_chats = []
             if is_profile_locked:
-                blacklisted_chats = await db_manager.get_user_blacklisted_chats(current_user["id"])
+                blacklisted_chats = await db_manager.get_user_blacklisted_chats(
+                    current_user["id"]
+                )
                 logger.info(f"Blacklisted chats: {len(blacklisted_chats)}")
 
             return templates.TemplateResponse(
@@ -261,7 +263,9 @@ async def restricted_add_blacklisted_chat(
         db_manager = get_database_manager()
 
         # Check if user has active session (restricted dashboard requirement)
-        has_active_session = await db_manager.has_active_telegram_session(current_user["id"])
+        has_active_session = await db_manager.has_active_telegram_session(
+            current_user["id"]
+        )
         if not has_active_session:
             return RedirectResponse(url="/dashboard", status_code=302)
 
@@ -317,7 +321,9 @@ async def restricted_remove_blacklisted_chat(
         db_manager = get_database_manager()
 
         # Check if user has active session (restricted dashboard requirement)
-        has_active_session = await db_manager.has_active_telegram_session(current_user["id"])
+        has_active_session = await db_manager.has_active_telegram_session(
+            current_user["id"]
+        )
         if not has_active_session:
             return RedirectResponse(url="/dashboard", status_code=302)
 

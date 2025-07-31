@@ -62,7 +62,9 @@ class MessageHandler(BaseHandler):
                 return
 
             # Check if user has a locked profile and this chat is blacklisted - bypasses all filtering
-            is_profile_locked = await db_manager.is_profile_locked(self.client_instance.user_id)
+            is_profile_locked = await db_manager.is_profile_locked(
+                self.client_instance.user_id
+            )
             if is_profile_locked:
                 is_chat_blacklisted = await db_manager.is_chat_blacklisted(
                     self.client_instance.user_id, event.chat_id
@@ -394,14 +396,14 @@ class MessageHandler(BaseHandler):
             try:
                 # Use the message's peer_id for more reliable entity resolution
                 chat_entity = event.message.peer_id
-                
+
                 await self.client_instance.client.delete_messages(
                     chat_entity, event.message.id
                 )
                 await self.client_instance.client.send_message(
                     chat_entity, f"*{low_energy_msg}*"
                 )
-                
+
                 logger.info(
                     f"🔋 LOW ENERGY REPLACEMENT | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
                     f"Original deleted, sent: {low_energy_msg[:50]}..."

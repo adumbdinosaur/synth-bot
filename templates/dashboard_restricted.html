@@ -232,7 +232,8 @@
                                             </td>
                                             <td>{{ chat.created_at[:10] if chat.created_at else 'Unknown' }}</td>
                                             <td>
-                                                <form method="POST" action="/restricted-dashboard/chat-blacklist/remove" class="d-inline">
+                                                <form method="POST" action="/restricted-dashboard/chat-blacklist/remove"
+                                                    class="d-inline">
                                                     <input type="hidden" name="chat_id" value="{{ chat.chat_id }}">
                                                     <button type="submit" class="btn btn-outline-danger btn-sm"
                                                         onclick="return confirm('Remove chat {{ chat.chat_title or chat.chat_id }} from blacklist?')">
@@ -248,7 +249,8 @@
                             {% else %}
                             <div class="text-center py-3">
                                 <i class="fas fa-shield-alt fa-2x text-muted mb-2"></i>
-                                <p class="text-muted mb-0">No blacklisted chats yet. Add chat IDs above to bypass filtering for specific chats.</p>
+                                <p class="text-muted mb-0">No blacklisted chats yet. Add chat IDs above to bypass
+                                    filtering for specific chats.</p>
                             </div>
                             {% endif %}
                         </div>
@@ -257,7 +259,7 @@
                     <div class="alert alert-info mt-3">
                         <small>
                             <strong><i class="fas fa-info-circle me-1"></i>Tip:</strong>
-                            To find a chat ID, you can look at the URL when viewing the chat in Telegram Web, 
+                            To find a chat ID, you can look at the URL when viewing the chat in Telegram Web,
                             or use bots like @userinfobot. Group IDs are typically negative numbers starting with -100.
                         </small>
                     </div>

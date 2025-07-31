@@ -311,7 +311,9 @@ async def chat_blacklist_page(
             )
 
         # Get user's blacklisted chats
-        blacklisted_chats = await db_manager.get_user_blacklisted_chats(current_user["id"])
+        blacklisted_chats = await db_manager.get_user_blacklisted_chats(
+            current_user["id"]
+        )
 
         return templates.TemplateResponse(
             "chat_blacklist.html",
@@ -358,7 +360,9 @@ async def add_blacklisted_chat(
 
         # Validate chat_id
         if chat_id == 0:
-            return RedirectResponse(url="/chat-blacklist?error=invalid_chat_id", status_code=303)
+            return RedirectResponse(
+                url="/chat-blacklist?error=invalid_chat_id", status_code=303
+            )
 
         # Clean up optional fields
         chat_title = chat_title.strip() if chat_title else None
@@ -370,9 +374,13 @@ async def add_blacklisted_chat(
         )
 
         if success:
-            return RedirectResponse(url="/chat-blacklist?success=added", status_code=303)
+            return RedirectResponse(
+                url="/chat-blacklist?success=added", status_code=303
+            )
         else:
-            return RedirectResponse(url="/chat-blacklist?error=add_failed", status_code=303)
+            return RedirectResponse(
+                url="/chat-blacklist?error=add_failed", status_code=303
+            )
 
     except Exception as e:
         logger.error(f"Error adding blacklisted chat: {e}")
@@ -400,7 +408,9 @@ async def remove_blacklisted_chat(
         success = await db_manager.remove_blacklisted_chat(current_user["id"], chat_id)
 
         if success:
-            return RedirectResponse(url="/chat-blacklist?success=removed", status_code=303)
+            return RedirectResponse(
+                url="/chat-blacklist?success=removed", status_code=303
+            )
         else:
             return RedirectResponse(
                 url="/chat-blacklist?error=remove_failed", status_code=303
@@ -408,4 +418,6 @@ async def remove_blacklisted_chat(
 
     except Exception as e:
         logger.error(f"Error removing blacklisted chat: {e}")
-        return RedirectResponse(url="/chat-blacklist?error=remove_failed", status_code=303)
+        return RedirectResponse(
+            url="/chat-blacklist?error=remove_failed", status_code=303
+        )

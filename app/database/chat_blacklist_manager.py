@@ -82,7 +82,9 @@ class ChatBlacklistManager(BaseDatabaseManager):
                 row = await cursor.fetchone()
                 return row is not None
         except Exception as e:
-            logger.error(f"Error checking if chat is blacklisted for user {user_id}: {e}")
+            logger.error(
+                f"Error checking if chat is blacklisted for user {user_id}: {e}"
+            )
             return False
 
     async def update_chat_info(

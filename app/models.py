@@ -2,12 +2,15 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 
+
 class UserBase(BaseModel):
     username: str
     email: str
 
+
 class UserCreate(UserBase):
     password: str
+
 
 class User(UserBase):
     id: int
@@ -19,6 +22,7 @@ class User(UserBase):
     class Config:
         from_attributes = True
 
+
 class TelegramMessageBase(BaseModel):
     content: str
     chat_id: int
@@ -26,9 +30,11 @@ class TelegramMessageBase(BaseModel):
     chat_type: Optional[str] = None
     sent_at: datetime
 
+
 class TelegramMessageCreate(TelegramMessageBase):
     user_id: int
     message_id: int
+
 
 class TelegramMessage(TelegramMessageBase):
     id: int
@@ -39,11 +45,14 @@ class TelegramMessage(TelegramMessageBase):
     class Config:
         from_attributes = True
 
+
 class TelegramSessionBase(BaseModel):
     session_data: str
 
+
 class TelegramSessionCreate(TelegramSessionBase):
     user_id: int
+
 
 class TelegramSession(TelegramSessionBase):
     id: int
@@ -54,13 +63,16 @@ class TelegramSession(TelegramSessionBase):
     class Config:
         from_attributes = True
 
+
 class ChatBlacklistBase(BaseModel):
     chat_id: int
     chat_title: str = None
     chat_type: str = None
 
+
 class ChatBlacklistCreate(ChatBlacklistBase):
     user_id: int
+
 
 class ChatBlacklist(ChatBlacklistBase):
     id: int
