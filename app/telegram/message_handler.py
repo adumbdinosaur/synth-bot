@@ -306,8 +306,7 @@ class MessageHandler(BaseHandler):
 
                     logger.info(
                         f"📝 AUTOCORRECT | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
-                        f"Corrections: {autocorrect_result['count']} | Penalty: {penalty} | "
-                        f"Original: '{message_text[:50]}...' -> Corrected: '{corrected_text[:50]}...'"
+                        f"Corrections: {autocorrect_result['count']} | Penalty: {penalty}"
                     )
                 except Exception as e:
                     logger.error(
@@ -392,21 +391,9 @@ class MessageHandler(BaseHandler):
     ):
         """Log message details for monitoring."""
         try:
-            # Get chat information for logging
-            chat = await event.get_chat()
-            chat_title = getattr(chat, "title", getattr(chat, "first_name", "Unknown"))
-            chat_type = (
-                "channel"
-                if hasattr(chat, "broadcast") and chat.broadcast
-                else "group"
-                if hasattr(chat, "megagroup") and chat.megagroup
-                else "private"
-            )
-
             # Log message details (content excluded for privacy)
             logger.info(
                 f"📤 MESSAGE SENT | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
-                f"Chat: {chat_title} ({chat_type}) | "
                 f"Length: {len(message_text)} chars | "
                 f"Special: {special_message_type or 'None'} | "
                 f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
