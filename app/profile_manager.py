@@ -332,8 +332,12 @@ class ProfileManager:
                         self.user_id, penalty
                     )
                     if result["success"]:
+                        # Get max energy for proper logging
+                        energy_info = await self.db_manager.get_user_energy(self.user_id)
+                        max_energy = energy_info["max_energy"]
+                        
                         logger.info(
-                            f"⚡ Applied energy penalty: -{penalty} (Energy: {result['energy']}/100)"
+                            f"⚡ Applied energy penalty: -{penalty} (Energy: {result['energy']}/{max_energy})"
                         )
                     else:
                         logger.warning(

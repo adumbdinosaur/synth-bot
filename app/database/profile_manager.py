@@ -27,7 +27,9 @@ class ProfileManager(BaseDatabaseManager):
                 await db.commit()
                 return True
         except Exception as e:
-            logger.error(f"Error initializing profile protection for user {user_id}: {e}")
+            logger.error(
+                f"Error initializing profile protection for user {user_id}: {e}"
+            )
             return False
 
     @retry_db_operation()
@@ -44,7 +46,9 @@ class ProfileManager(BaseDatabaseManager):
                 await db.commit()
                 return True
         except Exception as e:
-            logger.error(f"Error setting profile change penalty for user {user_id}: {e}")
+            logger.error(
+                f"Error setting profile change penalty for user {user_id}: {e}"
+            )
             return False
 
     async def get_profile_change_penalty(self, user_id: int) -> int:
@@ -58,7 +62,9 @@ class ProfileManager(BaseDatabaseManager):
                 row = await cursor.fetchone()
                 return row[0] if row else 10  # Default penalty
         except Exception as e:
-            logger.error(f"Error getting profile change penalty for user {user_id}: {e}")
+            logger.error(
+                f"Error getting profile change penalty for user {user_id}: {e}"
+            )
             return 10
 
     async def get_profile_protection_settings(self, user_id: int) -> Dict[str, Any]:
@@ -95,7 +101,9 @@ class ProfileManager(BaseDatabaseManager):
                         "profile_locked_at": None,
                     }
         except Exception as e:
-            logger.error(f"Error getting profile protection settings for user {user_id}: {e}")
+            logger.error(
+                f"Error getting profile protection settings for user {user_id}: {e}"
+            )
             return {}
 
     @retry_db_operation()
@@ -140,7 +148,7 @@ class ProfileManager(BaseDatabaseManager):
                     (user_id,),
                 )
                 await db.commit()
-                
+
                 # If no row was updated, create one
                 if db.total_changes == 0:
                     await db.execute(
@@ -150,7 +158,7 @@ class ProfileManager(BaseDatabaseManager):
                         (user_id,),
                     )
                     await db.commit()
-                
+
                 logger.info(f"Locked profile for user {user_id}")
                 return True
         except Exception as e:
@@ -235,7 +243,7 @@ class ProfileManager(BaseDatabaseManager):
                     (first_name, last_name, bio, profile_photo_id, user_id),
                 )
                 await db.commit()
-                
+
                 if db.total_changes == 0:
                     # Create record if it doesn't exist
                     await db.execute(
@@ -247,7 +255,7 @@ class ProfileManager(BaseDatabaseManager):
                         (user_id, first_name, last_name, bio, profile_photo_id),
                     )
                     await db.commit()
-                
+
                 logger.info(f"Updated saved profile state for user {user_id}")
                 return True
         except Exception as e:
@@ -274,7 +282,9 @@ class ProfileManager(BaseDatabaseManager):
         """Set the energy cost for reverting profile changes."""
         try:
             if not (0 <= cost <= 100):
-                logger.error(f"Invalid revert cost {cost} for user {user_id}. Must be 0-100.")
+                logger.error(
+                    f"Invalid revert cost {cost} for user {user_id}. Must be 0-100."
+                )
                 return False
 
             async with self.get_connection() as db:

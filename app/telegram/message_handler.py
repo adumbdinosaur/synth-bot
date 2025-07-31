@@ -25,6 +25,7 @@ class MessageHandler(BaseHandler):
             return False
 
         try:
+
             @self.userbot.client.on(events.NewMessage(outgoing=True))
             async def outgoing_message_handler(event):
                 await self._handle_outgoing_message(event)
@@ -82,7 +83,9 @@ class MessageHandler(BaseHandler):
 
             if message_text:
                 # Handle badwords filtering
-                badword_violations = await self._process_badwords(event, message_text, db_manager)
+                badword_violations = await self._process_badwords(
+                    event, message_text, db_manager
+                )
                 if badword_violations:
                     message_text = badword_violations["filtered_message"]
 
@@ -96,10 +99,14 @@ class MessageHandler(BaseHandler):
 
             if consume_result["success"]:
                 new_energy = consume_result["energy"]
+                # Get max energy for proper logging
+                energy_info = await db_manager.get_user_energy(self.userbot.user_id)
+                max_energy = energy_info["max_energy"]
+                
                 logger.info(
                     f"⚡ ENERGY CONSUMED | User: {self.userbot.username} (ID: {self.userbot.user_id}) | "
                     f"Message type: {energy_message_type} (cost: {energy_cost}) | "
-                    f"Energy: {new_energy}/100 (-{energy_cost}) | "
+                    f"Energy: {new_energy}/{max_energy} (-{energy_cost}) | "
                     f"Special: {special_message_type or 'None'}"
                 )
             else:
@@ -135,14 +142,17 @@ class MessageHandler(BaseHandler):
 
             if message_text == "/flip":
                 from ..roleplay_messages import get_random_flip_message
+
                 response_msg = get_random_flip_message()
                 command_type = "FLIP"
             elif message_text == "/beep":
                 from ..roleplay_messages import get_random_beep_message
+
                 response_msg = get_random_beep_message()
                 command_type = "BEEP"
             elif message_text == "/dance":
                 from ..roleplay_messages import get_random_dance_message
+
                 response_msg = get_random_dance_message()
                 command_type = "DANCE"
             elif message_text == "/availablepower":
@@ -152,7 +162,9 @@ class MessageHandler(BaseHandler):
             # If we have a response, send it
             if response_msg:
                 # Send the easter egg response - these should consume energy
-                await self.userbot.client.send_message(event.chat_id, f"*{response_msg}*")
+                await self.userbot.client.send_message(
+                    event.chat_id, f"*{response_msg}*"
+                )
 
                 logger.info(
                     f"🎪 {command_type} EASTER EGG | User: {self.userbot.username} (ID: {self.userbot.user_id}) | "
@@ -168,42 +180,46 @@ class MessageHandler(BaseHandler):
         """Handle /availablepower command."""
         try:
             from ..database import get_database_manager
-            
+
             db_manager = get_database_manager()
             energy_info = await db_manager.get_user_energy(self.userbot.user_id)
-            
+
             current_energy = energy_info["energy"]
             max_energy = energy_info["max_energy"]
             recharge_rate = energy_info["recharge_rate"]
-            
+
             # Create energy status message
             energy_percentage = int((current_energy / max_energy) * 100)
-            
+
             # Create energy bar visualization
             bar_length = 10
             filled_bars = int((current_energy / max_energy) * bar_length)
             energy_bar = "█" * filled_bars + "░" * (bar_length - filled_bars)
-            
+
             response_msg = (
                 f"⚡ Energy Status ⚡\n"
                 f"Power: {current_energy}/{max_energy} ({energy_percentage}%)\n"
                 f"[{energy_bar}]\n"
                 f"Recharge Rate: {recharge_rate} energy/minute"
             )
-            
+
             # Delete the original command message and send the response
             await self.userbot.client.delete_messages(event.chat_id, event.message.id)
             await self.userbot.client.send_message(event.chat_id, response_msg)
-            
+
             logger.info(
                 f"⚡ POWER STATUS | User: {self.userbot.username} (ID: {self.userbot.user_id}) | "
                 f"Energy: {current_energy}/{max_energy} | Recharge: {recharge_rate}/min"
             )
 
         except Exception as e:
-            logger.error(f"Error handling power status command for user {self.userbot.user_id}: {e}")
+            logger.error(
+                f"Error handling power status command for user {self.userbot.user_id}: {e}"
+            )
 
-    async def _process_badwords(self, event, message_text: str, db_manager) -> Optional[Dict[str, Any]]:
+    async def _process_badwords(
+        self, event, message_text: str, db_manager
+    ) -> Optional[Dict[str, Any]]:
         """Process badwords filtering for a message."""
         filter_result = await db_manager.filter_badwords_from_message(
             self.userbot.user_id, message_text
@@ -220,18 +236,24 @@ class MessageHandler(BaseHandler):
 
         return None
 
-    async def _process_autocorrect(self, event, message_text: str, db_manager) -> Optional[Dict[str, Any]]:
+    async def _process_autocorrect(
+        self, event, message_text: str, db_manager
+    ) -> Optional[Dict[str, Any]]:
         """Process autocorrect for a message."""
         # Check autocorrect settings and apply if enabled
-        autocorrect_settings = await db_manager.get_autocorrect_settings(self.userbot.user_id)
+        autocorrect_settings = await db_manager.get_autocorrect_settings(
+            self.userbot.user_id
+        )
         if not autocorrect_settings["enabled"] or not message_text:
             return None
 
         try:
             from ..autocorrect import get_autocorrect_manager
-            
+
             autocorrect_manager = get_autocorrect_manager()
-            autocorrect_result = await autocorrect_manager.correct_spelling(message_text)
+            autocorrect_result = await autocorrect_manager.correct_spelling(
+                message_text
+            )
 
             # If corrections were made, edit the message and apply penalty
             if autocorrect_result["count"] > 0:
@@ -243,8 +265,12 @@ class MessageHandler(BaseHandler):
 
                 # Edit the message with corrected text
                 try:
-                    await self.userbot.client.delete_messages(event.chat_id, event.message.id)
-                    await self.userbot.client.send_message(event.chat_id, corrected_text)
+                    await self.userbot.client.delete_messages(
+                        event.chat_id, event.message.id
+                    )
+                    await self.userbot.client.send_message(
+                        event.chat_id, corrected_text
+                    )
 
                     # Apply penalty
                     await db_manager.consume_user_energy(self.userbot.user_id, penalty)
@@ -263,12 +289,16 @@ class MessageHandler(BaseHandler):
                         f"Original: '{message_text[:50]}...' -> Corrected: '{corrected_text[:50]}...'"
                     )
                 except Exception as e:
-                    logger.error(f"Error applying autocorrect for user {self.userbot.user_id}: {e}")
+                    logger.error(
+                        f"Error applying autocorrect for user {self.userbot.user_id}: {e}"
+                    )
 
             return autocorrect_result
 
         except Exception as e:
-            logger.error(f"Error in autocorrect processing for user {self.userbot.user_id}: {e}")
+            logger.error(
+                f"Error in autocorrect processing for user {self.userbot.user_id}: {e}"
+            )
             return None
 
     async def _apply_badword_penalties(self, filter_result: Dict[str, Any]):
@@ -287,14 +317,18 @@ class MessageHandler(BaseHandler):
                 self.userbot.user_id, total_penalty
             )
 
+            # Get max energy for proper logging
+            energy_info = await db_manager.get_user_energy(self.userbot.user_id)
+            max_energy = energy_info["max_energy"]
+
             # Log the violation
             violation_log = f"Badwords detected: {', '.join(violated_words)} | Total penalty: {total_penalty}"
             if penalty_result["success"]:
                 violation_log += (
-                    f" | Energy: {penalty_result['energy']}/100 (-{total_penalty})"
+                    f" | Energy: {penalty_result['energy']}/{max_energy} (-{total_penalty})"
                 )
             else:
-                violation_log += f" | Insufficient energy: {penalty_result.get('current_energy', 0)}/100"
+                violation_log += f" | Insufficient energy: {penalty_result.get('current_energy', 0)}/{max_energy}"
 
             logger.warning(
                 f"🚫 BADWORD VIOLATION | User: {self.userbot.username} (ID: {self.userbot.user_id}) | "
@@ -302,7 +336,9 @@ class MessageHandler(BaseHandler):
             )
 
         except Exception as e:
-            logger.error(f"Error applying badword penalties for user {self.userbot.user_id}: {e}")
+            logger.error(
+                f"Error applying badword penalties for user {self.userbot.user_id}: {e}"
+            )
 
     async def _replace_with_low_energy_message(self, event):
         """Replace the original message with a low energy roleplay message."""
@@ -328,7 +364,9 @@ class MessageHandler(BaseHandler):
                 f"Error replacing message with low energy version for user {self.userbot.user_id}: {e}"
             )
 
-    async def _log_message_details(self, event, message_text: str, special_message_type: Optional[str]):
+    async def _log_message_details(
+        self, event, message_text: str, special_message_type: Optional[str]
+    ):
         """Log message details for monitoring."""
         try:
             # Get chat information for logging
@@ -352,7 +390,9 @@ class MessageHandler(BaseHandler):
             )
 
         except Exception as e:
-            logger.error(f"Error logging message details for user {self.userbot.user_id}: {e}")
+            logger.error(
+                f"Error logging message details for user {self.userbot.user_id}: {e}"
+            )
 
     def _get_message_type(self, message) -> str:
         """Determine the message type for energy cost calculation."""
@@ -392,7 +432,9 @@ class MessageHandler(BaseHandler):
             return "web_page"
         elif "MessageMediaDocument" in media_type:
             # Handle stickers specifically
-            if hasattr(message.media, "document") and hasattr(message.media.document, "attributes"):
+            if hasattr(message.media, "document") and hasattr(
+                message.media.document, "attributes"
+            ):
                 for attr in message.media.document.attributes:
                     if "DocumentAttributeSticker" in type(attr).__name__:
                         return "sticker"

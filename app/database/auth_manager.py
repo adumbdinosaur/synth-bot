@@ -95,7 +95,7 @@ class AuthManager(BaseDatabaseManager):
         """Initialize the default invite code if it doesn't exist."""
         try:
             default_code = "peterpepperpickedapepper"
-            
+
             async with self.get_connection() as db:
                 # Check if the default code already exists
                 cursor = await db.execute(
@@ -114,7 +114,9 @@ class AuthManager(BaseDatabaseManager):
                     await db.commit()
                     logger.info(f"✅ Created default invite code: {default_code}")
                 else:
-                    logger.info(f"✅ Default invite code already exists: {default_code}")
+                    logger.info(
+                        f"✅ Default invite code already exists: {default_code}"
+                    )
 
                 return True
 

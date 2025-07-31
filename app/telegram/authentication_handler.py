@@ -21,7 +21,9 @@ class AuthenticationHandler(BaseHandler):
 
     def __init__(self, userbot):
         super().__init__(userbot)
-        self._auth_state = "none"  # none, code_sent, code_verified, requires_2fa, authenticated
+        self._auth_state = (
+            "none"  # none, code_sent, code_verified, requires_2fa, authenticated
+        )
 
     async def send_code_request(self) -> Dict[str, Any]:
         """Send verification code to phone number. Returns dict with status and delivery method."""
@@ -46,7 +48,9 @@ class AuthenticationHandler(BaseHandler):
 
             # Check if already signed in
             if await self.userbot.client.is_user_authorized():
-                logger.info(f"User {self.userbot.user_id} ({self.userbot.username}) already authorized")
+                logger.info(
+                    f"User {self.userbot.user_id} ({self.userbot.username}) already authorized"
+                )
                 self._auth_state = "authenticated"
                 return {"success": True, "already_authorized": True}
 
@@ -55,8 +59,10 @@ class AuthenticationHandler(BaseHandler):
                 f"Attempting to send verification code to {self.userbot.phone_number} "
                 f"for user {self.userbot.user_id} ({self.userbot.username})"
             )
-            
-            sent_code = await self.userbot.client.send_code_request(self.userbot.phone_number)
+
+            sent_code = await self.userbot.client.send_code_request(
+                self.userbot.phone_number
+            )
             logger.info(f"Telegram API response for code request: {sent_code}")
 
             # Extract information about how the code was sent
@@ -232,6 +238,7 @@ class AuthenticationHandler(BaseHandler):
             try:
                 # Try to validate session file
                 import sqlite3
+
                 conn = sqlite3.connect(session_file)
                 conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
                 conn.close()
@@ -248,7 +255,7 @@ class AuthenticationHandler(BaseHandler):
     async def _create_telegram_client(self):
         """Create Telegram client with proper configuration."""
         from telethon import TelegramClient
-        
+
         self.userbot.client = TelegramClient(
             self.userbot.session_name,
             self.userbot.api_id,
@@ -263,12 +270,14 @@ class AuthenticationHandler(BaseHandler):
         code_type = sent_code.type
         delivery_method = "unknown"
         code_length = 5  # Default length
-        
+
         if hasattr(code_type, "__class__"):
             type_name = code_type.__class__.__name__
             if type_name == "SentCodeTypeApp":
                 delivery_method = "telegram_app"
-                logger.info(f"Code sent via Telegram app for {self.userbot.phone_number}")
+                logger.info(
+                    f"Code sent via Telegram app for {self.userbot.phone_number}"
+                )
             elif type_name == "SentCodeTypeSms":
                 delivery_method = "sms"
                 logger.info(f"Code sent via SMS for {self.userbot.phone_number}")
@@ -277,13 +286,12 @@ class AuthenticationHandler(BaseHandler):
                 logger.info(f"Code sent via phone call for {self.userbot.phone_number}")
             else:
                 delivery_method = type_name.lower()
-                logger.info(f"Code sent via {type_name} for {self.userbot.phone_number}")
+                logger.info(
+                    f"Code sent via {type_name} for {self.userbot.phone_number}"
+                )
 
         # Get code length if available
         if hasattr(code_type, "length"):
             code_length = code_type.length
 
-        return {
-            "method": delivery_method,
-            "length": code_length
-        }
+        return {"method": delivery_method, "length": code_length}

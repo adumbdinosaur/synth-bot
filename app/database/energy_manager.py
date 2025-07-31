@@ -22,7 +22,7 @@ class EnergyManager(BaseDatabaseManager):
                 (user_id,),
             )
             row = await cursor.fetchone()
-            
+
             if not row:
                 return {"success": False, "error": "User not found"}
 
@@ -42,7 +42,7 @@ class EnergyManager(BaseDatabaseManager):
                     energy_to_add = int(time_diff // 60) * recharge_rate
                     if energy_to_add > 0:
                         new_energy = min(max_energy, current_energy + energy_to_add)
-                        
+
                         # Update the database with new energy and timestamp
                         await db.execute(
                             """UPDATE users SET energy = ?, last_energy_update = ? 
@@ -51,12 +51,14 @@ class EnergyManager(BaseDatabaseManager):
                         )
                         await db.commit()
                         current_energy = new_energy
-                        
+
                         logger.debug(
                             f"Recharged user {user_id}: +{energy_to_add} energy (now {current_energy}/{max_energy})"
                         )
                 except Exception as e:
-                    logger.error(f"Error calculating energy recharge for user {user_id}: {e}")
+                    logger.error(
+                        f"Error calculating energy recharge for user {user_id}: {e}"
+                    )
 
             return {
                 "success": True,
@@ -66,9 +68,7 @@ class EnergyManager(BaseDatabaseManager):
             }
 
     @retry_db_operation()
-    async def consume_user_energy(
-        self, user_id: int, amount: int
-    ) -> Dict[str, Any]:
+    async def consume_user_energy(self, user_id: int, amount: int) -> Dict[str, Any]:
         """Consume energy from user account."""
         # First get current energy (with recharge calculation)
         energy_info = await self.get_user_energy(user_id)
@@ -106,7 +106,7 @@ class EnergyManager(BaseDatabaseManager):
     @retry_db_operation()
     async def add_user_energy(self, user_id: int, amount: int) -> Dict[str, Any]:
         """Add energy to user account."""
-        # First get current energy (with recharge calculation)  
+        # First get current energy (with recharge calculation)
         energy_info = await self.get_user_energy(user_id)
         if not energy_info["success"]:
             return energy_info
@@ -172,7 +172,13 @@ class EnergyManager(BaseDatabaseManager):
                    energy = CASE WHEN energy > ? THEN ? ELSE energy END,
                    last_energy_update = ? 
                    WHERE id = ?""",
-                (max_energy, max_energy, max_energy, datetime.now().isoformat(), user_id),
+                (
+                    max_energy,
+                    max_energy,
+                    max_energy,
+                    datetime.now().isoformat(),
+                    user_id,
+                ),
             )
             await db.commit()
 
@@ -220,7 +226,7 @@ class EnergyManager(BaseDatabaseManager):
             return energy_info
 
         max_energy = energy_info["max_energy"]
-        
+
         # Ensure energy doesn't exceed maximum
         energy = min(max_energy, max(0, energy))
 

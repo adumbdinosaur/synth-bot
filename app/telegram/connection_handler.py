@@ -21,7 +21,10 @@ class ConnectionHandler(BaseHandler):
 
     async def start_message_listener(self) -> bool:
         """Start listening for messages in a background task."""
-        if not self.userbot.client or not await self.userbot.client.is_user_authorized():
+        if (
+            not self.userbot.client
+            or not await self.userbot.client.is_user_authorized()
+        ):
             logger.error(
                 f"Client not authorized for user {self.userbot.user_id} ({self.userbot.username})"
             )
@@ -37,6 +40,7 @@ class ConnectionHandler(BaseHandler):
             # Initialize profile handler
             if not self.userbot.profile_handler:
                 from .profile_handler import ProfileHandler
+
                 self.userbot.profile_handler = ProfileHandler(self.userbot)
 
             # Initialize profile handler
@@ -53,6 +57,7 @@ class ConnectionHandler(BaseHandler):
             # Initialize message handler
             if not self.userbot.message_handler:
                 from .message_handler import MessageHandler
+
                 self.userbot.message_handler = MessageHandler(self.userbot)
 
             # Register message handlers
@@ -112,7 +117,10 @@ class ConnectionHandler(BaseHandler):
 
     async def get_me(self):
         """Get current user information."""
-        if not self.userbot.client or not await self.userbot.client.is_user_authorized():
+        if (
+            not self.userbot.client
+            or not await self.userbot.client.is_user_authorized()
+        ):
             return None
 
         try:
@@ -127,7 +135,9 @@ class ConnectionHandler(BaseHandler):
         """Send a message through this user's client. Returns True if successful."""
         try:
             if not self.userbot.client or not self.userbot.client.is_connected():
-                logger.error(f"User {self.userbot.user_id} ({self.userbot.username}) not connected")
+                logger.error(
+                    f"User {self.userbot.user_id} ({self.userbot.username}) not connected"
+                )
                 return False
 
             # Send the message
@@ -154,28 +164,34 @@ class ConnectionHandler(BaseHandler):
             # Initialize and register handlers
             if not self.userbot.message_handler:
                 from .message_handler import MessageHandler
+
                 self.userbot.message_handler = MessageHandler(self.userbot)
-            
+
             if not self.userbot.profile_handler:
                 from .profile_handler import ProfileHandler
+
                 self.userbot.profile_handler = ProfileHandler(self.userbot)
 
             # Register handlers
             await self.userbot.message_handler.register_handlers()
             await self.userbot.profile_handler.register_handlers()
 
-            logger.info(f"Event handlers setup completed for user {self.userbot.user_id}")
+            logger.info(
+                f"Event handlers setup completed for user {self.userbot.user_id}"
+            )
 
         except Exception as e:
-            logger.error(f"Error setting up handlers for user {self.userbot.user_id}: {e}")
+            logger.error(
+                f"Error setting up handlers for user {self.userbot.user_id}: {e}"
+            )
 
     @property
     def is_connected(self) -> bool:
         """Check if the client is connected and authorized."""
         return (
-            self.userbot.client is not None and 
-            self.userbot.client.is_connected() and 
-            self._is_running
+            self.userbot.client is not None
+            and self.userbot.client.is_connected()
+            and self._is_running
         )
 
     @property

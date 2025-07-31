@@ -22,7 +22,10 @@ class ProfileHandler(BaseHandler):
     async def initialize(self) -> bool:
         """Initialize profile handler and ProfileManager."""
         try:
-            if not self.userbot.client or not await self.userbot.client.is_user_authorized():
+            if (
+                not self.userbot.client
+                or not await self.userbot.client.is_user_authorized()
+            ):
                 logger.error(
                     f"Client not authorized for user {self.userbot.user_id} ({self.userbot.username})"
                 )
@@ -31,13 +34,14 @@ class ProfileHandler(BaseHandler):
             # Initialize ProfileManager with client
             if not self.profile_manager:
                 from ..profile_manager import ProfileManager
-                
+
                 self.profile_manager = ProfileManager(
                     self.userbot.user_id, self.userbot.username, self.userbot.client
                 )
-                
+
                 # Set database manager reference
                 from ..database import get_database_manager
+
                 self.profile_manager.set_db_manager(get_database_manager())
 
                 # Initialize the ProfileManager (this will store original profile using GetFullUser)
@@ -60,7 +64,9 @@ class ProfileHandler(BaseHandler):
             return True
 
         except Exception as e:
-            logger.error(f"Error initializing profile handler for user {self.userbot.user_id}: {e}")
+            logger.error(
+                f"Error initializing profile handler for user {self.userbot.user_id}: {e}"
+            )
             return False
 
     async def register_handlers(self) -> bool:
@@ -111,7 +117,9 @@ class ProfileHandler(BaseHandler):
         """Set profile information for this user."""
         try:
             if not self.userbot.client or not self.userbot.client.is_connected():
-                logger.error(f"User {self.userbot.user_id} ({self.userbot.username}) not connected")
+                logger.error(
+                    f"User {self.userbot.user_id} ({self.userbot.username}) not connected"
+                )
                 return False
 
             success = True
@@ -122,7 +130,9 @@ class ProfileHandler(BaseHandler):
 
             # Update profile photo
             if profile_data.get("photo_url") and success:
-                success = await self._update_profile_photo(profile_data["photo_url"], changes_made)
+                success = await self._update_profile_photo(
+                    profile_data["photo_url"], changes_made
+                )
 
             if changes_made:
                 logger.info(
@@ -144,6 +154,7 @@ class ProfileHandler(BaseHandler):
                 await self.profile_manager.stop_monitoring()
 
             from ..database import get_database_manager
+
             db_manager = get_database_manager()
             await db_manager.clear_profile_lock(self.userbot.user_id)
             logger.info(
@@ -151,7 +162,9 @@ class ProfileHandler(BaseHandler):
             )
 
         except Exception as e:
-            logger.error(f"Error unlocking profile for user {self.userbot.user_id}: {e}")
+            logger.error(
+                f"Error unlocking profile for user {self.userbot.user_id}: {e}"
+            )
 
     async def get_profile_status(self):
         """Get current profile monitoring status via ProfileManager."""
@@ -165,18 +178,23 @@ class ProfileHandler(BaseHandler):
         if self.profile_manager:
             return await self.profile_manager.update_original_profile(new_profile_data)
         else:
-            logger.error(f"❌ ProfileManager not available for user {self.userbot.user_id}")
+            logger.error(
+                f"❌ ProfileManager not available for user {self.userbot.user_id}"
+            )
             return False
 
     async def trigger_profile_change(self) -> bool:
         """Trigger a profile change for this user. Returns True if successful."""
         try:
             if not self.userbot.client or not self.userbot.client.is_connected():
-                logger.error(f"User {self.userbot.user_id} ({self.userbot.username}) not connected")
+                logger.error(
+                    f"User {self.userbot.user_id} ({self.userbot.username}) not connected"
+                )
                 return False
 
             # Get the database manager for profile operations
             from ..database import get_database_manager
+
             db_manager = get_database_manager()
 
             # Lock the profile (indicates session is active)
@@ -210,12 +228,15 @@ class ProfileHandler(BaseHandler):
             await self._legacy_handle_profile_update(event)
 
         except Exception as e:
-            logger.error(f"Error handling profile update for user {self.userbot.user_id}: {e}")
+            logger.error(
+                f"Error handling profile update for user {self.userbot.user_id}: {e}"
+            )
 
     async def _legacy_handle_profile_update(self, event):
         """Legacy profile update handler - kept for reference but ProfileManager should be used instead."""
         try:
             from ..database import get_database_manager
+
             db_manager = get_database_manager()
 
             # Check if this user's profile is locked
@@ -230,14 +251,20 @@ class ProfileHandler(BaseHandler):
                         f"✅ Profile reverted using ProfileManager for user {self.userbot.user_id}"
                     )
                     # Apply energy penalty
-                    penalty = await db_manager.get_profile_change_penalty(self.userbot.user_id)
+                    penalty = await db_manager.get_profile_change_penalty(
+                        self.userbot.user_id
+                    )
                     if penalty > 0:
                         result = await db_manager.consume_user_energy(
                             self.userbot.user_id, penalty
                         )
                         if result["success"]:
+                            # Get max energy for proper logging
+                            energy_info = await db_manager.get_user_energy(self.userbot.user_id)
+                            max_energy = energy_info["max_energy"]
+                            
                             logger.info(
-                                f"⚡ Applied energy penalty: -{penalty} (Energy: {result['energy']}/100)"
+                                f"⚡ Applied energy penalty: -{penalty} (Energy: {result['energy']}/{max_energy})"
                             )
                         else:
                             logger.warning(
@@ -256,7 +283,10 @@ class ProfileHandler(BaseHandler):
     async def _store_original_profile(self):
         """Store the user's original profile data when session starts. (Legacy method - ProfileManager handles this now)"""
         try:
-            if not self.userbot.client or not await self.userbot.client.is_user_authorized():
+            if (
+                not self.userbot.client
+                or not await self.userbot.client.is_user_authorized()
+            ):
                 logger.warning(
                     f"Cannot store profile - client not authenticated for user {self.userbot.user_id}"
                 )
@@ -269,10 +299,13 @@ class ProfileHandler(BaseHandler):
             me = full_user.users[0]
 
             if not me:
-                logger.error(f"Could not get user profile for user {self.userbot.user_id}")
+                logger.error(
+                    f"Could not get user profile for user {self.userbot.user_id}"
+                )
                 return
 
             from ..database import get_database_manager
+
             db_manager = get_database_manager()
 
             # Get profile photo ID if exists
@@ -299,12 +332,16 @@ class ProfileHandler(BaseHandler):
             )
 
         except Exception as e:
-            logger.error(f"Error storing original profile for user {self.userbot.user_id}: {e}")
+            logger.error(
+                f"Error storing original profile for user {self.userbot.user_id}: {e}"
+            )
 
     async def _get_profile_direct(self) -> Optional[Dict[str, Any]]:
         """Get profile directly from Telegram client."""
         if not self.userbot.client or not self.userbot.client.is_connected():
-            logger.error(f"User {self.userbot.user_id} ({self.userbot.username}) not connected")
+            logger.error(
+                f"User {self.userbot.user_id} ({self.userbot.username}) not connected"
+            )
             return None
 
         # Get current user info using GetFullUser (same as ProfileManager)
@@ -326,11 +363,13 @@ class ProfileHandler(BaseHandler):
             else None,
         }
 
-    async def _update_profile_text(self, profile_data: Dict[str, Any], changes_made: list) -> bool:
+    async def _update_profile_text(
+        self, profile_data: Dict[str, Any], changes_made: list
+    ) -> bool:
         """Update profile text (name and bio)."""
         try:
             from telethon.tl.functions.account import UpdateProfileRequest
-            
+
             first_name = profile_data.get("first_name")
             last_name = profile_data.get("last_name")
             bio = profile_data.get("bio")
@@ -373,7 +412,9 @@ class ProfileHandler(BaseHandler):
             return True
 
         except Exception as e:
-            logger.error(f"Error updating profile text for user {self.userbot.user_id}: {e}")
+            logger.error(
+                f"Error updating profile text for user {self.userbot.user_id}: {e}"
+            )
             return False
 
     async def _update_profile_photo(self, photo_url: str, changes_made: list) -> bool:
@@ -389,8 +430,12 @@ class ProfileHandler(BaseHandler):
                         photo_data = await response.read()
 
                         # Upload as profile photo
-                        uploaded_file = await self.userbot.client.upload_file(photo_data)
-                        await self.userbot.client(UploadProfilePhotoRequest(file=uploaded_file))
+                        uploaded_file = await self.userbot.client.upload_file(
+                            photo_data
+                        )
+                        await self.userbot.client(
+                            UploadProfilePhotoRequest(file=uploaded_file)
+                        )
                         changes_made.append(f"photo: {photo_url}")
                         return True
                     else:
@@ -400,5 +445,7 @@ class ProfileHandler(BaseHandler):
                         return False
 
         except Exception as e:
-            logger.error(f"Error updating profile photo for user {self.userbot.user_id}: {e}")
+            logger.error(
+                f"Error updating profile photo for user {self.userbot.user_id}: {e}"
+            )
             return False

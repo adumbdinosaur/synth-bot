@@ -73,7 +73,7 @@ class SessionManager(BaseDatabaseManager):
                        ORDER BY u.username"""
                 )
                 rows = await cursor.fetchall()
-                
+
                 sessions = []
                 for row in rows:
                     # Calculate current energy with recharge
@@ -88,24 +88,31 @@ class SessionManager(BaseDatabaseManager):
                             now = datetime.now()
                             time_diff = (now - last_update_dt).total_seconds()
                             energy_to_add = int(time_diff // 60) * recharge_rate
-                            current_energy = min(max_energy, current_energy + energy_to_add)
+                            current_energy = min(
+                                max_energy, current_energy + energy_to_add
+                            )
                         except Exception as e:
-                            logger.error(f"Error calculating energy recharge for user {row[0]}: {e}")
+                            logger.error(
+                                f"Error calculating energy recharge for user {row[0]}: {e}"
+                            )
 
-                    sessions.append({
-                        "user_id": row[0],
-                        "username": row[1],
-                        "email": row[2],
-                        "energy": current_energy,
-                        "max_energy": max_energy,
-                        "energy_recharge_rate": recharge_rate,
-                        "last_energy_update": last_update,
-                        "telegram_connected": bool(row[7]),
-                        "has_session_data": row[8] is not None,
-                        "session_updated_at": row[9],
-                        "is_connected": bool(row[7]) and row[8] is not None,
-                    })
-                
+                    sessions.append(
+                        {
+                            "user_id": row[0],
+                            "username": row[1],
+                            "email": row[2],
+                            "energy": current_energy,
+                            "max_energy": max_energy,
+                            "energy_percentage": int((current_energy / max_energy * 100)) if max_energy > 0 else 0,
+                            "energy_recharge_rate": recharge_rate,
+                            "last_energy_update": last_update,
+                            "telegram_connected": bool(row[7]),
+                            "has_session_data": row[8] is not None,
+                            "session_updated_at": row[9],
+                            "is_connected": bool(row[7]) and row[8] is not None,
+                        }
+                    )
+
                 return sessions
         except Exception as e:
             logger.error(f"Error getting active sessions: {e}")
@@ -123,10 +130,10 @@ class SessionManager(BaseDatabaseManager):
                     (user_id,),
                 )
                 row = await cursor.fetchone()
-                
+
                 if not row:
                     return False
-                
+
                 session_data, telegram_connected = row
                 # User has active session if they're marked as connected AND have session data
                 return bool(telegram_connected) and session_data is not None

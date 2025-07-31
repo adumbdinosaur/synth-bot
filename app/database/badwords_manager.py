@@ -95,7 +95,7 @@ class BadwordsManager(BaseDatabaseManager):
     ) -> Tuple[bool, List[Dict[str, Any]], int]:
         """
         Check message for badwords and return found badwords with total penalty.
-        
+
         Returns:
             Tuple of (has_badwords, found_badwords_list, total_penalty)
         """
@@ -114,20 +114,22 @@ class BadwordsManager(BaseDatabaseManager):
 
                 # Create regex pattern for whole word matching
                 if case_sensitive:
-                    pattern = r'\b' + re.escape(word) + r'\b'
+                    pattern = r"\b" + re.escape(word) + r"\b"
                     matches = re.findall(pattern, message)
                 else:
-                    pattern = r'\b' + re.escape(word) + r'\b'
+                    pattern = r"\b" + re.escape(word) + r"\b"
                     matches = re.findall(pattern, message, re.IGNORECASE)
 
                 if matches:
                     count = len(matches)
-                    found_badwords.append({
-                        "word": word,
-                        "penalty": penalty,
-                        "count": count,
-                        "case_sensitive": case_sensitive
-                    })
+                    found_badwords.append(
+                        {
+                            "word": word,
+                            "penalty": penalty,
+                            "count": count,
+                            "case_sensitive": case_sensitive,
+                        }
+                    )
                     total_penalty += penalty * count
 
             return len(found_badwords) > 0, found_badwords, total_penalty
@@ -141,7 +143,7 @@ class BadwordsManager(BaseDatabaseManager):
     ) -> Dict[str, Any]:
         """
         Filter badwords from message and return filtered message with details.
-        
+
         Returns:
             Dict with keys: filtered_message, found_badwords, total_penalty
         """
@@ -166,10 +168,10 @@ class BadwordsManager(BaseDatabaseManager):
                 case_sensitive = badword_info["case_sensitive"]
 
                 if case_sensitive:
-                    pattern = r'\b' + re.escape(word) + r'\b'
+                    pattern = r"\b" + re.escape(word) + r"\b"
                     filtered_message = re.sub(pattern, "<redacted>", filtered_message)
                 else:
-                    pattern = r'\b' + re.escape(word) + r'\b'
+                    pattern = r"\b" + re.escape(word) + r"\b"
                     filtered_message = re.sub(
                         pattern, "<redacted>", filtered_message, flags=re.IGNORECASE
                     )

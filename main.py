@@ -423,6 +423,8 @@ async def dashboard(
         energy_manager = EnergyManager()
         energy_info = await energy_manager.get_user_energy(user_id)
         energy_level = energy_info["energy"]
+        max_energy = energy_info["max_energy"]
+        energy_percentage = int((energy_level / max_energy * 100)) if max_energy > 0 else 0
 
         return templates.TemplateResponse(
             "dashboard.html",
@@ -440,6 +442,8 @@ async def dashboard(
                 "session_files_count": len(session_files),
                 "has_session_files": len(session_files) > 0,
                 "energy_level": energy_level,
+                "max_energy": max_energy,
+                "energy_percentage": energy_percentage,
                 "message": message,
                 "message_type": message_type or "info",
             },
@@ -1304,6 +1308,7 @@ async def public_session_info(
 
         # Calculate current energy with recharge
         current_energy = user["energy"] if user["energy"] is not None else 100
+        max_energy = user["max_energy"] if user["max_energy"] is not None else 100
         recharge_rate = (
             user["energy_recharge_rate"]
             if user["energy_recharge_rate"] is not None
@@ -1319,13 +1324,15 @@ async def public_session_info(
         now = datetime.now()
         time_diff = (now - last_update).total_seconds()
         energy_to_add = int(time_diff // 60) * recharge_rate
-        current_energy = min(100, current_energy + energy_to_add)
+        current_energy = min(max_energy, current_energy + energy_to_add)
 
         session_info = {
             "user_id": user["id"],
             "username": user["username"],
             "telegram_connected": bool(user["telegram_connected"]),
             "energy": current_energy,
+            "max_energy": max_energy,
+            "energy_percentage": int((current_energy / max_energy * 100)) if max_energy > 0 else 0,
             "energy_recharge_rate": recharge_rate,
             "last_energy_update": user["last_energy_update"],
             "account_created": user["created_at"],

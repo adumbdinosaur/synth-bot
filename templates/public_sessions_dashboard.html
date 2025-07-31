@@ -107,14 +107,14 @@
                             <div class="mb-3">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                     <small class="text-muted">Energy Level</small>
-                                    <small class="fw-bold">{{ session.energy }}/100</small>
+                                    <small class="fw-bold">{{ session.energy }}/{{ session.max_energy }}</small>
                                 </div>
                                 <div class="progress">
                                     <div class="progress-bar 
-                                            {% if session.energy > 70 %}bg-success
-                                            {% elif session.energy > 30 %}bg-warning
+                                            {% if session.energy_percentage > 70 %}bg-success
+                                            {% elif session.energy_percentage > 30 %}bg-warning
                                             {% else %}bg-danger{% endif %}" role="progressbar"
-                                        style="width: {{ session.energy }}%">
+                                        style="width: {{ session.energy_percentage }}%">
                                     </div>
                                 </div>
                             </div>

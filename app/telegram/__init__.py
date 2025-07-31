@@ -33,11 +33,11 @@ __all__ = [
     "TelegramClientManager",
     # Manager functions
     "get_telegram_manager",
-    "initialize_telegram_manager", 
+    "initialize_telegram_manager",
     "recover_telegram_sessions",
     # Handlers (for advanced usage)
     "AuthenticationHandler",
-    "MessageHandler", 
+    "MessageHandler",
     "ProfileHandler",
     "ConnectionHandler",
 ]

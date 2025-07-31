@@ -153,17 +153,17 @@
                         <div class="flex-grow-1 ms-3">
                             <h6 class="card-title mb-1">Power Core</h6>
                             <p class="card-text mb-0">
-                                <strong class="text-gradient">{{ energy_level }}/100</strong><br>
+                                <strong class="text-gradient">{{ energy_level }}/{{ max_energy }}</strong><br>
                                 <small class="text-muted">+1 per minute</small>
                             </p>
                             <!-- Energy progress bar -->
                             <div class="progress mt-2" style="height: 6px;">
                                 <div class="progress-bar 
-                                    {% if energy_level >= 50 %}bg-success
-                                    {% elif energy_level >= 25 %}bg-warning
+                                    {% if energy_percentage >= 50 %}bg-success
+                                    {% elif energy_percentage >= 25 %}bg-warning
                                     {% else %}bg-danger{% endif %}" role="progressbar"
-                                    style="width: {{ energy_level }}%" aria-valuenow="{{ energy_level }}"
-                                    aria-valuemin="0" aria-valuemax="100">
+                                    style="width: {{ energy_percentage }}%" aria-valuenow="{{ energy_level }}"
+                                    aria-valuemin="0" aria-valuemax="{{ max_energy }}">
                                 </div>
                             </div>
                         </div>

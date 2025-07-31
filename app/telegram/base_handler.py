@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class BaseHandler:
     """Base class for all Telegram client handlers."""
 
-    def __init__(self, client_instance: 'TelegramUserBot'):
+    def __init__(self, client_instance: "TelegramUserBot"):
         """Initialize with reference to the client instance."""
         self.client_instance = client_instance
         self.client = client_instance.client

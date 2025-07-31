@@ -20,7 +20,7 @@ from app.telegram import (
 # Maintain backward compatibility - export the same classes and functions
 __all__ = [
     "TelegramUserBot",
-    "TelegramClientManager", 
+    "TelegramClientManager",
     "get_telegram_manager",
     "initialize_telegram_manager",
     "recover_telegram_sessions",
