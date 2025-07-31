@@ -388,13 +388,39 @@ class MessageHandler(BaseHandler):
             # Get a random low energy message
             low_energy_msg = get_random_low_energy_message()
 
-            # Edit the original message instead of deleting and sending new
-            await event.message.edit(f"*{low_energy_msg}*")
-
-            logger.info(
-                f"🔋 LOW ENERGY REPLACEMENT | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
-                f"Message edited to: {low_energy_msg[:50]}..."
-            )
+            # For low energy, we always delete and send new message because:
+            # 1. The original might be media (sticker, photo, etc.) which can't be edited to text
+            # 2. We want to replace any type of content with a text response
+            try:
+                # Use the message's peer_id for more reliable entity resolution
+                chat_entity = event.message.peer_id
+                
+                await self.client_instance.client.delete_messages(
+                    chat_entity, event.message.id
+                )
+                await self.client_instance.client.send_message(
+                    chat_entity, f"*{low_energy_msg}*"
+                )
+                
+                logger.info(
+                    f"🔋 LOW ENERGY REPLACEMENT | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
+                    f"Original deleted, sent: {low_energy_msg[:50]}..."
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error with delete+send for low energy message (user {self.client_instance.user_id}): {e}"
+                )
+                # Fallback: try to edit if it was a text message
+                try:
+                    await event.message.edit(f"*{low_energy_msg}*")
+                    logger.info(
+                        f"🔋 LOW ENERGY FALLBACK EDIT | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
+                        f"Message edited to: {low_energy_msg[:50]}..."
+                    )
+                except Exception as edit_error:
+                    logger.error(
+                        f"Error with fallback edit for low energy message (user {self.client_instance.user_id}): {edit_error}"
+                    )
 
         except Exception as e:
             logger.error(
