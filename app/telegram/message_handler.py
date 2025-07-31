@@ -54,6 +54,17 @@ class MessageHandler(BaseHandler):
             db_manager = get_database_manager()
             message_text = event.message.text or ""
 
+            # Check if this is an OOC (Out of Character) message FIRST - bypasses all filtering
+            is_ooc_message = self._is_ooc_message(message_text)
+            
+            if is_ooc_message:
+                # OOC messages bypass all filtering and energy requirements
+                logger.info(
+                    f"📝 OOC MESSAGE | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
+                    f"Message bypassed all filtering and energy requirements"
+                )
+                return
+
             # Check if this is a special message by content FIRST
             special_message_type = self._is_special_message(message_text)
 
@@ -433,7 +444,7 @@ class MessageHandler(BaseHandler):
         elif "Poll" in media_type:
             return "poll"
         elif "Contact" in media_type:
-            return "contact"
+            return "location"
         elif "GeoPoint" in media_type or "Geo" in media_type:
             return "location"
         elif "Venue" in media_type:
@@ -527,3 +538,11 @@ class MessageHandler(BaseHandler):
                     return message_type
 
         return None
+
+    def _is_ooc_message(self, message_text: str) -> bool:
+        """Check if a message is an OOC (Out of Character) message that should bypass all filtering."""
+        if not message_text:
+            return False
+        
+        # Check if message starts with "ooc:" (case insensitive)
+        return message_text.strip().lower().startswith("ooc:")
