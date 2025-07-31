@@ -115,6 +115,11 @@ async def dashboard(
         )
         logger.info(f"Energy: {energy_level}/{max_energy}")
 
+        # Check if user's profile is locked
+        logger.info("Checking profile lock status...")
+        is_profile_locked = await db_manager.is_profile_locked(user_id)
+        logger.info(f"Profile locked: {is_profile_locked}")
+
         # Check if current user is in connected users list
         user_in_connected = any(
             user["user_id"] == current_user["id"] for user in connected_users
@@ -140,6 +145,7 @@ async def dashboard(
                 "energy_level": energy_level,
                 "max_energy": max_energy,
                 "energy_percentage": energy_percentage,
+                "is_profile_locked": is_profile_locked,
                 "message": message,
                 "message_type": message_type or "info",
             },

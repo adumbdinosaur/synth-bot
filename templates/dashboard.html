@@ -26,6 +26,10 @@
                                 Regulation</a></li>
                         <li><a class="dropdown-item" href="/badwords"><i class="fas fa-ban me-2"></i>Behavior
                                 Filters</a></li>
+                        {% if is_profile_locked %}
+                        <li><a class="dropdown-item" href="/chat-blacklist"><i class="fas fa-shield-alt me-2"></i>Chat
+                                Blacklist</a></li>
+                        {% endif %}
                         <li><a class="dropdown-item" href="/profile-protection"><i
                                     class="fas fa-shield-alt me-2"></i>Identity Lock</a></li>
                         <li><a class="dropdown-item" href="#"><i class="fas fa-satellite-dish me-2"></i>Neural

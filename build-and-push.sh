@@ -5,7 +5,7 @@ set -e
 
 REGISTRY="registry.rptr.dev"
 IMAGE_NAME="synth-bot"
-TAG="cyberpunk"
+TAG="latest"
 GIT_SHA=$(git rev-parse --short HEAD)
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 

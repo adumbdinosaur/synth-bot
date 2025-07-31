@@ -235,6 +235,22 @@ class BaseDatabaseManager:
                 """
                 )
 
+                # Chat blacklist table - allows users with locked profiles to exempt chats from filtering
+                await db.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS user_chat_blacklist (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        chat_id INTEGER NOT NULL,
+                        chat_title TEXT,
+                        chat_type TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                        UNIQUE(user_id, chat_id)
+                    )
+                """
+                )
+
                 await db.commit()
                 logger.info("✅ Database initialized successfully")
 

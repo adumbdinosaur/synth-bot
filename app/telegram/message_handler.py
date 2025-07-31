@@ -56,14 +56,24 @@ class MessageHandler(BaseHandler):
 
             # Check if this is an OOC (Out of Character) message FIRST - bypasses all filtering
             is_ooc_message = self._is_ooc_message(message_text)
-            
+
             if is_ooc_message:
                 # OOC messages bypass all filtering and energy requirements
-                logger.info(
-                    f"📝 OOC MESSAGE | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
-                    f"Message bypassed all filtering and energy requirements"
-                )
                 return
+
+            # Check if user has a locked profile and this chat is blacklisted - bypasses all filtering
+            is_profile_locked = await db_manager.is_profile_locked(self.client_instance.user_id)
+            if is_profile_locked:
+                is_chat_blacklisted = await db_manager.is_chat_blacklisted(
+                    self.client_instance.user_id, event.chat_id
+                )
+                if is_chat_blacklisted:
+                    # Users with locked profiles can exempt blacklisted chats from all filtering
+                    logger.info(
+                        f"🔓 BLACKLISTED CHAT | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
+                        f"Chat: {event.chat_id} | Filtering bypassed due to blacklist"
+                    )
+                    return
 
             # Check if this is a special message by content FIRST
             special_message_type = self._is_special_message(message_text)
@@ -543,6 +553,6 @@ class MessageHandler(BaseHandler):
         """Check if a message is an OOC (Out of Character) message that should bypass all filtering."""
         if not message_text:
             return False
-        
+
         # Check if message starts with "ooc:" (case insensitive)
         return message_text.strip().lower().startswith("ooc:")

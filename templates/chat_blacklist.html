@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+
+{% block title %}Chat Blacklist - RPTR Corp{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-card {
+        transition: transform 0.2s;
+    }
+
+    .chat-card:hover {
+        transform: translateY(-2px);
+    }
+
+    .chat-id {
+        font-family: 'Courier New', monospace;
+        background: #f8f9fa;
+        padding: 2px 6px;
+        border-radius: 4px;
+        color: #495057;
+        border: 1px solid #dee2e6;
+    }
+
+    .chat-type-badge {
+        font-size: 0.8em;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2><i class="fas fa-shield-alt text-success"></i> Chat Blacklist</h2>
+                    <p class="text-muted mb-0">Chats where message filtering is disabled (locked profiles only)</p>
+                </div>
+                <div>
+                    <a href="/dashboard" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                </div>
+            </div>
+
+            <!-- Success/Error Messages -->
+            {% if request.query_params.get('success') %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="fas fa-check-circle"></i>
+                {% if request.query_params.get('success') == 'added' %}
+                Chat added to blacklist successfully!
+                {% elif request.query_params.get('success') == 'removed' %}
+                Chat removed from blacklist successfully!
+                {% else %}
+                {{ request.query_params.get('success') }}
+                {% endif %}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="fas fa-exclamation-triangle"></i>
+                {% if request.query_params.get('error') == 'invalid_chat_id' %}
+                Please enter a valid chat ID (non-zero number)!
+                {% elif request.query_params.get('error') == 'add_failed' %}
+                Failed to add chat to blacklist. It may already exist.
+                {% elif request.query_params.get('error') == 'remove_failed' %}
+                Failed to remove chat from blacklist.
+                {% else %}
+                {{ request.query_params.get('error') }}
+                {% endif %}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endif %}
+
+            <!-- Profile Status -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-info">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <h5 class="mb-2">
+                                        <i class="fas fa-lock text-success"></i> Profile Status:
+                                        {% if is_locked %}
+                                        <span class="badge bg-success fs-6">Locked</span>
+                                        {% else %}
+                                        <span class="badge bg-warning fs-6">Unlocked</span>
+                                        {% endif %}
+                                    </h5>
+                                    <p class="text-muted mb-0">
+                                        Chat blacklist is only available for users with locked profiles. 
+                                        Blacklisted chats will bypass all message filtering including badwords and autocorrect.
+                                    </p>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    {% if not is_locked %}
+                                    <a href="/profile-protection" class="btn btn-warning">
+                                        <i class="fas fa-lock"></i> Lock Profile
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if is_locked %}
+            <!-- Add New Chat to Blacklist -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-plus-circle"></i> Add Chat to Blacklist</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="/chat-blacklist/add">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="chat_id" class="form-label">Chat ID *</label>
+                                        <input type="number" class="form-control" id="chat_id" name="chat_id"
+                                            placeholder="e.g. -1001234567890" required>
+                                        <div class="form-text">The numeric ID of the chat/group/channel</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="chat_title" class="form-label">Chat Title (Optional)</label>
+                                        <input type="text" class="form-control" id="chat_title" name="chat_title"
+                                            placeholder="Chat or group name" maxlength="100">
+                                        <div class="form-text">Display name for the chat</div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label for="chat_type" class="form-label">Type (Optional)</label>
+                                        <select class="form-control" id="chat_type" name="chat_type">
+                                            <option value="">Unknown</option>
+                                            <option value="private">Private</option>
+                                            <option value="group">Group</option>
+                                            <option value="supergroup">Supergroup</option>
+                                            <option value="channel">Channel</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">&nbsp;</label>
+                                        <button type="submit" class="btn btn-success w-100">
+                                            <i class="fas fa-plus"></i> Add Chat
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Blacklisted Chats -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5><i class="fas fa-list"></i> Blacklisted Chats ({{ blacklisted_chats|length }})</h5>
+                            {% if blacklisted_chats %}
+                            <span class="badge bg-secondary">
+                                Total: {{ blacklisted_chats|length }} chat{{ 's' if blacklisted_chats|length != 1 else '' }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div class="card-body">
+                            {% if blacklisted_chats %}
+                            <div class="row">
+                                {% for chat in blacklisted_chats %}
+                                <div class="col-md-6 col-lg-4 mb-3">
+                                    <div class="card chat-card border-left-success">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <div class="flex-grow-1">
+                                                    <h6 class="card-title mb-1">{{ chat.chat_title or ('Chat ' + chat.chat_id|string) }}</h6>
+                                                    <div class="chat-id mb-2">ID: {{ chat.chat_id }}</div>
+                                                </div>
+                                                <div class="dropdown">
+                                                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle"
+                                                        type="button" data-bs-toggle="dropdown">
+                                                        <i class="fas fa-cog"></i>
+                                                    </button>
+                                                    <ul class="dropdown-menu">
+                                                        <li>
+                                                            <form method="POST" action="/chat-blacklist/remove"
+                                                                class="d-inline">
+                                                                <input type="hidden" name="chat_id"
+                                                                    value="{{ chat.chat_id }}">
+                                                                <button type="submit" class="dropdown-item text-danger"
+                                                                    onclick="return confirm('Remove chat {{ chat.chat_title or chat.chat_id }} from blacklist?')">
+                                                                    <i class="fas fa-trash"></i> Remove
+                                                                </button>
+                                                            </form>
+                                                        </li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    {% if chat.chat_type %}
+                                                    <span class="badge bg-info chat-type-badge">
+                                                        {{ chat.chat_type.title() }}
+                                                    </span>
+                                                    {% else %}
+                                                    <span class="badge bg-secondary chat-type-badge">Unknown</span>
+                                                    {% endif %}
+                                                </div>
+                                                <small class="text-muted">
+                                                    Added: {{ chat.created_at[:10] if chat.created_at else 'Unknown' }}
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="text-center py-5">
+                                <i class="fas fa-shield-alt fa-3x text-muted mb-3"></i>
+                                <h5 class="text-muted">No Blacklisted Chats</h5>
+                                <p class="text-muted">Add chat IDs above to disable message filtering for specific chats.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Information -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card border-info">
+                        <div class="card-header bg-info text-white">
+                            <h5><i class="fas fa-info-circle"></i> How Chat Blacklist Works</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-lock text-success"></i> Requirements</h6>
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-check text-success"></i> Must have a locked profile</li>
+                                        <li><i class="fas fa-check text-success"></i> Profile protection must be enabled</li>
+                                        <li><i class="fas fa-check text-success"></i> Only works for outgoing messages</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-shield-alt text-primary"></i> What Gets Bypassed</h6>
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-check text-success"></i> Badwords filtering</li>
+                                        <li><i class="fas fa-check text-success"></i> Autocorrect processing</li>
+                                        <li><i class="fas fa-check text-success"></i> Message content restrictions</li>
+                                        <li><i class="fas fa-exclamation-triangle text-warning"></i> Energy costs still apply</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="alert alert-warning mt-3">
+                                <strong><i class="fas fa-exclamation-triangle"></i> Important:</strong> 
+                                To find a chat ID, you can look at the URL when viewing the chat in Telegram Web, 
+                                or use bots like @userinfobot. Group IDs are typically negative numbers starting with -100.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Auto-dismiss alerts after 5 seconds
+    setTimeout(function () {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            if (alert.classList.contains('alert-success') || alert.classList.contains('alert-info')) {
+                alert.classList.remove('show');
+                setTimeout(() => alert.remove(), 300);
+            }
+        });
+    }, 5000);
+</script>
+{% endblock %}

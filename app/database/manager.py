@@ -11,6 +11,7 @@ from .badwords_manager import BadwordsManager
 from .session_manager import SessionManager
 from .auth_manager import AuthManager
 from .autocorrect_manager import AutocorrectManager
+from .chat_blacklist_manager import ChatBlacklistManager
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ class DatabaseManager(BaseDatabaseManager):
         self.sessions = SessionManager(database_path)
         self.auth = AuthManager(database_path)
         self.autocorrect = AutocorrectManager(database_path)
+        self.chat_blacklist = ChatBlacklistManager(database_path)
 
         logger.info(f"DatabaseManager initialized with database: {database_path}")
 
@@ -266,6 +268,30 @@ class DatabaseManager(BaseDatabaseManager):
     ):
         return await self.autocorrect.log_autocorrect_usage(
             user_id, original_text, corrected_text, corrections_count
+        )
+
+    # Chat blacklist
+    async def get_user_blacklisted_chats(self, user_id: int):
+        return await self.chat_blacklist.get_user_blacklisted_chats(user_id)
+
+    async def add_blacklisted_chat(
+        self, user_id: int, chat_id: int, chat_title: str = None, chat_type: str = None
+    ):
+        return await self.chat_blacklist.add_blacklisted_chat(
+            user_id, chat_id, chat_title, chat_type
+        )
+
+    async def remove_blacklisted_chat(self, user_id: int, chat_id: int):
+        return await self.chat_blacklist.remove_blacklisted_chat(user_id, chat_id)
+
+    async def is_chat_blacklisted(self, user_id: int, chat_id: int):
+        return await self.chat_blacklist.is_chat_blacklisted(user_id, chat_id)
+
+    async def update_chat_info(
+        self, user_id: int, chat_id: int, chat_title: str = None, chat_type: str = None
+    ):
+        return await self.chat_blacklist.update_chat_info(
+            user_id, chat_id, chat_title, chat_type
         )
 
 

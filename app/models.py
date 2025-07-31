@@ -53,3 +53,19 @@ class TelegramSession(TelegramSessionBase):
 
     class Config:
         from_attributes = True
+
+class ChatBlacklistBase(BaseModel):
+    chat_id: int
+    chat_title: str = None
+    chat_type: str = None
+
+class ChatBlacklistCreate(ChatBlacklistBase):
+    user_id: int
+
+class ChatBlacklist(ChatBlacklistBase):
+    id: int
+    user_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

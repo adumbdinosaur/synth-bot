@@ -243,7 +243,9 @@ class TelegramClientManager:
                                     first_name=current_profile.get("first_name", ""),
                                     last_name=current_profile.get("last_name", ""),
                                     bio=current_profile.get("bio", ""),
-                                    profile_photo_id=current_profile.get("profile_photo_id"),
+                                    profile_photo_id=current_profile.get(
+                                        "profile_photo_id"
+                                    ),
                                 )
                                 await db_manager.lock_user_profile(user_id)
                                 logger.info(
