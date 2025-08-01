@@ -490,6 +490,47 @@ async def public_add_badword(
         )
 
 
+@router.post("/sessions/{user_id}/badwords/remove")
+async def public_remove_badword(
+    request: Request,
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    word: str = Form(...),
+):
+    """Remove a badword for a user via public dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Remove the badword
+        success = await db_manager.remove_badword(user_id, word)
+
+        if success:
+            logger.info(f"Removed badword '{word}' for user {user_id}")
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Badword '{word}' removed successfully",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Failed to remove badword - word may not exist",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error removing badword for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to remove badword",
+            status_code=303,
+        )
+
+
 @router.post("/sessions/{user_id}/autocorrect")
 async def update_autocorrect_settings(
     request: Request,
