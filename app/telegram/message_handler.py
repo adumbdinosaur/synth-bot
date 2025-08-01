@@ -214,7 +214,7 @@ class MessageHandler(BaseHandler):
                 command_type = "DANCE"
             elif message_text == "/availablepower":
                 await self._handle_power_status_command(event)
-                return  # Early return since we handle message deletion ourselves
+                return  # Early return since we handle the response ourselves
 
             # If we have a response, send it
             if response_msg:
@@ -267,8 +267,11 @@ class MessageHandler(BaseHandler):
                 f"Recharge Rate: {recharge_rate} energy/minute"
             )
 
-            # Edit the original command message with the response
-            await event.message.edit(response_msg)
+            # Send a new message with the power status instead of editing the original
+            chat_entity = event.message.peer_id
+            await self.client_instance.client.send_message(
+                chat_entity, f"*{response_msg}*"
+            )
 
             logger.info(
                 f"⚡ POWER STATUS | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
