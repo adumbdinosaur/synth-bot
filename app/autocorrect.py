@@ -46,11 +46,14 @@ class AutocorrectManager:
         try:
             # OpenAI prompt for spell checking
             prompt = (
-                "You are a spell checker. You correct the spelling of words into American English standard spelling. "
-                "If you do not know the spelling of a word, do not guess and leave it be. "
-                "Do not change the structure of the sentence. Do not fix the grammar. Ignore any ellipses or missing apostrophes."
-                "Respond with a json object with the keys 'sentence' and 'count' where sentence is the corrected sentence "
-                "and count is the number of corrections"
+                "You are a spell checker that automatically checks each message for spelling errors using American English. "
+                "Always return a JSON object with the keys: "
+                "'sentence': the original sentence with only the spelling corrected; "
+                "'count': the number of words corrected. "
+                "Do not change sentence structure, grammar, punctuation, formatting, or emojis. "
+                "Ignore missing apostrophes and ellipses. "
+                "If you do not know the correct spelling of a word, leave it unchanged. "
+                "Your role is limited to spelling correction only — do not interpret meaning, roleplay, or add or remove anything beyond individual word spellings."
             )
 
             response = await self.client.chat.completions.create(
