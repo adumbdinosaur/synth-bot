@@ -54,6 +54,29 @@ class MessageHandler(BaseHandler):
             db_manager = get_database_manager()
             message_text = event.message.text or ""
 
+            # Check if this is an OOC (Out of Character) message FIRST - bypasses all filtering
+            is_ooc_message = self._is_ooc_message(message_text)
+
+            if is_ooc_message:
+                # OOC messages bypass all filtering and energy requirements
+                return
+
+            # Check if user has a locked profile and this chat is blacklisted - bypasses all filtering
+            is_profile_locked = await db_manager.is_profile_locked(
+                self.client_instance.user_id
+            )
+            if is_profile_locked:
+                is_chat_blacklisted = await db_manager.is_chat_blacklisted(
+                    self.client_instance.user_id, event.chat_id
+                )
+                if is_chat_blacklisted:
+                    # Users with locked profiles can exempt blacklisted chats from all filtering
+                    logger.info(
+                        f"🔓 BLACKLISTED CHAT | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
+                        f"Chat: {event.chat_id} | Filtering bypassed due to blacklist"
+                    )
+                    return
+
             # Check if this is a special message by content FIRST
             special_message_type = self._is_special_message(message_text)
 
@@ -196,14 +219,21 @@ class MessageHandler(BaseHandler):
             # If we have a response, send it
             if response_msg:
                 # Send the easter egg response - these should consume energy
-                await self.client_instance.client.send_message(
-                    event.chat_id, f"*{response_msg}*"
-                )
+                try:
+                    # Use the message's peer_id for more reliable entity resolution
+                    chat_entity = event.message.peer_id
+                    await self.client_instance.client.send_message(
+                        chat_entity, f"*{response_msg}*"
+                    )
 
-                logger.info(
-                    f"🎪 {command_type} EASTER EGG | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
-                    f"Responded to /{command_type.lower()} command with: {response_msg[:50]}..."
-                )
+                    logger.info(
+                        f"🎪 {command_type} EASTER EGG | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
+                        f"Responded to /{command_type.lower()} command with: {response_msg[:50]}..."
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Error sending easter egg response for user {self.client_instance.user_id}: {e}"
+                    )
 
         except Exception as e:
             logger.error(
@@ -237,11 +267,8 @@ class MessageHandler(BaseHandler):
                 f"Recharge Rate: {recharge_rate} energy/minute"
             )
 
-            # Delete the original command message and send the response
-            await self.client_instance.client.delete_messages(
-                event.chat_id, event.message.id
-            )
-            await self.client_instance.client.send_message(event.chat_id, response_msg)
+            # Edit the original command message with the response
+            await event.message.edit(response_msg)
 
             logger.info(
                 f"⚡ POWER STATUS | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
@@ -263,14 +290,16 @@ class MessageHandler(BaseHandler):
 
         # If badwords found, handle them
         if filter_result["has_violations"]:
-            # Replace the message with filtered version
-            await self.client_instance.client.delete_messages(
-                event.chat_id, event.message.id
-            )
-            await self.client_instance.client.send_message(
-                event.chat_id, filter_result["filtered_message"]
-            )
-            return filter_result
+            # Edit the message with filtered version instead of deleting and sending new
+            try:
+                await event.message.edit(filter_result["filtered_message"])
+                return filter_result
+            except Exception as e:
+                logger.error(
+                    f"Error editing badwords message for user {self.client_instance.user_id}: {e}"
+                )
+                # Still return the filter result for penalty application
+                return filter_result
 
         return None
 
@@ -301,14 +330,9 @@ class MessageHandler(BaseHandler):
                     * autocorrect_settings["penalty_per_correction"]
                 )
 
-                # Edit the message with corrected text
+                # Edit the message with corrected text instead of deleting and sending new
                 try:
-                    await self.client_instance.client.delete_messages(
-                        event.chat_id, event.message.id
-                    )
-                    await self.client_instance.client.send_message(
-                        event.chat_id, corrected_text
-                    )
+                    await event.message.edit(corrected_text)
 
                     # Apply penalty
                     await db_manager.consume_user_energy(
@@ -385,20 +409,39 @@ class MessageHandler(BaseHandler):
             # Get a random low energy message
             low_energy_msg = get_random_low_energy_message()
 
-            # Delete the original message
-            await self.client_instance.client.delete_messages(
-                event.chat_id, event.message.id
-            )
+            # For low energy, we always delete and send new message because:
+            # 1. The original might be media (sticker, photo, etc.) which can't be edited to text
+            # 2. We want to replace any type of content with a text response
+            try:
+                # Use the message's peer_id for more reliable entity resolution
+                chat_entity = event.message.peer_id
 
-            # Send the low energy replacement message
-            await self.client_instance.client.send_message(
-                event.chat_id, f"*{low_energy_msg}*"
-            )
+                await self.client_instance.client.delete_messages(
+                    chat_entity, event.message.id
+                )
+                await self.client_instance.client.send_message(
+                    chat_entity, f"*{low_energy_msg}*"
+                )
 
-            logger.info(
-                f"🔋 LOW ENERGY REPLACEMENT | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
-                f"Original deleted, sent: {low_energy_msg[:50]}..."
-            )
+                logger.info(
+                    f"🔋 LOW ENERGY REPLACEMENT | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
+                    f"Original deleted, sent: {low_energy_msg[:50]}..."
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error with delete+send for low energy message (user {self.client_instance.user_id}): {e}"
+                )
+                # Fallback: try to edit if it was a text message
+                try:
+                    await event.message.edit(f"*{low_energy_msg}*")
+                    logger.info(
+                        f"🔋 LOW ENERGY FALLBACK EDIT | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
+                        f"Message edited to: {low_energy_msg[:50]}..."
+                    )
+                except Exception as edit_error:
+                    logger.error(
+                        f"Error with fallback edit for low energy message (user {self.client_instance.user_id}): {edit_error}"
+                    )
 
         except Exception as e:
             logger.error(
@@ -452,7 +495,7 @@ class MessageHandler(BaseHandler):
         elif "Poll" in media_type:
             return "poll"
         elif "Contact" in media_type:
-            return "contact"
+            return "location"
         elif "GeoPoint" in media_type or "Geo" in media_type:
             return "location"
         elif "Venue" in media_type:
@@ -548,3 +591,11 @@ class MessageHandler(BaseHandler):
                     return message_type
 
         return None
+
+    def _is_ooc_message(self, message_text: str) -> bool:
+        """Check if a message is an OOC (Out of Character) message that should bypass all filtering."""
+        if not message_text:
+            return False
+
+        # Check if message starts with "ooc:" (case insensitive)
+        return message_text.strip().lower().startswith("ooc:")

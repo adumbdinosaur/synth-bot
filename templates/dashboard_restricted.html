@@ -169,12 +169,135 @@
                                 <li><i class="fas fa-check text-success me-2"></i>View recent activities</li>
                                 <li><i class="fas fa-check text-success me-2"></i>Session management</li>
                                 <li><i class="fas fa-check text-success me-2"></i>Account information</li>
+                                {% if is_profile_locked %}
+                                <li><i class="fas fa-check text-success me-2"></i>Chat blacklist management</li>
+                                {% endif %}
                             </ul>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        {% if is_profile_locked %}
+        <!-- Chat Blacklist Management for Locked Profiles -->
+        <div class="col-12">
+            <div class="card border-success mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-shield-alt me-2"></i>
+                        Chat Blacklist Management
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text mb-4">
+                        Your profile is locked, so you can manage chat blacklists to bypass filtering in specific chats.
+                        Blacklisted chats will skip badwords and autocorrect processing.
+                    </p>
+
+                    <!-- Add New Chat Form -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6><i class="fas fa-plus-circle me-2"></i>Add Chat to Blacklist</h6>
+                            <form method="POST" action="/restricted-dashboard/chat-blacklist/add">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="chat_id" class="form-label">Chat ID *</label>
+                                        <input type="number" class="form-control" id="chat_id" name="chat_id"
+                                            placeholder="e.g. -1001234567890" required>
+                                        <div class="form-text">The numeric ID of the chat/group/channel</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="chat_title" class="form-label">Chat Title (Optional)</label>
+                                        <input type="text" class="form-control" id="chat_title" name="chat_title"
+                                            placeholder="Chat or group name" maxlength="100">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label for="chat_type" class="form-label">Type</label>
+                                        <select class="form-control" id="chat_type" name="chat_type">
+                                            <option value="">Unknown</option>
+                                            <option value="private">Private</option>
+                                            <option value="group">Group</option>
+                                            <option value="supergroup">Supergroup</option>
+                                            <option value="channel">Channel</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">&nbsp;</label>
+                                        <button type="submit" class="btn btn-success w-100">
+                                            <i class="fas fa-plus"></i> Add
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Current Blacklisted Chats -->
+                    <div class="row">
+                        <div class="col-12">
+                            <h6><i class="fas fa-list me-2"></i>Blacklisted Chats ({{ blacklisted_chats|length }})</h6>
+                            {% if blacklisted_chats %}
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Chat ID</th>
+                                            <th>Title</th>
+                                            <th>Type</th>
+                                            <th>Added</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for chat in blacklisted_chats %}
+                                        <tr>
+                                            <td><code>{{ chat.chat_id }}</code></td>
+                                            <td>{{ chat.chat_title or ('Chat ' + chat.chat_id|string) }}</td>
+                                            <td>
+                                                {% if chat.chat_type %}
+                                                <span class="badge bg-info">{{ chat.chat_type.title() }}</span>
+                                                {% else %}
+                                                <span class="badge bg-secondary">Unknown</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ chat.created_at[:10] if chat.created_at else 'Unknown' }}</td>
+                                            <td>
+                                                <form method="POST" action="/restricted-dashboard/chat-blacklist/remove"
+                                                    class="d-inline">
+                                                    <input type="hidden" name="chat_id" value="{{ chat.chat_id }}">
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm"
+                                                        onclick="return confirm('Remove chat {{ chat.chat_title or chat.chat_id }} from blacklist?')">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="text-center py-3">
+                                <i class="fas fa-shield-alt fa-2x text-muted mb-2"></i>
+                                <p class="text-muted mb-0">No blacklisted chats yet. Add chat IDs above to bypass
+                                    filtering for specific chats.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info mt-3">
+                        <small>
+                            <strong><i class="fas fa-info-circle me-1"></i>Tip:</strong>
+                            To find a chat ID, you can look at the URL when viewing the chat in Telegram Web,
+                            or use bots like @userinfobot. Group IDs are typically negative numbers starting with -100.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 

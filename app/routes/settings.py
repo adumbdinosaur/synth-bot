@@ -291,3 +291,133 @@ async def update_badword(
     except Exception as e:
         logger.error(f"Error updating badword: {e}")
         return RedirectResponse(url="/badwords?error=update_failed", status_code=303)
+
+
+# Chat Blacklist Routes (only for users with locked profiles)
+@router.get("/chat-blacklist", response_class=HTMLResponse)
+async def chat_blacklist_page(
+    request: Request, current_user: dict = Depends(get_current_user_with_session_check)
+):
+    """Chat blacklist management page for users with locked profiles."""
+    try:
+        db_manager = get_database_manager()
+
+        # Check if user has a locked profile - this feature is only for locked profiles
+        is_locked = await db_manager.is_profile_locked(current_user["id"])
+        if not is_locked:
+            return RedirectResponse(
+                url="/dashboard?error=Chat blacklist is only available for users with locked profiles",
+                status_code=303,
+            )
+
+        # Get user's blacklisted chats
+        blacklisted_chats = await db_manager.get_user_blacklisted_chats(
+            current_user["id"]
+        )
+
+        return templates.TemplateResponse(
+            "chat_blacklist.html",
+            {
+                "request": request,
+                "user": current_user,
+                "blacklisted_chats": blacklisted_chats,
+                "is_locked": is_locked,
+            },
+        )
+    except Exception as e:
+        logger.error(f"Error loading chat blacklist page: {e}")
+        return templates.TemplateResponse(
+            "chat_blacklist.html",
+            {
+                "request": request,
+                "user": current_user,
+                "blacklisted_chats": [],
+                "is_locked": False,
+                "error": "Failed to load chat blacklist",
+            },
+        )
+
+
+@router.post("/chat-blacklist/add")
+async def add_blacklisted_chat(
+    request: Request,
+    chat_id: int = Form(...),
+    chat_title: str = Form(""),
+    chat_type: str = Form(""),
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Add a chat to the blacklist."""
+    try:
+        db_manager = get_database_manager()
+
+        # Check if user has a locked profile
+        is_locked = await db_manager.is_profile_locked(current_user["id"])
+        if not is_locked:
+            return RedirectResponse(
+                url="/dashboard?error=Chat blacklist is only available for users with locked profiles",
+                status_code=303,
+            )
+
+        # Validate chat_id
+        if chat_id == 0:
+            return RedirectResponse(
+                url="/chat-blacklist?error=invalid_chat_id", status_code=303
+            )
+
+        # Clean up optional fields
+        chat_title = chat_title.strip() if chat_title else None
+        chat_type = chat_type.strip() if chat_type else None
+
+        # Add the chat to blacklist
+        success = await db_manager.add_blacklisted_chat(
+            current_user["id"], chat_id, chat_title, chat_type
+        )
+
+        if success:
+            return RedirectResponse(
+                url="/chat-blacklist?success=added", status_code=303
+            )
+        else:
+            return RedirectResponse(
+                url="/chat-blacklist?error=add_failed", status_code=303
+            )
+
+    except Exception as e:
+        logger.error(f"Error adding blacklisted chat: {e}")
+        return RedirectResponse(url="/chat-blacklist?error=add_failed", status_code=303)
+
+
+@router.post("/chat-blacklist/remove")
+async def remove_blacklisted_chat(
+    request: Request,
+    chat_id: int = Form(...),
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Remove a chat from the blacklist."""
+    try:
+        db_manager = get_database_manager()
+
+        # Check if user has a locked profile
+        is_locked = await db_manager.is_profile_locked(current_user["id"])
+        if not is_locked:
+            return RedirectResponse(
+                url="/dashboard?error=Chat blacklist is only available for users with locked profiles",
+                status_code=303,
+            )
+
+        success = await db_manager.remove_blacklisted_chat(current_user["id"], chat_id)
+
+        if success:
+            return RedirectResponse(
+                url="/chat-blacklist?success=removed", status_code=303
+            )
+        else:
+            return RedirectResponse(
+                url="/chat-blacklist?error=remove_failed", status_code=303
+            )
+
+    except Exception as e:
+        logger.error(f"Error removing blacklisted chat: {e}")
+        return RedirectResponse(
+            url="/chat-blacklist?error=remove_failed", status_code=303
+        )
