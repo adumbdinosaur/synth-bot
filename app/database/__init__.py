@@ -13,6 +13,9 @@ from .badwords_manager import BadwordsManager
 from .session_manager import SessionManager
 from .auth_manager import AuthManager
 from .autocorrect_manager import AutocorrectManager
+from .chat_blacklist_manager import ChatBlacklistManager
+from .chat_whitelist_manager import ChatWhitelistManager
+from .chat_list_settings_manager import ChatListSettingsManager
 
 __all__ = [
     "DatabaseManager",
@@ -26,6 +29,9 @@ __all__ = [
     "SessionManager",
     "AuthManager",
     "AutocorrectManager",
+    "ChatBlacklistManager",
+    "ChatWhitelistManager",
+    "ChatListSettingsManager",
 ]
 
 

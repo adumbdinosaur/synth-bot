@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+
+{% block title %}
+{% if list_mode == 'whitelist' %}
+Chat Whitelist - RPTR Corp
+{% else %}
+Chat Blacklist - RPTR Corp
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-card {
+        transition: transform 0.2s;
+    }
+
+    .chat-card:hover {
+        transform: translateY(-2px);
+    }
+
+    .chat-id {
+        font-family: 'Courier New', monospace;
+        background: #f8f9fa;
+        padding: 2px 6px;
+        border-radius: 4px;
+        color: #495057;
+        border: 1px solid #dee2e6;
+    }
+
+    .chat-type-badge {
+        font-size: 0.8em;
+    }
+
+    .mode-toggle-card {
+        border: 2px solid #007bff;
+        background: linear-gradient(135deg, #f8f9ff 0%, #e3f2fd 100%);
+    }
+
+    .list-mode-badge {
+        font-size: 1.1em;
+        padding: 8px 16px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>
+                        {% if list_mode == 'whitelist' %}
+                        <i class="fas fa-check-circle text-primary"></i> Chat Whitelist
+                        {% else %}
+                        <i class="fas fa-shield-alt text-success"></i> Chat Blacklist
+                        {% endif %}
+                    </h2>
+                    <p class="text-muted mb-0">
+                        {% if list_mode == 'whitelist' %}
+                        Chats where message filtering is ENABLED (locked profiles only)
+                        {% else %}
+                        Chats where message filtering is DISABLED (locked profiles only)
+                        {% endif %}
+                    </p>
+                </div>
+                <div>
+                    <a href="/dashboard" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                </div>
+            </div>
+
+            <!-- Success/Error Messages -->
+            {% if request.query_params.get('success') %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="fas fa-check-circle"></i>
+                {% set success_type = request.query_params.get('success') %}
+                {% set mode = request.query_params.get('mode', list_mode) %}
+                {% if success_type == 'added' %}
+                Chat added to {{ mode }} successfully!
+                {% elif success_type == 'removed' %}
+                Chat removed from {{ mode }} successfully!
+                {% elif success_type == 'mode_switched' %}
+                Successfully switched to {{ mode }} mode! Your previous list has been cleared.
+                {% else %}
+                {{ success_type }}
+                {% endif %}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="fas fa-exclamation-triangle"></i>
+                {% set error_type = request.query_params.get('error') %}
+                {% if error_type == 'invalid_chat_id' %}
+                Please enter a valid chat ID (non-zero number)!
+                {% elif error_type == 'add_failed' %}
+                Failed to add chat to {{ list_mode }}. It may already exist.
+                {% elif error_type == 'remove_failed' %}
+                Failed to remove chat from {{ list_mode }}.
+                {% elif error_type == 'mode_switch_failed' %}
+                Failed to switch list mode. Please try again.
+                {% else %}
+                {{ error_type }}
+                {% endif %}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endif %}
+
+            <!-- Mode Toggle Card -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card mode-toggle-card">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <h5 class="mb-2">
+                                        <i class="fas fa-toggle-on text-primary"></i> Current Mode:
+                                        {% if list_mode == 'whitelist' %}
+                                        <span class="badge bg-primary list-mode-badge">Whitelist Mode</span>
+                                        {% else %}
+                                        <span class="badge bg-success list-mode-badge">Blacklist Mode</span>
+                                        {% endif %}
+                                    </h5>
+                                    <p class="text-muted mb-0">
+                                        {% if list_mode == 'whitelist' %}
+                                        <strong>Whitelist:</strong> Message filtering applies ONLY to chats in your list. All other chats are unfiltered.
+                                        {% else %}
+                                        <strong>Blacklist:</strong> Message filtering applies to ALL chats EXCEPT those in your list.
+                                        {% endif %}
+                                    </p>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <form method="POST" action="/chat-blacklist/toggle-mode" class="d-inline">
+                                        <button type="submit" class="btn {% if list_mode == 'whitelist' %}btn-success{% else %}btn-primary{% endif %} btn-lg"
+                                                onclick="return confirm('Switch modes? This will clear your current list and you will start fresh.')">>>
+                                            <i class="fas fa-sync-alt"></i>
+                                            Switch to {{ 'Blacklist' if list_mode == 'whitelist' else 'Whitelist' }}
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Status -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-info">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <h5 class="mb-2">
+                                        <i class="fas fa-lock text-success"></i> Profile Status:
+                                        {% if is_locked %}
+                                        <span class="badge bg-success fs-6">Locked</span>
+                                        {% else %}
+                                        <span class="badge bg-warning fs-6">Unlocked</span>
+                                        {% endif %}
+                                    </h5>
+                                    <p class="text-muted mb-0">
+                                        Chat list management is only available for users with locked profiles.
+                                        {% if list_mode == 'whitelist' %}
+                                        Whitelisted chats will have message filtering including badwords and autocorrect.
+                                        {% else %}
+                                        Blacklisted chats will bypass all message filtering including badwords and autocorrect.
+                                        {% endif %}
+                                    </p>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    {% if not is_locked %}
+                                    <a href="/profile-protection" class="btn btn-warning">
+                                        <i class="fas fa-lock"></i> Lock Profile
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if is_locked %}
+            <!-- Add New Chat to List -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>
+                                <i class="fas fa-plus-circle"></i> Add Chat to {{ list_mode.title() }}
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="/chat-blacklist/add">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="chat_id" class="form-label">Chat ID *</label>
+                                        <input type="number" class="form-control" id="chat_id" name="chat_id"
+                                            placeholder="e.g. -1001234567890" required>
+                                        <div class="form-text">The numeric ID of the chat/group/channel</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="chat_title" class="form-label">Chat Title (Optional)</label>
+                                        <input type="text" class="form-control" id="chat_title" name="chat_title"
+                                            placeholder="Chat or group name" maxlength="100">
+                                        <div class="form-text">Display name for the chat</div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label for="chat_type" class="form-label">Type (Optional)</label>
+                                        <select class="form-control" id="chat_type" name="chat_type">
+                                            <option value="">Unknown</option>
+                                            <option value="private">Private</option>
+                                            <option value="group">Group</option>
+                                            <option value="supergroup">Supergroup</option>
+                                            <option value="channel">Channel</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">&nbsp;</label>
+                                        <button type="submit" class="btn {% if list_mode == 'whitelist' %}btn-primary{% else %}btn-success{% endif %} w-100">
+                                            <i class="fas fa-plus"></i> Add Chat
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current List -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5>
+                                <i class="fas fa-list"></i> 
+                                {% if list_mode == 'whitelist' %}
+                                Whitelisted Chats ({{ chat_list|length }})
+                                {% else %}
+                                Blacklisted Chats ({{ chat_list|length }})
+                                {% endif %}
+                            </h5>
+                            {% if chat_list %}
+                            <span class="badge bg-secondary">
+                                Total: {{ chat_list|length }} chat{{ 's' if chat_list|length != 1 else '' }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div class="card-body">
+                            {% if chat_list %}
+                            <div class="row">
+                                {% for chat in chat_list %}
+                                <div class="col-md-6 col-lg-4 mb-3">
+                                    <div class="card chat-card {% if list_mode == 'whitelist' %}border-left-primary{% else %}border-left-success{% endif %}">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <div class="flex-grow-1">
+                                                    <h6 class="card-title mb-1">{{ chat.chat_title or ('Chat ' + chat.chat_id|string) }}</h6>
+                                                    <div class="chat-id mb-2">ID: {{ chat.chat_id }}</div>
+                                                </div>
+                                                <div class="dropdown">
+                                                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle"
+                                                        type="button" data-bs-toggle="dropdown">
+                                                        <i class="fas fa-cog"></i>
+                                                    </button>
+                                                    <ul class="dropdown-menu">
+                                                        <li>
+                                                            <form method="POST" action="/chat-blacklist/remove"
+                                                                class="d-inline">
+                                                                <input type="hidden" name="chat_id" value="{{ chat.chat_id }}">
+                                                                <button type="submit" class="dropdown-item text-danger"
+                                                                    onclick="return confirm('Remove this chat from your list?')">>
+                                                                    <i class="fas fa-trash"></i> Remove
+                                                                </button>
+                                                            </form>
+                                                        </li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    {% if chat.chat_type %}
+                                                    <span class="badge bg-info chat-type-badge">
+                                                        {{ chat.chat_type.title() }}
+                                                    </span>
+                                                    {% else %}
+                                                    <span class="badge bg-secondary chat-type-badge">Unknown</span>
+                                                    {% endif %}
+                                                </div>
+                                                <small class="text-muted">
+                                                    Added: {{ chat.created_at[:10] if chat.created_at else 'Unknown' }}
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="text-center py-5">
+                                {% if list_mode == 'whitelist' %}
+                                <i class="fas fa-check-circle fa-3x text-muted mb-3"></i>
+                                <h5 class="text-muted">No Whitelisted Chats</h5>
+                                <p class="text-muted">Add chat IDs above to enable message filtering for specific chats only.
+                                    <br><strong>Note:</strong> In whitelist mode, filtering only applies to chats in your list.</p>
+                                {% else %}
+                                <i class="fas fa-shield-alt fa-3x text-muted mb-3"></i>
+                                <h5 class="text-muted">No Blacklisted Chats</h5>
+                                <p class="text-muted">Add chat IDs above to disable message filtering for specific chats.
+                                    <br><strong>Note:</strong> In blacklist mode, all chats are filtered except those in your list.</p>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Information -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card border-info">
+                        <div class="card-header bg-info text-white">
+                            <h5><i class="fas fa-info-circle"></i> How Chat List Management Works</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-lock text-success"></i> Requirements</h6>
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-check text-success"></i> Must have a locked profile</li>
+                                        <li><i class="fas fa-check text-success"></i> Profile protection must be enabled</li>
+                                        <li><i class="fas fa-check text-success"></i> Only works for outgoing messages</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-shield-alt text-primary"></i> What Gets Controlled</h6>
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-check text-success"></i> Badwords filtering</li>
+                                        <li><i class="fas fa-check text-success"></i> Autocorrect processing</li>
+                                        <li><i class="fas fa-check text-success"></i> Message content restrictions</li>
+                                        <li><i class="fas fa-exclamation-triangle text-warning"></i> Energy costs still apply</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-shield-alt text-success"></i> Blacklist Mode</h6>
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-info text-info"></i> Default mode for all users</li>
+                                        <li><i class="fas fa-check text-success"></i> Filtering applies to ALL chats</li>
+                                        <li><i class="fas fa-times text-danger"></i> EXCEPT chats in your blacklist</li>
+                                        <li><i class="fas fa-lightbulb text-warning"></i> Good for exempting a few trusted chats</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-check-circle text-primary"></i> Whitelist Mode</h6>
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-star text-warning"></i> Advanced mode for specific needs</li>
+                                        <li><i class="fas fa-times text-danger"></i> No filtering by default</li>
+                                        <li><i class="fas fa-check text-success"></i> ONLY filter chats in your whitelist</li>
+                                        <li><i class="fas fa-lightbulb text-warning"></i> Good for filtering only specific chats</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="alert alert-warning mt-3">
+                                <strong><i class="fas fa-exclamation-triangle"></i> Important:</strong>
+                                To find a chat ID, you can look at the URL when viewing the chat in Telegram Web,
+                                or use bots like @userinfobot. Group IDs are typically negative numbers starting with -100.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Auto-dismiss alerts after 5 seconds
+    setTimeout(function () {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            if (alert.classList.contains('alert-success') || alert.classList.contains('alert-info')) {
+                alert.classList.remove('show');
+                setTimeout(() => alert.remove(), 300);
+            }
+        });
+    }, 5000);
+</script>
+{% endblock %}

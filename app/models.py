@@ -81,3 +81,40 @@ class ChatBlacklist(ChatBlacklistBase):
 
     class Config:
         from_attributes = True
+
+
+class ChatWhitelistBase(BaseModel):
+    chat_id: int
+    chat_title: str = None
+    chat_type: str = None
+
+
+class ChatWhitelistCreate(ChatWhitelistBase):
+    user_id: int
+
+
+class ChatWhitelist(ChatWhitelistBase):
+    id: int
+    user_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ChatListSettingsBase(BaseModel):
+    list_mode: str = "blacklist"  # "blacklist" or "whitelist"
+
+
+class ChatListSettingsCreate(ChatListSettingsBase):
+    user_id: int
+
+
+class ChatListSettings(ChatListSettingsBase):
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

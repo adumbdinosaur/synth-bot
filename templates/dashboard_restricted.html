@@ -180,25 +180,54 @@
         </div>
 
         {% if is_profile_locked %}
-        <!-- Chat Blacklist Management for Locked Profiles -->
+        <!-- Chat List Management for Locked Profiles -->
         <div class="col-12">
-            <div class="card border-success mb-4">
-                <div class="card-header bg-success text-white">
+            <div class="card {% if list_mode == 'whitelist' %}border-primary{% else %}border-success{% endif %} mb-4">
+                <div class="card-header {% if list_mode == 'whitelist' %}bg-primary{% else %}bg-success{% endif %} text-white">
                     <h5 class="card-title mb-0">
+                        {% if list_mode == 'whitelist' %}
+                        <i class="fas fa-check-circle me-2"></i>
+                        Chat Whitelist Management
+                        {% else %}
                         <i class="fas fa-shield-alt me-2"></i>
                         Chat Blacklist Management
+                        {% endif %}
                     </h5>
                 </div>
                 <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <span class="badge {% if list_mode == 'whitelist' %}bg-primary{% else %}bg-success{% endif %} fs-6">
+                                {{ list_mode.title() }} Mode
+                            </span>
+                        </div>
+                        <div>
+                            <form method="POST" action="/restricted-dashboard/chat-blacklist/toggle-mode" class="d-inline me-2">
+                                <button type="submit" class="btn {% if list_mode == 'whitelist' %}btn-success{% else %}btn-primary{% endif %} btn-sm"
+                                        onclick="return confirm('Switch modes? This will clear your current list and you will start fresh.')">
+                                    <i class="fas fa-sync-alt"></i>
+                                    Switch to {{ 'Blacklist' if list_mode == 'whitelist' else 'Whitelist' }}
+                                </button>
+                            </form>
+                            <a href="/chat-blacklist" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-cog"></i> Advanced Settings
+                            </a>
+                        </div>
+                    </div>
                     <p class="card-text mb-4">
-                        Your profile is locked, so you can manage chat blacklists to bypass filtering in specific chats.
+                        {% if list_mode == 'whitelist' %}
+                        Your profile is locked and you're using whitelist mode. Only chats in your whitelist will have message filtering applied.
+                        All other chats will bypass badwords and autocorrect processing.
+                        {% else %}
+                        Your profile is locked and you're using blacklist mode. Blacklisted chats will bypass filtering in specific chats.
                         Blacklisted chats will skip badwords and autocorrect processing.
+                        {% endif %}
                     </p>
 
                     <!-- Add New Chat Form -->
                     <div class="row mb-4">
                         <div class="col-12">
-                            <h6><i class="fas fa-plus-circle me-2"></i>Add Chat to Blacklist</h6>
+                            <h6><i class="fas fa-plus-circle me-2"></i>Add Chat to {{ list_mode.title() }}</h6>
                             <form method="POST" action="/restricted-dashboard/chat-blacklist/add">
                                 <div class="row g-3">
                                     <div class="col-md-4">
@@ -224,7 +253,7 @@
                                     </div>
                                     <div class="col-md-2">
                                         <label class="form-label">&nbsp;</label>
-                                        <button type="submit" class="btn btn-success w-100">
+                                        <button type="submit" class="btn {% if list_mode == 'whitelist' %}btn-primary{% else %}btn-success{% endif %} w-100">
                                             <i class="fas fa-plus"></i> Add
                                         </button>
                                     </div>
@@ -233,11 +262,11 @@
                         </div>
                     </div>
 
-                    <!-- Current Blacklisted Chats -->
+                    <!-- Current Chat List -->
                     <div class="row">
                         <div class="col-12">
-                            <h6><i class="fas fa-list me-2"></i>Blacklisted Chats ({{ blacklisted_chats|length }})</h6>
-                            {% if blacklisted_chats %}
+                            <h6><i class="fas fa-list me-2"></i>{{ list_mode.title() }} Chats ({{ chat_list|length }})</h6>
+                            {% if chat_list %}
                             <div class="table-responsive">
                                 <table class="table table-sm table-striped">
                                     <thead>
@@ -250,7 +279,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {% for chat in blacklisted_chats %}
+                                        {% for chat in chat_list %}
                                         <tr>
                                             <td><code>{{ chat.chat_id }}</code></td>
                                             <td>{{ chat.chat_title or ('Chat ' + chat.chat_id|string) }}</td>
@@ -267,7 +296,7 @@
                                                     class="d-inline">
                                                     <input type="hidden" name="chat_id" value="{{ chat.chat_id }}">
                                                     <button type="submit" class="btn btn-outline-danger btn-sm"
-                                                        onclick="return confirm('Remove chat {{ chat.chat_title or chat.chat_id }} from blacklist?')">
+                                                        onclick="return confirm('Remove this chat from your {{ list_mode }}?')">
                                                         <i class="fas fa-trash"></i>
                                                     </button>
                                                 </form>
@@ -279,9 +308,15 @@
                             </div>
                             {% else %}
                             <div class="text-center py-3">
+                                {% if list_mode == 'whitelist' %}
+                                <i class="fas fa-check-circle fa-2x text-muted mb-2"></i>
+                                <p class="text-muted mb-0">No whitelisted chats yet. Add chat IDs above to enable
+                                    filtering for specific chats only.</p>
+                                {% else %}
                                 <i class="fas fa-shield-alt fa-2x text-muted mb-2"></i>
                                 <p class="text-muted mb-0">No blacklisted chats yet. Add chat IDs above to bypass
                                     filtering for specific chats.</p>
+                                {% endif %}
                             </div>
                             {% endif %}
                         </div>
