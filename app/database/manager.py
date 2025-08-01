@@ -12,6 +12,8 @@ from .session_manager import SessionManager
 from .auth_manager import AuthManager
 from .autocorrect_manager import AutocorrectManager
 from .chat_blacklist_manager import ChatBlacklistManager
+from .chat_whitelist_manager import ChatWhitelistManager
+from .chat_list_settings_manager import ChatListSettingsManager
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,8 @@ class DatabaseManager(BaseDatabaseManager):
         self.auth = AuthManager(database_path)
         self.autocorrect = AutocorrectManager(database_path)
         self.chat_blacklist = ChatBlacklistManager(database_path)
+        self.chat_whitelist = ChatWhitelistManager(database_path)
+        self.chat_list_settings = ChatListSettingsManager(database_path)
 
         logger.info(f"DatabaseManager initialized with database: {database_path}")
 
@@ -297,6 +301,125 @@ class DatabaseManager(BaseDatabaseManager):
             user_id, chat_id, chat_title, chat_type
         )
 
+    # Chat whitelist
+    async def get_user_whitelisted_chats(self, user_id: int):
+        return await self.chat_whitelist.get_user_whitelisted_chats(user_id)
+
+    async def add_whitelisted_chat(
+        self, user_id: int, chat_id: int, chat_title: str = None, chat_type: str = None
+    ):
+        return await self.chat_whitelist.add_whitelisted_chat(
+            user_id, chat_id, chat_title, chat_type
+        )
+
+    async def remove_whitelisted_chat(self, user_id: int, chat_id: int):
+        return await self.chat_whitelist.remove_whitelisted_chat(user_id, chat_id)
+
+    async def is_chat_whitelisted(self, user_id: int, chat_id: int):
+        return await self.chat_whitelist.is_chat_whitelisted(user_id, chat_id)
+
+    async def update_whitelist_chat_info(
+        self, user_id: int, chat_id: int, chat_title: str = None, chat_type: str = None
+    ):
+        return await self.chat_whitelist.update_chat_info(
+            user_id, chat_id, chat_title, chat_type
+        )
+
+    async def clear_all_whitelisted_chats(self, user_id: int):
+        return await self.chat_whitelist.clear_all_whitelisted_chats(user_id)
+
+    # Chat list settings (blacklist/whitelist mode)
+    async def get_user_chat_list_mode(self, user_id: int):
+        return await self.chat_list_settings.get_user_chat_list_mode(user_id)
+
+    async def set_user_chat_list_mode(self, user_id: int, list_mode: str):
+        return await self.chat_list_settings.set_user_chat_list_mode(user_id, list_mode)
+
+    async def get_user_chat_list_settings(self, user_id: int):
+        return await self.chat_list_settings.get_user_chat_list_settings(user_id)
+
+    async def toggle_user_chat_list_mode(self, user_id: int):
+        return await self.chat_list_settings.toggle_user_chat_list_mode(user_id)
+
+    # Synchronous wrappers for chat list operations
+    def set_chat_list_mode(self, user_id: int, list_mode: str):
+        """Set the chat list mode for a user (synchronous wrapper)."""
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(self.set_user_chat_list_mode(user_id, list_mode))
+        finally:
+            loop.close()
+
+    def get_chat_list_mode(self, user_id: int):
+        """Get the chat list mode for a user (synchronous wrapper)."""
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(self.get_user_chat_list_mode(user_id))
+        finally:
+            loop.close()
+
+    def add_chat_to_whitelist(self, user_id: int, chat_id: int):
+        """Add a chat to whitelist (synchronous wrapper)."""
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(self.add_chat_to_user_whitelist(user_id, chat_id))
+        finally:
+            loop.close()
+
+    # Unified filtering logic that respects the current list mode
+    async def should_filter_chat(self, user_id: int, chat_id: int) -> bool:
+        """
+        Determine if a chat should be filtered based on the user's current list mode.
+
+        Returns:
+            True if the chat should be filtered (processing applied)
+            False if the chat should be ignored (no processing)
+        """
+        try:
+            list_mode = await self.get_user_chat_list_mode(user_id)
+
+            if list_mode == "blacklist":
+                # In blacklist mode, DON'T filter if chat is blacklisted
+                is_blacklisted = await self.is_chat_blacklisted(user_id, chat_id)
+                return not is_blacklisted
+            elif list_mode == "whitelist":
+                # In whitelist mode, ONLY filter if chat is whitelisted
+                is_whitelisted = await self.is_chat_whitelisted(user_id, chat_id)
+                return is_whitelisted
+            else:
+                # Default to blacklist behavior
+                is_blacklisted = await self.is_chat_blacklisted(user_id, chat_id)
+                return not is_blacklisted
+        except Exception as e:
+            logger.error(f"Error determining if chat should be filtered for user {user_id}: {e}")
+            # Default to filtering (safe fallback)
+            return True
+
+    # Helper method to clear blacklist when switching to whitelist mode
+    async def clear_all_blacklisted_chats(self, user_id: int):
+        """Clear all blacklisted chats for a user (used when switching from blacklist to whitelist)."""
+        try:
+            async with self.get_connection() as db:
+                await db.execute(
+                    "DELETE FROM user_chat_blacklist WHERE user_id = ?",
+                    (user_id,),
+                )
+                await db.commit()
+                logger.info(f"Cleared all blacklisted chats for user {user_id}")
+                return True
+        except Exception as e:
+            logger.error(f"Error clearing blacklisted chats for user {user_id}: {e}")
+            return False
+
+    async def add_chat_to_user_whitelist(self, user_id: int, chat_id: int):
+        """Add a chat to whitelist (async)."""
+        return await self.add_whitelisted_chat(user_id, chat_id)
 
 # Global database manager instance
 _database_manager = None

@@ -251,6 +251,37 @@ class BaseDatabaseManager:
                 """
                 )
 
+                # Chat whitelist table - allows users with locked profiles to only apply filtering to specific chats
+                await db.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS user_chat_whitelist (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        chat_id INTEGER NOT NULL,
+                        chat_title TEXT,
+                        chat_type TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                        UNIQUE(user_id, chat_id)
+                    )
+                """
+                )
+
+                # Chat list mode settings - determines whether a user uses blacklist or whitelist
+                await db.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS user_chat_list_settings (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL UNIQUE,
+                        list_mode TEXT NOT NULL DEFAULT 'blacklist',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                        CHECK (list_mode IN ('blacklist', 'whitelist'))
+                    )
+                """
+                )
+
                 await db.commit()
                 logger.info("✅ Database initialized successfully")
 

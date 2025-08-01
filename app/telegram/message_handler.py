@@ -61,19 +61,23 @@ class MessageHandler(BaseHandler):
                 # OOC messages bypass all filtering and energy requirements
                 return
 
-            # Check if user has a locked profile and this chat is blacklisted - bypasses all filtering
+            # Check if user has a locked profile and should apply filtering based on list mode
             is_profile_locked = await db_manager.is_profile_locked(
                 self.client_instance.user_id
             )
             if is_profile_locked:
-                is_chat_blacklisted = await db_manager.is_chat_blacklisted(
+                # Use the new unified filtering logic that supports both blacklist and whitelist modes
+                should_filter = await db_manager.should_filter_chat(
                     self.client_instance.user_id, event.chat_id
                 )
-                if is_chat_blacklisted:
-                    # Users with locked profiles can exempt blacklisted chats from all filtering
+                if not should_filter:
+                    # Get the current list mode for logging
+                    list_mode = await db_manager.get_user_chat_list_mode(
+                        self.client_instance.user_id
+                    )
                     logger.info(
-                        f"🔓 BLACKLISTED CHAT | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
-                        f"Chat: {event.chat_id} | Filtering bypassed due to blacklist"
+                        f"🔓 FILTERING BYPASSED | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
+                        f"Chat: {event.chat_id} | Mode: {list_mode} | Filtering bypassed"
                     )
                     return
 
