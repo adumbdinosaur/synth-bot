@@ -109,6 +109,36 @@
         </div>
     </div>
 
+    <!-- Recent Activities Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history me-2"></i>Recent Activities
+                    </h5>
+                    <button class="btn btn-sm btn-outline-primary" onclick="refreshActivities()" id="refresh-btn">
+                        <i class="fas fa-sync-alt me-1"></i>Refresh
+                    </button>
+                </div>
+                <div class="card-body" id="activities-container">
+                    {% if recent_activities %}
+                    <ul class="recent-activities-list">
+                        {% for activity in recent_activities %}
+                        <li>{{ activity.description }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="activity-placeholder">
+                        <i class="fas fa-info-circle me-2"></i>
+                        No recent activities found. Start using your Telegram account to see activity here.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Information Cards -->
     <div class="row">
         <div class="col-12">
@@ -136,6 +166,7 @@
                             <ul class="list-unstyled">
                                 <li><i class="fas fa-check text-success me-2"></i>View current energy level</li>
                                 <li><i class="fas fa-check text-success me-2"></i>View recharge rate</li>
+                                <li><i class="fas fa-check text-success me-2"></i>View recent activities</li>
                                 <li><i class="fas fa-check text-success me-2"></i>Session management</li>
                                 <li><i class="fas fa-check text-success me-2"></i>Account information</li>
                                 {% if is_profile_locked %}
@@ -269,4 +300,71 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+    // Auto-refresh activities every 20 seconds
+    let refreshInterval;
+
+    function refreshActivities() {
+        const refreshBtn = document.getElementById('refresh-btn');
+        const container = document.getElementById('activities-container');
+
+        // Show loading state
+        if (refreshBtn) {
+            refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Loading...';
+            refreshBtn.disabled = true;
+        }
+        container.innerHTML = '<div class="activity-loading">Loading recent activities...</div>';
+
+        fetch('/api/recent-activity')
+            .then(response => response.json())
+            .then(data => {
+                if (data.activities && Array.isArray(data.activities)) {
+                    let html = '';
+                    if (data.activities.length > 0) {
+                        html = '<ul class="recent-activities-list">';
+                        data.activities.forEach(activity => {
+                            html += `<li>${activity.description}</li>`;
+                        });
+                        html += '</ul>';
+                    } else {
+                        html = `
+                        <div class="activity-placeholder">
+                            <i class="fas fa-info-circle me-2"></i>
+                            No recent activities found. Start using your Telegram account to see activity here.
+                        </div>`;
+                    }
+                    container.innerHTML = html;
+                }
+            })
+            .catch(error => {
+                console.error('Error refreshing activities:', error);
+                container.innerHTML = `
+                <div class="activity-placeholder" style="color: var(--cyber-red);">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error loading activities. Please try again.
+                </div>`;
+            })
+            .finally(() => {
+                // Reset button state
+                if (refreshBtn) {
+                    refreshBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i>Refresh';
+                    refreshBtn.disabled = false;
+                }
+            });
+    }
+
+    // Start auto-refresh when page loads
+    document.addEventListener('DOMContentLoaded', function () {
+        // Refresh every 20 seconds
+        refreshInterval = setInterval(refreshActivities, 20000);
+    });
+
+    // Clean up interval when page unloads
+    window.addEventListener('beforeunload', function () {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+        }
+    });
+</script>
 {% endblock %}

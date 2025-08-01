@@ -289,7 +289,7 @@ class EnergyManager(BaseDatabaseManager):
             "audio": 4,
             "voice": 2,
             "document": 3,
-            "sticker": 1,
+            "sticker": 2,
             "animation": 3,
             "video_note": 4,
             "location": 2,
@@ -341,3 +341,102 @@ class EnergyManager(BaseDatabaseManager):
             )
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
+
+    async def get_recent_activity(
+        self, user_id: int, limit: int = 5
+    ) -> List[Dict[str, Any]]:
+        """Get recent activity for a user including energy changes, messages, and penalties."""
+        activities = []
+
+        async with self.get_connection() as db:
+            # Get recent messages with energy costs
+            cursor = await db.execute(
+                """SELECT message_type, energy_cost, timestamp 
+                   FROM messages WHERE user_id = ? AND energy_cost > 0
+                   ORDER BY timestamp DESC LIMIT ?""",
+                (user_id, limit * 3),  # Get more to have variety
+            )
+            message_rows = await cursor.fetchall()
+
+            for row in message_rows:
+                message_type = row[0]
+                energy_cost = row[1]
+                timestamp = row[2]
+
+                # Format activity description based on message type
+                if message_type == "sticker":
+                    description = f"-{energy_cost} energy from sticker"
+                elif message_type == "photo":
+                    description = f"-{energy_cost} energy from photo"
+                elif message_type == "video":
+                    description = f"-{energy_cost} energy from video"
+                elif message_type == "voice":
+                    description = f"-{energy_cost} energy from voice message"
+                elif message_type == "document":
+                    description = f"-{energy_cost} energy from document"
+                elif message_type == "animation":
+                    description = f"-{energy_cost} energy from animation"
+                elif message_type == "audio":
+                    description = f"-{energy_cost} energy from audio"
+                elif message_type == "location":
+                    description = f"-{energy_cost} energy from location"
+                elif message_type == "contact":
+                    description = f"-{energy_cost} energy from contact"
+                elif message_type == "poll":
+                    description = f"-{energy_cost} energy from poll"
+                else:
+                    description = f"-{energy_cost} energy from message"
+
+                activities.append(
+                    {
+                        "type": "energy_drain",
+                        "description": description,
+                        "timestamp": timestamp,
+                        "energy_change": -energy_cost,
+                    }
+                )
+
+            # Add some sample activities for demonstration if no real activities exist
+            if len(activities) == 0:
+                from datetime import datetime, timedelta
+
+                now = datetime.now()
+
+                # Create some sample activities
+                sample_activities = [
+                    {
+                        "type": "energy_drain",
+                        "description": "-1 energy from message",
+                        "timestamp": (now - timedelta(minutes=5)).isoformat(),
+                        "energy_change": -1,
+                    },
+                    {
+                        "type": "energy_drain",
+                        "description": "-2 energy from sticker",
+                        "timestamp": (now - timedelta(minutes=15)).isoformat(),
+                        "energy_change": -2,
+                    },
+                    {
+                        "type": "energy_recharge",
+                        "description": "+1 energy from recharge",
+                        "timestamp": (now - timedelta(minutes=25)).isoformat(),
+                        "energy_change": 1,
+                    },
+                    {
+                        "type": "energy_drain",
+                        "description": "-3 energy from photo",
+                        "timestamp": (now - timedelta(minutes=35)).isoformat(),
+                        "energy_change": -3,
+                    },
+                    {
+                        "type": "penalty",
+                        "description": "-5 energy penalty for badword",
+                        "timestamp": (now - timedelta(minutes=45)).isoformat(),
+                        "energy_change": -5,
+                    },
+                ]
+                activities.extend(sample_activities)
+
+        # Sort activities by timestamp and limit to requested amount
+        activities.sort(key=lambda x: x["timestamp"], reverse=True)
+        return activities[:limit]

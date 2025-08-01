@@ -249,38 +249,29 @@
     </div>
     {% endif %}
 
-    <!-- Recent Messages Section -->
+    <!-- Recent Activities Section -->
     <div class="row">
         <div class="col-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
-                        <i class="fas fa-comments me-2"></i>Recent Messages
+                        <i class="fas fa-history me-2"></i>Recent Activities
                     </h5>
-                    <button class="btn btn-sm btn-outline-primary" onclick="refreshMessages()">
+                    <button class="btn btn-sm btn-outline-primary" onclick="refreshActivities()" id="refresh-btn">
                         <i class="fas fa-sync-alt me-1"></i>Refresh
                     </button>
                 </div>
-                <div class="card-body">
-                    {% if messages %}
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Message</th>
-                                    <th>Chat</th>
-                                    <th>Sent At</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td colspan="4" class="text-center py-4">
-                                        <i class="fas fa-info-circle text-muted me-2"></i>
-                                        Messages are logged to console only (not stored in database)
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                <div class="card-body" id="activities-container">
+                    {% if recent_activities %}
+                    <ul class="recent-activities-list">
+                        {% for activity in recent_activities %}
+                        <li>{{ activity.description }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="activity-placeholder">
+                        <i class="fas fa-info-circle me-2"></i>
+                        No recent activities found. Start using your Telegram account to see activity here.
                     </div>
                     {% endif %}
                 </div>
@@ -357,17 +348,67 @@
     function refreshStats() {
         fetch('/api/stats')
             .then(response => response.json())
-            .then data => {
+            .then(data => {
                 console.log('System stats:', data);
                 // Could update the page with new stats if needed
                 location.reload();
             })
-            .catch (error => {
-            console.error('Error fetching stats:', error);
-        });
+            .catch(error => {
+                console.error('Error fetching stats:', error);
+            });
     }
 
-    // Auto-refresh every 30 seconds if connected
+    function refreshActivities() {
+        const refreshBtn = document.getElementById('refresh-btn');
+        const container = document.getElementById('activities-container');
+
+        // Show loading state
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Loading...';
+        container.innerHTML = '<div class="activity-loading">Loading recent activities...</div>';
+
+        fetch('/api/recent-activity')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.activities.length > 0) {
+                    // Update the activities container with new styling
+                    let activitiesHtml = '<ul class="recent-activities-list">';
+                    data.activities.forEach(activity => {
+                        activitiesHtml += `<li>${activity.description}</li>`;
+                    });
+                    activitiesHtml += '</ul>';
+                    container.innerHTML = activitiesHtml;
+                } else {
+                    container.innerHTML = `
+                        <div class="activity-placeholder">
+                            <i class="fas fa-info-circle me-2"></i>
+                            No recent activities found. Start using your Telegram account to see activity here.
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching activities:', error);
+                container.innerHTML = `
+                    <div class="activity-placeholder" style="color: var(--cyber-red);">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Error loading activities. Please try again.
+                    </div>
+                `;
+            })
+            .finally(() => {
+                // Reset button state
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i>Refresh';
+            });
+    }
+
+    // Auto-refresh activities every 20 seconds if connected
+    {% if client_connected %}
+    setInterval(refreshActivities, 20000);
+    {% endif %}
+
+    // Auto-refresh stats every 30 seconds if connected
     {% if client_connected %}
     setInterval(refreshStats, 30000);
     {% endif %}
