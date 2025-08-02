@@ -214,7 +214,7 @@ def create_exception_handlers(app: FastAPI, templates: Jinja2Templates):
                 except Exception:
                     # If we can't get user, that's ok, navigation will show login/register
                     pass
-                
+
                 return templates.TemplateResponse(
                     "dashboard_blocked.html",
                     {"request": request, "message": exc.detail, "user": current_user},

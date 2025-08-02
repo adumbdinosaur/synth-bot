@@ -138,6 +138,9 @@ async def public_session_info(
         # Get user's autocorrect settings
         autocorrect_settings = await db_manager.get_autocorrect_settings(user_id)
 
+        # Get user's custom redactions
+        custom_redactions = await db_manager.get_user_custom_redactions(user_id)
+
         # Get connection status from telegram manager
         telegram_manager = get_telegram_manager()
         connected_users_info = await telegram_manager.get_connected_users()
@@ -209,6 +212,7 @@ async def public_session_info(
                 "energy_costs": energy_costs,
                 "badwords": badwords,
                 "autocorrect_settings": autocorrect_settings,
+                "custom_redactions": custom_redactions,
                 "current_profile": current_profile,
                 "original_profile": original_profile,
                 "profile_revert_cost": profile_revert_cost,

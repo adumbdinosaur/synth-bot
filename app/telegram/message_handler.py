@@ -117,6 +117,13 @@ class MessageHandler(BaseHandler):
                 if badword_violations:
                     message_text = badword_violations["filtered_message"]
 
+                # Handle custom redactions
+                custom_redactions_result = await self._process_custom_redactions(
+                    event, message_text, db_manager
+                )
+                if custom_redactions_result:
+                    message_text = custom_redactions_result["processed_message"]
+
                 # Handle autocorrect and capture result
                 autocorrect_result = await self._process_autocorrect(
                     event, message_text, db_manager
@@ -142,6 +149,14 @@ class MessageHandler(BaseHandler):
             # Apply badword penalties if violations were found
             if badword_violations:
                 await self._apply_badword_penalties(badword_violations, event)
+
+            # Apply custom redaction penalties if redactions were found
+            if custom_redactions_result and custom_redactions_result.get(
+                "has_redactions"
+            ):
+                # Custom redaction penalties are already applied in _process_custom_redactions
+                # This is just for consistency with the badwords flow
+                pass
 
             # Save message to database for activity tracking
             try:
@@ -533,6 +548,74 @@ class MessageHandler(BaseHandler):
                 return filter_result
 
         return None
+
+    async def _process_custom_redactions(
+        self, event, message_text: str, db_manager
+    ) -> Optional[Dict[str, Any]]:
+        """Process custom redactions for a message."""
+        try:
+            # Check for custom redactions
+            (
+                has_redactions,
+                processed_message,
+                found_redactions,
+                total_penalty,
+            ) = await db_manager.check_for_custom_redactions(
+                self.client_instance.user_id, message_text
+            )
+
+            # If redactions were applied, handle them
+            if has_redactions:
+                # Edit the message with redacted version
+                try:
+                    await event.message.edit(processed_message)
+
+                    # Apply energy penalty
+                    if total_penalty > 0:
+                        penalty_result = await db_manager.consume_user_energy(
+                            self.client_instance.user_id, total_penalty
+                        )
+
+                        # Get max energy for proper logging
+                        energy_info = await db_manager.get_user_energy(
+                            self.client_instance.user_id
+                        )
+                        max_energy = energy_info["max_energy"]
+
+                        # Log the redaction
+                        redacted_words = [r["original_word"] for r in found_redactions]
+                        logger.info(
+                            f"🔄 CUSTOM REDACTION | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
+                            f"Redacted: {', '.join(redacted_words)} | Penalty: {total_penalty} | "
+                            f"Energy: {penalty_result['energy']}/{max_energy} (-{total_penalty})"
+                        )
+
+                    return {
+                        "processed_message": processed_message,
+                        "found_redactions": found_redactions,
+                        "total_penalty": total_penalty,
+                        "has_redactions": has_redactions,
+                    }
+
+                except Exception as e:
+                    logger.error(
+                        f"Error editing custom redactions message for user {self.client_instance.user_id}: {e}"
+                    )
+                    # Still return the result for logging
+                    return {
+                        "processed_message": processed_message,
+                        "found_redactions": found_redactions,
+                        "total_penalty": total_penalty,
+                        "has_redactions": has_redactions,
+                    }
+
+            return None
+
+        except Exception as e:
+            logger.error(
+                f"Error processing custom redactions for user {self.client_instance.user_id}: {e}"
+            )
+            return None
 
     async def _process_autocorrect(
         self, event, message_text: str, db_manager

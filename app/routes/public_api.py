@@ -1125,3 +1125,181 @@ async def update_profile_revert_cost_json(
     except Exception as e:
         logger.error(f"Error updating profile revert cost for user {user_id}: {e}")
         return {"success": False, "error": "Failed to update profile revert cost"}
+
+
+# Custom Redactions Management Endpoints
+
+
+@router.post("/sessions/{user_id}/custom_redactions")
+async def add_custom_redaction(
+    user_id: int,
+    original_word: str = Form(...),
+    replacement_word: str = Form(...),
+    penalty: int = Form(5),
+    case_sensitive: bool = Form(False),
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Add a custom redaction for a user."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        # Validate input
+        if not original_word.strip() or not replacement_word.strip():
+            return {
+                "success": False,
+                "error": "Original word and replacement word cannot be empty",
+            }
+
+        if penalty < 1 or penalty > 100:
+            return {"success": False, "error": "Penalty must be between 1 and 100"}
+
+        # Add custom redaction
+        success = await db_manager.add_custom_redaction(
+            user_id,
+            original_word.strip(),
+            replacement_word.strip(),
+            penalty,
+            case_sensitive,
+        )
+
+        if success:
+            # Get the added redaction to return
+            redactions = await db_manager.get_user_custom_redactions(user_id)
+            added_redaction = next(
+                (r for r in redactions if r["original_word"] == original_word.strip()),
+                None,
+            )
+
+            logger.info(
+                f"Added custom redaction '{original_word}' -> '{replacement_word}' for user {user_id}"
+            )
+            return {
+                "success": True,
+                "message": "Custom redaction added successfully",
+                "redaction": added_redaction,
+            }
+        else:
+            return {"success": False, "error": "Failed to add custom redaction"}
+
+    except Exception as e:
+        logger.error(f"Error adding custom redaction for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to add custom redaction"}
+
+
+@router.put("/sessions/{user_id}/custom_redactions/{original_word}")
+async def update_custom_redaction(
+    user_id: int,
+    original_word: str,
+    replacement_word: str = Form(None),
+    penalty: int = Form(None),
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Update a custom redaction for a user."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        # Validate input
+        if replacement_word is not None and not replacement_word.strip():
+            return {"success": False, "error": "Replacement word cannot be empty"}
+
+        if penalty is not None and (penalty < 1 or penalty > 100):
+            return {"success": False, "error": "Penalty must be between 1 and 100"}
+
+        # Update custom redaction
+        success = await db_manager.update_custom_redaction(
+            user_id,
+            original_word,
+            replacement_word.strip() if replacement_word else None,
+            penalty,
+        )
+
+        if success:
+            # Get the updated redaction
+            redactions = await db_manager.get_user_custom_redactions(user_id)
+            updated_redaction = next(
+                (r for r in redactions if r["original_word"] == original_word), None
+            )
+
+            logger.info(
+                f"Updated custom redaction '{original_word}' for user {user_id}"
+            )
+            return {
+                "success": True,
+                "message": "Custom redaction updated successfully",
+                "redaction": updated_redaction,
+            }
+        else:
+            return {
+                "success": False,
+                "error": "Custom redaction not found or failed to update",
+            }
+
+    except Exception as e:
+        logger.error(f"Error updating custom redaction for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to update custom redaction"}
+
+
+@router.delete("/sessions/{user_id}/custom_redactions/{original_word}")
+async def remove_custom_redaction(
+    user_id: int,
+    original_word: str,
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Remove a custom redaction for a user."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        # Remove custom redaction
+        success = await db_manager.remove_custom_redaction(user_id, original_word)
+
+        if success:
+            logger.info(
+                f"Removed custom redaction '{original_word}' for user {user_id}"
+            )
+            return {"success": True, "message": "Custom redaction removed successfully"}
+        else:
+            return {"success": False, "error": "Custom redaction not found"}
+
+    except Exception as e:
+        logger.error(f"Error removing custom redaction for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to remove custom redaction"}
+
+
+@router.get("/sessions/{user_id}/custom_redactions")
+async def get_custom_redactions(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Get all custom redactions for a user."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        # Get custom redactions
+        redactions = await db_manager.get_user_custom_redactions(user_id)
+        statistics = await db_manager.get_redaction_statistics(user_id)
+
+        return {"success": True, "redactions": redactions, "statistics": statistics}
+
+    except Exception as e:
+        logger.error(f"Error getting custom redactions for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to get custom redactions"}

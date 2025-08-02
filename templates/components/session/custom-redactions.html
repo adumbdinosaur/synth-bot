@@ -1,0 +1,170 @@
+<!-- Custom Redactions Management Section -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5><i class="fas fa-filter"></i> Custom Redactions</h5>
+        <small class="text-muted">Configure custom word replacements with penalties for this user</small>
+    </div>
+    <div class="card-body">
+        <!-- Add Custom Redaction Form -->
+        <div class="row mb-3">
+            <div class="col-md-12">
+                <h6>Add New Custom Redaction</h6>
+                <form id="addCustomRedactionForm" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="originalWord" class="form-label">Original Word</label>
+                        <input type="text" class="form-control" id="originalWord" name="original_word"
+                            placeholder="word to replace" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="replacementWord" class="form-label">Replacement Word</label>
+                        <input type="text" class="form-control" id="replacementWord" name="replacement_word"
+                            placeholder="replacement text" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="redactionPenalty" class="form-label">Penalty</label>
+                        <input type="number" class="form-control" id="redactionPenalty" name="penalty" value="5" min="1"
+                            max="100" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="caseSensitive" name="case_sensitive">
+                            <label class="form-check-label" for="caseSensitive">
+                                Case Sensitive
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="submit" class="btn btn-success d-block">
+                            <i class="fas fa-plus"></i> Add
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Custom Redactions List -->
+        <div class="row">
+            <div class="col-md-12">
+                <h6>Current Custom Redactions</h6>
+                {% if custom_redactions %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Original Word</th>
+                                <th>Replacement</th>
+                                <th>Penalty</th>
+                                <th>Case Sensitive</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customRedactionsList">
+                            {% for redaction in custom_redactions %}
+                            <tr data-original-word="{{ redaction.original_word }}">
+                                <td>
+                                    <code>{{ redaction.original_word }}</code>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ redaction.replacement_word }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-warning">-{{ redaction.penalty }}</span>
+                                </td>
+                                <td>
+                                    {% if redaction.case_sensitive %}
+                                    <i class="fas fa-check text-success"></i>
+                                    {% else %}
+                                    <i class="fas fa-times text-muted"></i>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        {% if redaction.created_at %}
+                                        {% if redaction.created_at.strftime %}
+                                        {{ redaction.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                        {% else %}
+                                        {{ redaction.created_at }}
+                                        {% endif %}
+                                        {% else %}
+                                        N/A
+                                        {% endif %}
+                                    </small>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-outline-primary btn-sm edit-redaction-btn"
+                                            data-original-word="{{ redaction.original_word }}"
+                                            data-replacement-word="{{ redaction.replacement_word }}"
+                                            data-penalty="{{ redaction.penalty }}"
+                                            data-case-sensitive="{{ redaction.case_sensitive }}">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-danger btn-sm remove-redaction-btn"
+                                            data-original-word="{{ redaction.original_word }}">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> No custom redactions configured. Add some above to start
+                    filtering specific words for this user.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        {% if custom_redactions %}
+        <div class="row mt-3">
+            <div class="col-md-12">
+                <div class="alert alert-light">
+                    <strong>Statistics:</strong>
+                    {{ custom_redactions|length }} custom redaction(s) configured •
+                    Total potential penalty: {{ custom_redactions|sum(attribute='penalty') }} energy points
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Edit Custom Redaction Modal -->
+<div class="modal fade" id="editCustomRedactionModal" tabindex="-1" aria-labelledby="editCustomRedactionModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editCustomRedactionModalLabel">Edit Custom Redaction</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editCustomRedactionForm">
+                    <input type="hidden" id="editOriginalWord" name="original_word">
+                    <div class="mb-3">
+                        <label for="editReplacementWord" class="form-label">Replacement Word</label>
+                        <input type="text" class="form-control" id="editReplacementWord" name="replacement_word"
+                            required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editRedactionPenalty" class="form-label">Penalty</label>
+                        <input type="number" class="form-control" id="editRedactionPenalty" name="penalty" min="1"
+                            max="100" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="updateCustomRedaction()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>

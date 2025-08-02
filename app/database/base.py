@@ -299,6 +299,23 @@ class BaseDatabaseManager:
                 """
                 )
 
+                # Custom redactions - allows controllers to specify custom word replacements
+                await db.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS user_custom_redactions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        original_word TEXT NOT NULL,
+                        replacement_word TEXT NOT NULL,
+                        penalty INTEGER NOT NULL DEFAULT 5,
+                        case_sensitive BOOLEAN NOT NULL DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                        UNIQUE(user_id, original_word)
+                    )
+                """
+                )
+
                 await db.commit()
                 logger.info("✅ Database initialized successfully")
 

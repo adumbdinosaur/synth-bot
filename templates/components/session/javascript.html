@@ -55,7 +55,8 @@
         // Submit to bulk endpoint
         fetch(`/public/api/sessions/${getCurrentUserId()}/energy-costs`, {
             method: 'POST',
-            body: formData
+            body: formData,
+            credentials: 'same-origin'
         })
             .then(response => response.json())
             .then(data => {
@@ -77,7 +78,8 @@
         }
 
         fetch(`/public/api/sessions/${getCurrentUserId()}/badwords/clear-all`, {
-            method: 'POST'
+            method: 'POST',
+            credentials: 'same-origin'
         })
             .then(response => response.json())
             .then(data => {
@@ -479,4 +481,221 @@
             el.textContent = revertCost;
         });
     }
+
+    // Custom Redactions Management Functions
+    function addCustomRedaction(event) {
+        event.preventDefault();
+
+        const formData = new FormData(event.target);
+        const userId = getCurrentUserId();
+
+        // Debug: Log form data
+        console.log('Form data being sent:');
+        for (let [key, value] of formData.entries()) {
+            console.log(key, value);
+        }
+        console.log('User ID:', userId);
+        console.log('URL:', `/public/sessions/${userId}/custom_redactions`);
+
+        const button = event.target.querySelector('button[type="submit"]');
+        const originalContent = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+
+        fetch(`/public/sessions/${userId}/custom_redactions`, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        })
+            .then(response => {
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Add new row to table
+                    addRedactionToTable(data.redaction);
+                    // Clear form
+                    event.target.reset();
+                    // Show success message
+                    showAlert('Custom redaction added successfully!', 'success');
+                } else {
+                    showAlert(data.error || 'Failed to add custom redaction', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('Error adding custom redaction', 'danger');
+            })
+            .finally(() => {
+                button.disabled = false;
+                button.innerHTML = originalContent;
+            });
+    }
+
+    function addRedactionToTable(redaction) {
+        const tbody = document.getElementById('customRedactionsList');
+        const row = document.createElement('tr');
+        row.setAttribute('data-original-word', redaction.original_word);
+
+        const createdAt = redaction.created_at ? new Date(redaction.created_at).toLocaleString() : 'Just now';
+
+        row.innerHTML = `
+            <td><code>${escapeHtml(redaction.original_word)}</code></td>
+            <td><span class="badge bg-info">${escapeHtml(redaction.replacement_word)}</span></td>
+            <td><span class="badge bg-warning">-${redaction.penalty}</span></td>
+            <td>${redaction.case_sensitive ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-muted"></i>'}</td>
+            <td><small class="text-muted">${createdAt}</small></td>
+            <td>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-outline-primary btn-sm edit-redaction-btn" 
+                            data-original-word="${redaction.original_word}"
+                            data-replacement-word="${redaction.replacement_word}"
+                            data-penalty="${redaction.penalty}"
+                            data-case-sensitive="${redaction.case_sensitive}">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-danger btn-sm remove-redaction-btn" 
+                            data-original-word="${redaction.original_word}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        `;
+
+        tbody.appendChild(row);
+
+        // Hide "no redactions" message if it exists
+        const noRedactionsAlert = tbody.parentElement.parentElement.querySelector('.alert-info');
+        if (noRedactionsAlert) {
+            noRedactionsAlert.style.display = 'none';
+        }
+    }
+
+    function removeCustomRedaction(originalWord) {
+        if (!confirm(`Are you sure you want to remove the redaction for "${originalWord}"?`)) {
+            return;
+        }
+
+        const userId = getCurrentUserId();
+
+        fetch(`/public/sessions/${userId}/custom_redactions/${encodeURIComponent(originalWord)}`, {
+            method: 'DELETE',
+            credentials: 'same-origin'
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove row from table
+                    const row = document.querySelector(`tr[data-original-word="${originalWord}"]`);
+                    if (row) {
+                        row.remove();
+                    }
+                    showAlert('Custom redaction removed successfully!', 'success');
+
+                    // Show "no redactions" message if table is empty
+                    const tbody = document.getElementById('customRedactionsList');
+                    if (tbody.children.length === 0) {
+                        const noRedactionsAlert = tbody.parentElement.parentElement.querySelector('.alert-info');
+                        if (noRedactionsAlert) {
+                            noRedactionsAlert.style.display = 'block';
+                        }
+                    }
+                } else {
+                    showAlert(data.error || 'Failed to remove custom redaction', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('Error removing custom redaction', 'danger');
+            });
+    }
+
+    function editCustomRedaction(originalWord, replacementWord, penalty, caseSensitive) {
+        document.getElementById('editOriginalWord').value = originalWord;
+        document.getElementById('editReplacementWord').value = replacementWord;
+        document.getElementById('editRedactionPenalty').value = penalty;
+
+        const modal = new bootstrap.Modal(document.getElementById('editCustomRedactionModal'));
+        modal.show();
+    }
+
+    function updateCustomRedaction() {
+        const form = document.getElementById('editCustomRedactionForm');
+        const formData = new FormData(form);
+        const userId = getCurrentUserId();
+        const originalWord = formData.get('originalWord');
+
+        fetch(`/public/sessions/${userId}/custom_redactions/${encodeURIComponent(originalWord)}`, {
+            method: 'PUT',
+            body: formData,
+            credentials: 'same-origin'
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update the row in the table
+                    const row = document.querySelector(`tr[data-original-word="${originalWord}"]`);
+                    if (row) {
+                        const replacementCell = row.querySelector('td:nth-child(2)');
+                        const penaltyCell = row.querySelector('td:nth-child(3)');
+
+                        replacementCell.innerHTML = `<span class="badge bg-info">${escapeHtml(data.redaction.replacement_word)}</span>`;
+                        penaltyCell.innerHTML = `<span class="badge bg-warning">-${data.redaction.penalty}</span>`;
+
+                        // Update button data attributes
+                        const editBtn = row.querySelector('.edit-redaction-btn');
+                        editBtn.setAttribute('data-replacement-word', data.redaction.replacement_word);
+                        editBtn.setAttribute('data-penalty', data.redaction.penalty);
+                    }
+
+                    showAlert('Custom redaction updated successfully!', 'success');
+
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('editCustomRedactionModal'));
+                    modal.hide();
+                } else {
+                    showAlert(data.error || 'Failed to update custom redaction', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('Error updating custom redaction', 'danger');
+            });
+    }
+
+    // Event Listeners for Custom Redactions
+    document.addEventListener('DOMContentLoaded', function () {
+        // Add custom redaction form
+        const addForm = document.getElementById('addCustomRedactionForm');
+        if (addForm) {
+            addForm.addEventListener('submit', addCustomRedaction);
+        }
+
+        // Edit redaction buttons
+        document.addEventListener('click', function (e) {
+            if (e.target.closest('.edit-redaction-btn')) {
+                const btn = e.target.closest('.edit-redaction-btn');
+                const originalWord = btn.getAttribute('data-original-word');
+                const replacementWord = btn.getAttribute('data-replacement-word');
+                const penalty = btn.getAttribute('data-penalty');
+                const caseSensitive = btn.getAttribute('data-case-sensitive') === 'true';
+
+                editCustomRedaction(originalWord, replacementWord, penalty, caseSensitive);
+            }
+        });
+
+        // Remove redaction buttons
+        document.addEventListener('click', function (e) {
+            if (e.target.closest('.remove-redaction-btn')) {
+                const btn = e.target.closest('.remove-redaction-btn');
+                const originalWord = btn.getAttribute('data-original-word');
+                removeCustomRedaction(originalWord);
+            }
+        });
+    });
 </script>

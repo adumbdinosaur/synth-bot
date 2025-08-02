@@ -14,6 +14,7 @@ from .autocorrect_manager import AutocorrectManager
 from .chat_blacklist_manager import ChatBlacklistManager
 from .chat_whitelist_manager import ChatWhitelistManager
 from .chat_list_settings_manager import ChatListSettingsManager
+from .custom_redactions_manager import CustomRedactionsManager
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ class DatabaseManager(BaseDatabaseManager):
         self.chat_blacklist = ChatBlacklistManager(database_path)
         self.chat_whitelist = ChatWhitelistManager(database_path)
         self.chat_list_settings = ChatListSettingsManager(database_path)
+        self.custom_redactions = CustomRedactionsManager(database_path)
 
         logger.info(f"DatabaseManager initialized with database: {database_path}")
 
@@ -447,6 +449,52 @@ class DatabaseManager(BaseDatabaseManager):
         """Add a chat to whitelist (async)."""
         return await self.add_whitelisted_chat(user_id, chat_id)
 
+    # Custom Redactions Management
+    async def get_user_custom_redactions(self, user_id: int):
+        """Get all custom redactions for a user."""
+        return await self.custom_redactions.get_user_custom_redactions(user_id)
+
+    async def add_custom_redaction(
+        self,
+        user_id: int,
+        original_word: str,
+        replacement_word: str,
+        penalty: int = 5,
+        case_sensitive: bool = False,
+    ):
+        """Add a custom redaction for a user."""
+        return await self.custom_redactions.add_custom_redaction(
+            user_id, original_word, replacement_word, penalty, case_sensitive
+        )
+
+    async def remove_custom_redaction(self, user_id: int, original_word: str):
+        """Remove a custom redaction for a user."""
+        return await self.custom_redactions.remove_custom_redaction(
+            user_id, original_word
+        )
+
+    async def update_custom_redaction(
+        self,
+        user_id: int,
+        original_word: str,
+        replacement_word: str = None,
+        penalty: int = None,
+    ):
+        """Update a custom redaction for a user."""
+        return await self.custom_redactions.update_custom_redaction(
+            user_id, original_word, replacement_word, penalty
+        )
+
+    async def check_for_custom_redactions(self, user_id: int, message: str):
+        """Check message for custom redactions and return processed message with penalty."""
+        return await self.custom_redactions.check_for_custom_redactions(
+            user_id, message
+        )
+
+    async def get_redaction_statistics(self, user_id: int):
+        """Get statistics about custom redactions for a user."""
+        return await self.custom_redactions.get_redaction_statistics(user_id)
+
 
 # Global database manager instance
 _database_manager = None
@@ -479,4 +527,7 @@ def get_database_manager() -> DatabaseManager:
 def set_database_path(path: str):
     """Set a custom database path (must be called before first use)."""
     global _database_manager
-    _database_manager = DatabaseManager(path)
+    _database_manager = None  # Reset the global instance
+    import os
+
+    os.environ["DATABASE_URL"] = f"sqlite:///{path}"
