@@ -33,7 +33,7 @@ class ChatListSettingsManager(BaseDatabaseManager):
         if list_mode not in ["blacklist", "whitelist"]:
             logger.error(f"Invalid list mode: {list_mode}")
             return False
-            
+
         try:
             async with self.get_connection() as db:
                 await db.execute(
@@ -83,7 +83,7 @@ class ChatListSettingsManager(BaseDatabaseManager):
         try:
             current_mode = await self.get_user_chat_list_mode(user_id)
             new_mode = "whitelist" if current_mode == "blacklist" else "blacklist"
-            
+
             if await self.set_user_chat_list_mode(user_id, new_mode):
                 return new_mode
             else:

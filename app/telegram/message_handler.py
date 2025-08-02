@@ -122,53 +122,46 @@ class MessageHandler(BaseHandler):
                     event, message_text, db_manager
                 )
 
-            # Always try to consume base energy cost for the message
+            # Always consume base energy cost for the message (can go to 0 or below)
             consume_result = await db_manager.consume_user_energy(
                 self.client_instance.user_id, energy_cost
             )
 
-            if consume_result["success"]:
-                new_energy = consume_result["energy"]
-                # Get max energy for proper logging
-                energy_info = await db_manager.get_user_energy(
-                    self.client_instance.user_id
-                )
-                max_energy = energy_info["max_energy"]
+            new_energy = consume_result["energy"]
+            # Get max energy for proper logging
+            energy_info = await db_manager.get_user_energy(
+                self.client_instance.user_id
+            )
+            max_energy = energy_info["max_energy"]
 
-                logger.info(
-                    f"⚡ ENERGY CONSUMED | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
-                    f"Message type: {energy_message_type} (cost: {energy_cost}) | "
-                    f"Energy: {new_energy}/{max_energy} (-{energy_cost}) | "
-                    f"Special: {special_message_type or 'None'}"
-                )
-            else:
-                logger.warning(
-                    f"⚡ ENERGY CONSUMPTION FAILED | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
-                    f"Required: {energy_cost}, Available: {current_energy}"
-                )
+            logger.info(
+                f"⚡ ENERGY CONSUMED | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
+                f"Message type: {energy_message_type} (cost: {energy_cost}) | "
+                f"Energy: {new_energy}/{max_energy} (-{energy_cost}) | "
+                f"Special: {special_message_type or 'None'}"
+            )
 
             # Apply badword penalties if violations were found
             if badword_violations:
-                await self._apply_badword_penalties(badword_violations)
+                await self._apply_badword_penalties(badword_violations, event)
 
-            # Save message to database for activity tracking (only if energy was consumed)
-            if consume_result["success"]:
-                try:
-                    # Extract chat information
-                    chat_id = event.chat_id if hasattr(event, "chat_id") else 0
-                    message_id = event.message.id if hasattr(event.message, "id") else 0
+            # Save message to database for activity tracking
+            try:
+                # Extract chat information
+                chat_id = event.chat_id if hasattr(event, "chat_id") else 0
+                message_id = event.message.id if hasattr(event.message, "id") else 0
 
-                    # Save message to database (excluding content for privacy)
-                    await db_manager.save_telegram_message(
-                        user_id=self.client_instance.user_id,
-                        chat_id=chat_id,
-                        message_id=message_id,
-                        message_type=energy_message_type,
-                        content="",  # Content excluded for privacy
-                        energy_cost=energy_cost,
-                    )
-                except Exception as save_error:
-                    logger.error(f"Error saving message to database: {save_error}")
+                # Save message to database (excluding content for privacy)
+                await db_manager.save_telegram_message(
+                    user_id=self.client_instance.user_id,
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    message_type=energy_message_type,
+                    content="",  # Content excluded for privacy
+                    energy_cost=energy_cost,
+                )
+            except Exception as save_error:
+                logger.error(f"Error saving message to database: {save_error}")
 
             # Log message details (content excluded for privacy)
             # Skip logging if autocorrect was applied (corrections > 0) since the corrected message will be logged separately
@@ -604,7 +597,7 @@ class MessageHandler(BaseHandler):
             )
             return None
 
-    async def _apply_badword_penalties(self, filter_result: Dict[str, Any]):
+    async def _apply_badword_penalties(self, filter_result: Dict[str, Any], event):
         """Apply energy penalties for badword violations."""
         try:
             from ..database import get_database_manager
@@ -624,12 +617,24 @@ class MessageHandler(BaseHandler):
             energy_info = await db_manager.get_user_energy(self.client_instance.user_id)
             max_energy = energy_info["max_energy"]
 
+            # Check if energy went to 0 or below after penalty
+            current_energy = penalty_result.get('energy', 0)
+            if current_energy <= 0:
+                # Replace the already filtered message with a low energy message
+                try:
+                    await self._replace_with_low_energy_message(event)
+                    logger.info(
+                        f"🔋 LOW ENERGY REPLACEMENT | User: {self.client_instance.username} "
+                        f"(ID: {self.client_instance.user_id}) | Energy after badword penalty: {current_energy}/{max_energy}"
+                    )
+                except Exception as replacement_error:
+                    logger.error(
+                        f"Error replacing badword message with low energy message for user {self.client_instance.user_id}: {replacement_error}"
+                    )
+
             # Log the violation
             violation_log = f"Badwords detected: {', '.join(violated_words)} | Total penalty: {total_penalty}"
-            if penalty_result["success"]:
-                violation_log += f" | Energy: {penalty_result['energy']}/{max_energy} (-{total_penalty})"
-            else:
-                violation_log += f" | Insufficient energy: {penalty_result.get('current_energy', 0)}/{max_energy}"
+            violation_log += f" | Energy: {penalty_result['energy']}/{max_energy} (-{total_penalty})"
 
             logger.warning(
                 f"🚫 BADWORD VIOLATION | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "

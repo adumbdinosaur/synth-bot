@@ -127,16 +127,19 @@ Chat Blacklist - RPTR Corp
                                     </h5>
                                     <p class="text-muted mb-0">
                                         {% if list_mode == 'whitelist' %}
-                                        <strong>Whitelist:</strong> Message filtering applies ONLY to chats in your list. All other chats are unfiltered.
+                                        <strong>Whitelist:</strong> Message filtering applies ONLY to chats in your
+                                        list. All other chats are unfiltered.
                                         {% else %}
-                                        <strong>Blacklist:</strong> Message filtering applies to ALL chats EXCEPT those in your list.
+                                        <strong>Blacklist:</strong> Message filtering applies to ALL chats EXCEPT those
+                                        in your list.
                                         {% endif %}
                                     </p>
                                 </div>
                                 <div class="col-md-4 text-end">
                                     <form method="POST" action="/chat-blacklist/toggle-mode" class="d-inline">
-                                        <button type="submit" class="btn {% if list_mode == 'whitelist' %}btn-success{% else %}btn-primary{% endif %} btn-lg"
-                                                onclick="return confirm('Switch modes? This will clear your current list and you will start fresh.')">>>
+                                        <button type="submit"
+                                            class="btn {% if list_mode == 'whitelist' %}btn-success{% else %}btn-primary{% endif %} btn-lg"
+                                            onclick="return confirm('Switch modes? This will clear your current list and you will start fresh.')">>>
                                             <i class="fas fa-sync-alt"></i>
                                             Switch to {{ 'Blacklist' if list_mode == 'whitelist' else 'Whitelist' }}
                                         </button>
@@ -166,9 +169,11 @@ Chat Blacklist - RPTR Corp
                                     <p class="text-muted mb-0">
                                         Chat list management is only available for users with locked profiles.
                                         {% if list_mode == 'whitelist' %}
-                                        Whitelisted chats will have message filtering including badwords and autocorrect.
+                                        Whitelisted chats will have message filtering including badwords and
+                                        autocorrect.
                                         {% else %}
-                                        Blacklisted chats will bypass all message filtering including badwords and autocorrect.
+                                        Blacklisted chats will bypass all message filtering including badwords and
+                                        autocorrect.
                                         {% endif %}
                                     </p>
                                 </div>
@@ -222,7 +227,8 @@ Chat Blacklist - RPTR Corp
                                     </div>
                                     <div class="col-md-2">
                                         <label class="form-label">&nbsp;</label>
-                                        <button type="submit" class="btn {% if list_mode == 'whitelist' %}btn-primary{% else %}btn-success{% endif %} w-100">
+                                        <button type="submit"
+                                            class="btn {% if list_mode == 'whitelist' %}btn-primary{% else %}btn-success{% endif %} w-100">
                                             <i class="fas fa-plus"></i> Add Chat
                                         </button>
                                     </div>
@@ -239,7 +245,7 @@ Chat Blacklist - RPTR Corp
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5>
-                                <i class="fas fa-list"></i> 
+                                <i class="fas fa-list"></i>
                                 {% if list_mode == 'whitelist' %}
                                 Whitelisted Chats ({{ chat_list|length }})
                                 {% else %}
@@ -257,11 +263,13 @@ Chat Blacklist - RPTR Corp
                             <div class="row">
                                 {% for chat in chat_list %}
                                 <div class="col-md-6 col-lg-4 mb-3">
-                                    <div class="card chat-card {% if list_mode == 'whitelist' %}border-left-primary{% else %}border-left-success{% endif %}">
+                                    <div
+                                        class="card chat-card {% if list_mode == 'whitelist' %}border-left-primary{% else %}border-left-success{% endif %}">
                                         <div class="card-body">
                                             <div class="d-flex justify-content-between align-items-start mb-2">
                                                 <div class="flex-grow-1">
-                                                    <h6 class="card-title mb-1">{{ chat.chat_title or ('Chat ' + chat.chat_id|string) }}</h6>
+                                                    <h6 class="card-title mb-1">{{ chat.chat_title or ('Chat ' +
+                                                        chat.chat_id|string) }}</h6>
                                                     <div class="chat-id mb-2">ID: {{ chat.chat_id }}</div>
                                                 </div>
                                                 <div class="dropdown">
@@ -273,7 +281,8 @@ Chat Blacklist - RPTR Corp
                                                         <li>
                                                             <form method="POST" action="/chat-blacklist/remove"
                                                                 class="d-inline">
-                                                                <input type="hidden" name="chat_id" value="{{ chat.chat_id }}">
+                                                                <input type="hidden" name="chat_id"
+                                                                    value="{{ chat.chat_id }}">
                                                                 <button type="submit" class="dropdown-item text-danger"
                                                                     onclick="return confirm('Remove this chat from your list?')">>
                                                                     <i class="fas fa-trash"></i> Remove
@@ -307,13 +316,19 @@ Chat Blacklist - RPTR Corp
                                 {% if list_mode == 'whitelist' %}
                                 <i class="fas fa-check-circle fa-3x text-muted mb-3"></i>
                                 <h5 class="text-muted">No Whitelisted Chats</h5>
-                                <p class="text-muted">Add chat IDs above to enable message filtering for specific chats only.
-                                    <br><strong>Note:</strong> In whitelist mode, filtering only applies to chats in your list.</p>
+                                <p class="text-muted">Add chat IDs above to enable message filtering for specific chats
+                                    only.
+                                    <br><strong>Note:</strong> In whitelist mode, filtering only applies to chats in
+                                    your list.
+                                </p>
                                 {% else %}
                                 <i class="fas fa-shield-alt fa-3x text-muted mb-3"></i>
                                 <h5 class="text-muted">No Blacklisted Chats</h5>
-                                <p class="text-muted">Add chat IDs above to disable message filtering for specific chats.
-                                    <br><strong>Note:</strong> In blacklist mode, all chats are filtered except those in your list.</p>
+                                <p class="text-muted">Add chat IDs above to disable message filtering for specific
+                                    chats.
+                                    <br><strong>Note:</strong> In blacklist mode, all chats are filtered except those in
+                                    your list.
+                                </p>
                                 {% endif %}
                             </div>
                             {% endif %}
@@ -336,8 +351,10 @@ Chat Blacklist - RPTR Corp
                                     <h6><i class="fas fa-lock text-success"></i> Requirements</h6>
                                     <ul class="list-unstyled">
                                         <li><i class="fas fa-check text-success"></i> Must have a locked profile</li>
-                                        <li><i class="fas fa-check text-success"></i> Profile protection must be enabled</li>
-                                        <li><i class="fas fa-check text-success"></i> Only works for outgoing messages</li>
+                                        <li><i class="fas fa-check text-success"></i> Profile protection must be enabled
+                                        </li>
+                                        <li><i class="fas fa-check text-success"></i> Only works for outgoing messages
+                                        </li>
                                     </ul>
                                 </div>
                                 <div class="col-md-6">
@@ -346,7 +363,8 @@ Chat Blacklist - RPTR Corp
                                         <li><i class="fas fa-check text-success"></i> Badwords filtering</li>
                                         <li><i class="fas fa-check text-success"></i> Autocorrect processing</li>
                                         <li><i class="fas fa-check text-success"></i> Message content restrictions</li>
-                                        <li><i class="fas fa-exclamation-triangle text-warning"></i> Energy costs still apply</li>
+                                        <li><i class="fas fa-exclamation-triangle text-warning"></i> Energy costs still
+                                            apply</li>
                                     </ul>
                                 </div>
                             </div>
@@ -355,25 +373,31 @@ Chat Blacklist - RPTR Corp
                                     <h6><i class="fas fa-shield-alt text-success"></i> Blacklist Mode</h6>
                                     <ul class="list-unstyled">
                                         <li><i class="fas fa-info text-info"></i> Default mode for all users</li>
-                                        <li><i class="fas fa-check text-success"></i> Filtering applies to ALL chats</li>
+                                        <li><i class="fas fa-check text-success"></i> Filtering applies to ALL chats
+                                        </li>
                                         <li><i class="fas fa-times text-danger"></i> EXCEPT chats in your blacklist</li>
-                                        <li><i class="fas fa-lightbulb text-warning"></i> Good for exempting a few trusted chats</li>
+                                        <li><i class="fas fa-lightbulb text-warning"></i> Good for exempting a few
+                                            trusted chats</li>
                                     </ul>
                                 </div>
                                 <div class="col-md-6">
                                     <h6><i class="fas fa-check-circle text-primary"></i> Whitelist Mode</h6>
                                     <ul class="list-unstyled">
-                                        <li><i class="fas fa-star text-warning"></i> Advanced mode for specific needs</li>
+                                        <li><i class="fas fa-star text-warning"></i> Advanced mode for specific needs
+                                        </li>
                                         <li><i class="fas fa-times text-danger"></i> No filtering by default</li>
-                                        <li><i class="fas fa-check text-success"></i> ONLY filter chats in your whitelist</li>
-                                        <li><i class="fas fa-lightbulb text-warning"></i> Good for filtering only specific chats</li>
+                                        <li><i class="fas fa-check text-success"></i> ONLY filter chats in your
+                                            whitelist</li>
+                                        <li><i class="fas fa-lightbulb text-warning"></i> Good for filtering only
+                                            specific chats</li>
                                     </ul>
                                 </div>
                             </div>
                             <div class="alert alert-warning mt-3">
                                 <strong><i class="fas fa-exclamation-triangle"></i> Important:</strong>
                                 To find a chat ID, you can look at the URL when viewing the chat in Telegram Web,
-                                or use bots like @userinfobot. Group IDs are typically negative numbers starting with -100.
+                                or use bots like @userinfobot. Group IDs are typically negative numbers starting with
+                                -100.
                             </div>
                         </div>
                     </div>

@@ -531,6 +531,50 @@ async def public_remove_badword(
         )
 
 
+@router.post("/sessions/{user_id}/badwords/update")
+async def public_update_badword_penalty(
+    request: Request,
+    user_id: int,
+    word: str = Form(...),
+    penalty: int = Form(...),
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Update the penalty for an existing badword via public dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Validate penalty
+        if penalty < 1 or penalty > 100:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Penalty must be between 1 and 100",
+                status_code=302,
+            )
+
+        # Update the badword penalty
+        success = await db_manager.update_badword_penalty(user_id, word, penalty)
+
+        if success:
+            logger.info(
+                f"Updated badword '{word}' penalty to {penalty} for user {user_id}"
+            )
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Badword '{word}' penalty updated successfully",
+                status_code=302,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Failed to update badword penalty",
+                status_code=302,
+            )
+
+    except Exception as e:
+        logger.error(f"Error updating badword penalty for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to update badword penalty",
+            status_code=302,
+        )
+
+
 @router.post("/sessions/{user_id}/autocorrect")
 async def update_autocorrect_settings(
     request: Request,
