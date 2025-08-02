@@ -75,12 +75,27 @@ class ChatWhitelistManager(BaseDatabaseManager):
         """Check if a chat is whitelisted for a user."""
         try:
             async with self.get_connection() as db:
-                cursor = await db.execute(
-                    "SELECT 1 FROM user_chat_whitelist WHERE user_id = ? AND chat_id = ?",
-                    (user_id, chat_id),
-                )
-                row = await cursor.fetchone()
-                return row is not None
+                # Normalize chat_id: Check both the original chat_id and its absolute value
+                # This handles the case where Telegram supergroup IDs can be stored as positive
+                # but received as negative in events (or vice versa)
+                chat_ids_to_check = [chat_id]
+                if chat_id < 0:
+                    chat_ids_to_check.append(abs(chat_id))
+                elif chat_id > 0:
+                    chat_ids_to_check.append(-chat_id)
+                
+                for check_id in chat_ids_to_check:
+                    cursor = await db.execute(
+                        "SELECT 1 FROM user_chat_whitelist WHERE user_id = ? AND chat_id = ?",
+                        (user_id, check_id),
+                    )
+                    row = await cursor.fetchone()
+                    if row is not None:
+                        logger.info(f"WHITELIST CHECK | User: {user_id} | Chat: {chat_id} | Matched stored chat_id: {check_id} | Found: True")
+                        return True
+                
+                logger.info(f"WHITELIST CHECK | User: {user_id} | Chat: {chat_id} | Checked IDs: {chat_ids_to_check} | Found: False")
+                return False
         except Exception as e:
             logger.error(
                 f"Error checking if chat is whitelisted for user {user_id}: {e}"
