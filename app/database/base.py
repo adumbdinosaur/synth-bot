@@ -316,6 +316,21 @@ class BaseDatabaseManager:
                 """
                 )
 
+                # Whitelist words - words that are always allowed to be sent, even when power is 0
+                await db.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS user_whitelist_words (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        word TEXT NOT NULL,
+                        case_sensitive BOOLEAN DEFAULT FALSE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                        UNIQUE(user_id, word, case_sensitive)
+                    )
+                """
+                )
+
                 await db.commit()
                 logger.info("✅ Database initialized successfully")
 

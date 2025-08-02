@@ -15,6 +15,7 @@ from .chat_blacklist_manager import ChatBlacklistManager
 from .chat_whitelist_manager import ChatWhitelistManager
 from .chat_list_settings_manager import ChatListSettingsManager
 from .custom_redactions_manager import CustomRedactionsManager
+from .whitelist_words_manager import WhitelistWordsManager
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class DatabaseManager(BaseDatabaseManager):
         self.chat_whitelist = ChatWhitelistManager(database_path)
         self.chat_list_settings = ChatListSettingsManager(database_path)
         self.custom_redactions = CustomRedactionsManager(database_path)
+        self.whitelist_words = WhitelistWordsManager(database_path)
 
         logger.info(f"DatabaseManager initialized with database: {database_path}")
 
@@ -227,6 +229,26 @@ class DatabaseManager(BaseDatabaseManager):
 
     async def filter_badwords_from_message(self, user_id: int, message: str):
         return await self.badwords.filter_badwords_from_message(user_id, message)
+
+    # Whitelist words management
+    async def get_user_whitelist_words(self, user_id: int):
+        return await self.whitelist_words.get_user_whitelist_words(user_id)
+
+    async def add_whitelist_word(
+        self, user_id: int, word: str, case_sensitive: bool = False
+    ):
+        return await self.whitelist_words.add_whitelist_word(
+            user_id, word, case_sensitive
+        )
+
+    async def remove_whitelist_word(self, user_id: int, word: str):
+        return await self.whitelist_words.remove_whitelist_word(user_id, word)
+
+    async def is_message_whitelisted(self, user_id: int, message: str):
+        return await self.whitelist_words.is_message_whitelisted(user_id, message)
+
+    async def clear_all_whitelist_words(self, user_id: int):
+        return await self.whitelist_words.clear_all_whitelist_words(user_id)
 
     # Session management
     async def save_telegram_session(self, user_id: int, session_data: str):

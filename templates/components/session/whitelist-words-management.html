@@ -1,0 +1,166 @@
+<!-- Whitelist Words Management Section Component -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card collapsible-section">
+            <div class="card-header" data-bs-toggle="collapse" data-bs-target="#whitelistWordsCollapse"
+                aria-expanded="false" aria-controls="whitelistWordsCollapse">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4><i class="fas fa-shield-alt text-primary"></i> Whitelist Words Management</h4>
+                        <p class="text-muted mb-0">Manage words that are always allowed to be sent, even when power is 0
+                        </p>
+                    </div>
+                    <i class="fas fa-chevron-down collapse-toggle collapsed"></i>
+                </div>
+            </div>
+            <div class="collapse" id="whitelistWordsCollapse">
+                <div class="card-body">
+                    <!-- Add New Whitelist Word Form -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5><i class="fas fa-plus"></i> Add New Whitelist Word</h5>
+                            <form method="POST" action="/public/sessions/{{ session.user_id }}/whitelist-words/add">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="whitelist_word" class="form-label">Word/Phrase</label>
+                                        <input type="text" class="form-control" id="whitelist_word" name="word"
+                                            placeholder="Enter word or phrase" required maxlength="200">
+                                        <div class="form-text">This word/phrase will always be allowed to be sent</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Options</label>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox"
+                                                id="whitelist_case_sensitive" name="case_sensitive" value="true">
+                                            <label class="form-check-label" for="whitelist_case_sensitive">
+                                                Case Sensitive
+                                            </label>
+                                        </div>
+                                        <div class="form-text">Exact case matching</div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">&nbsp;</label>
+                                        <button type="submit" class="btn btn-success w-100">
+                                            <i class="fas fa-plus"></i> Add
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Current Whitelist Words List -->
+                    <div class="row">
+                        <div class="col-12">
+                            <h5><i class="fas fa-list text-success"></i> Current Whitelist Words ({{
+                                whitelist_words|length }})</h5>
+                            {% if whitelist_words %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-success">
+                                        <tr>
+                                            <th>Word/Phrase</th>
+                                            <th>Case Sensitive</th>
+                                            <th>Added</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for whitelist_word in whitelist_words %}
+                                        <tr>
+                                            <td>
+                                                <code class="text-success">{{ whitelist_word.word }}</code>
+                                            </td>
+                                            <td>
+                                                {% if whitelist_word.case_sensitive %}
+                                                <span class="badge bg-warning">
+                                                    <i class="fas fa-check"></i> Yes
+                                                </span>
+                                                {% else %}
+                                                <span class="badge bg-secondary">
+                                                    <i class="fas fa-times"></i> No
+                                                </span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    {{ whitelist_word.created_at[:10] if whitelist_word.created_at else
+                                                    'Unknown' }}
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <form method="POST"
+                                                    action="/public/sessions/{{ session.user_id }}/whitelist-words/remove"
+                                                    class="d-inline">
+                                                    <input type="hidden" name="word" value="{{ whitelist_word.word }}">
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm"
+                                                        onclick="return confirm('Remove whitelist word \'{{ whitelist_word.word }}\'?')">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i>
+                                No whitelist words configured for this user. Add some above to allow specific messages
+                                even when power is 0.
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Bulk Whitelist Words Actions -->
+                    {% if whitelist_words %}
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card bulk-actions-card">
+                                <div class="card-body">
+                                    <h6 class="card-title mb-3">
+                                        <i class="fas fa-layer-group"></i> Bulk Actions
+                                    </h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-12">
+                                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                                <button type="button" class="btn btn-outline-danger"
+                                                    onclick="clearAllWhitelistWords()">
+                                                    <i class="fas fa-trash-alt"></i> Clear All Whitelist Words
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Whitelist Words Info -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="alert alert-success">
+                                <h6><i class="fas fa-shield-alt"></i> How Whitelist Words Work</h6>
+                                <ul class="mb-0">
+                                    <li><strong>Always Allowed:</strong> Messages that exactly match whitelist words are
+                                        always allowed to be sent</li>
+                                    <li><strong>Power Override:</strong> Even when power is 0, or sending would make
+                                        power 0, these messages still go through</li>
+                                    <li><strong>Exact Match:</strong> The entire message must match the whitelist word
+                                        exactly (not just part of it)</li>
+                                    <li><strong>Case Sensitivity:</strong> Choose whether matching should be
+                                        case-sensitive or not</li>
+                                    <li><strong>Emergency Use:</strong> Perfect for emergency words or important phrases
+                                        that should never be blocked</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

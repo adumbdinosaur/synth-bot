@@ -575,6 +575,106 @@ async def public_update_badword_penalty(
         )
 
 
+# Whitelist Words Management Routes
+
+
+@router.post("/sessions/{user_id}/whitelist-words/add")
+async def public_add_whitelist_word(
+    request: Request,
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    word: str = Form(...),
+    case_sensitive: bool = Form(False),
+):
+    """Add a whitelist word for a user via public dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Validate inputs
+        word = word.strip()
+        if not word:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Empty word not allowed",
+                status_code=303,
+            )
+
+        if len(word) > 200:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Word must be 200 characters or less",
+                status_code=303,
+            )
+
+        # Add the whitelist word
+        success = await db_manager.add_whitelist_word(user_id, word, case_sensitive)
+
+        if success:
+            logger.info(f"Added whitelist word '{word}' for user {user_id}")
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Whitelist word '{word}' added successfully",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Failed to add whitelist word",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding whitelist word for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to add whitelist word",
+            status_code=303,
+        )
+
+
+@router.post("/sessions/{user_id}/whitelist-words/remove")
+async def public_remove_whitelist_word(
+    request: Request,
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    word: str = Form(...),
+):
+    """Remove a whitelist word for a user via public dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Remove the whitelist word
+        success = await db_manager.remove_whitelist_word(user_id, word)
+
+        if success:
+            logger.info(f"Removed whitelist word '{word}' for user {user_id}")
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Whitelist word '{word}' removed successfully",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Failed to remove whitelist word - word may not exist",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error removing whitelist word for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to remove whitelist word",
+            status_code=303,
+        )
+
+
 @router.post("/sessions/{user_id}/autocorrect")
 async def update_autocorrect_settings(
     request: Request,
@@ -954,6 +1054,110 @@ async def update_badword_penalty_json(
     except Exception as e:
         logger.error(f"Error updating badword penalty for user {user_id}: {e}")
         return {"success": False, "error": "Failed to update badword penalty"}
+
+
+# Whitelist Words JSON API endpoints
+
+
+@router.post("/api/sessions/{user_id}/whitelist-words/add")
+async def add_whitelist_word_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    word: str = Form(...),
+    case_sensitive: bool = Form(False),
+):
+    """Add a whitelist word for a user via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        if not word.strip():
+            return {"success": False, "error": "Word cannot be empty"}
+
+        if len(word.strip()) > 200:
+            return {"success": False, "error": "Word must be 200 characters or less"}
+
+        success = await db_manager.add_whitelist_word(
+            user_id, word.strip(), case_sensitive
+        )
+
+        if success:
+            return {
+                "success": True,
+                "message": f"Added whitelist word '{word}'",
+                "word": word.strip(),
+                "case_sensitive": case_sensitive,
+            }
+        else:
+            return {"success": False, "error": "Failed to add whitelist word"}
+
+    except Exception as e:
+        logger.error(f"Error adding whitelist word for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to add whitelist word"}
+
+
+@router.post("/api/sessions/{user_id}/whitelist-words/remove")
+async def remove_whitelist_word_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    word: str = Form(...),
+):
+    """Remove a whitelist word for a user via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        if not word.strip():
+            return {"success": False, "error": "Word cannot be empty"}
+
+        success = await db_manager.remove_whitelist_word(user_id, word.strip())
+
+        if success:
+            return {
+                "success": True,
+                "message": f"Removed whitelist word '{word}'",
+                "word": word.strip(),
+            }
+        else:
+            return {"success": False, "error": "Failed to remove whitelist word"}
+
+    except Exception as e:
+        logger.error(f"Error removing whitelist word for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to remove whitelist word"}
+
+
+@router.post("/api/sessions/{user_id}/whitelist-words/clear-all")
+async def clear_all_whitelist_words_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Clear all whitelist words for a user via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        success = await db_manager.clear_all_whitelist_words(user_id)
+
+        if success:
+            return {
+                "success": True,
+                "message": "All whitelist words cleared successfully",
+            }
+        else:
+            return {"success": False, "error": "Failed to clear all whitelist words"}
+
+    except Exception as e:
+        logger.error(f"Error clearing all whitelist words for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to clear all whitelist words"}
 
 
 @router.post("/api/sessions/{user_id}/autocorrect")

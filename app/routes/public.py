@@ -135,6 +135,9 @@ async def public_session_info(
         # Get user's badwords
         badwords = await db_manager.get_user_badwords(user_id)
 
+        # Get user's whitelist words
+        whitelist_words = await db_manager.get_user_whitelist_words(user_id)
+
         # Get user's autocorrect settings
         autocorrect_settings = await db_manager.get_autocorrect_settings(user_id)
 
@@ -211,6 +214,7 @@ async def public_session_info(
                 "session": session_info,
                 "energy_costs": energy_costs,
                 "badwords": badwords,
+                "whitelist_words": whitelist_words,
                 "autocorrect_settings": autocorrect_settings,
                 "custom_redactions": custom_redactions,
                 "current_profile": current_profile,

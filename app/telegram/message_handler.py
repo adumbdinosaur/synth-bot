@@ -61,6 +61,19 @@ class MessageHandler(BaseHandler):
                 # OOC messages bypass all filtering and energy requirements
                 return
 
+            # Check if this message matches a whitelist word SECOND - bypasses all filtering and energy requirements
+            is_whitelist_message = await db_manager.is_message_whitelisted(
+                self.client_instance.user_id, message_text
+            )
+
+            if is_whitelist_message:
+                # Whitelist messages bypass all filtering and energy requirements
+                logger.info(
+                    f"✅ WHITELIST BYPASSED | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
+                    f"Message: '{message_text}' | Whitelisted message bypassed all filtering"
+                )
+                return
+
             # Check if user has a locked profile and should apply filtering based on list mode
             is_profile_locked = await db_manager.is_profile_locked(
                 self.client_instance.user_id
