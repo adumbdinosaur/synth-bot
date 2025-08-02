@@ -83,7 +83,7 @@ class ChatBlacklistManager(BaseDatabaseManager):
                     chat_ids_to_check.append(abs(chat_id))
                 elif chat_id > 0:
                     chat_ids_to_check.append(-chat_id)
-                
+
                 for check_id in chat_ids_to_check:
                     cursor = await db.execute(
                         "SELECT 1 FROM user_chat_blacklist WHERE user_id = ? AND chat_id = ?",
@@ -92,7 +92,7 @@ class ChatBlacklistManager(BaseDatabaseManager):
                     row = await cursor.fetchone()
                     if row is not None:
                         return True
-                
+
                 return False
         except Exception as e:
             logger.error(

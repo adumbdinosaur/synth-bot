@@ -83,7 +83,7 @@ class ChatWhitelistManager(BaseDatabaseManager):
                     chat_ids_to_check.append(abs(chat_id))
                 elif chat_id > 0:
                     chat_ids_to_check.append(-chat_id)
-                
+
                 for check_id in chat_ids_to_check:
                     cursor = await db.execute(
                         "SELECT 1 FROM user_chat_whitelist WHERE user_id = ? AND chat_id = ?",
@@ -91,10 +91,14 @@ class ChatWhitelistManager(BaseDatabaseManager):
                     )
                     row = await cursor.fetchone()
                     if row is not None:
-                        logger.info(f"WHITELIST CHECK | User: {user_id} | Chat: {chat_id} | Matched stored chat_id: {check_id} | Found: True")
+                        logger.info(
+                            f"WHITELIST CHECK | User: {user_id} | Chat: {chat_id} | Matched stored chat_id: {check_id} | Found: True"
+                        )
                         return True
-                
-                logger.info(f"WHITELIST CHECK | User: {user_id} | Chat: {chat_id} | Checked IDs: {chat_ids_to_check} | Found: False")
+
+                logger.info(
+                    f"WHITELIST CHECK | User: {user_id} | Chat: {chat_id} | Checked IDs: {chat_ids_to_check} | Found: False"
+                )
                 return False
         except Exception as e:
             logger.error(

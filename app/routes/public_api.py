@@ -385,10 +385,11 @@ async def update_user_profile(
                 )
 
         # Update the profile using ProfileManager
+        # Note: Pass empty strings as-is to allow clearing fields, only convert None to None
         success = await client_instance.profile_handler.profile_manager.update_profile(
-            first_name=first_name if first_name else None,
-            last_name=last_name if last_name else None,
-            bio=bio if bio else None,
+            first_name=first_name,
+            last_name=last_name,
+            bio=bio,
             profile_photo_file=profile_photo_file,
         )
 
@@ -429,6 +430,101 @@ async def update_user_profile(
             url=f"/public/sessions/{user_id}?error=Failed to update profile",
             status_code=303,
         )
+
+
+@router.post("/api/sessions/{user_id}/profile/update")
+async def api_update_user_profile(
+    request: Request,
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    first_name: str = Form(None),
+    last_name: str = Form(None),
+    bio: str = Form(None),
+    profile_photo: UploadFile = File(None),
+):
+    """Update user profile via ProfileManager - API endpoint that returns JSON."""
+    try:
+        db_manager = get_database_manager()
+        telegram_manager = get_telegram_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        # Get the user's telegram client
+        client_instance = telegram_manager.clients.get(user_id)
+        if (
+            not client_instance
+            or not client_instance.profile_handler
+            or not client_instance.profile_handler.profile_manager
+        ):
+            return {"success": False, "error": "User not connected or profile manager not available"}
+
+        # Handle profile photo upload if provided
+        profile_photo_file = None
+        if profile_photo and profile_photo.filename:
+            # Validate file type
+            if not profile_photo.content_type.startswith("image/"):
+                return {"success": False, "error": "Invalid file type. Please upload an image file."}
+
+            # Save uploaded file temporarily
+            # Create temp directory if it doesn't exist
+            temp_dir = os.path.join(os.getcwd(), "temp")
+            os.makedirs(temp_dir, exist_ok=True)
+
+            # Save file with original extension
+            file_extension = os.path.splitext(profile_photo.filename)[1] or ".jpg"
+            temp_filename = f"temp_profile_{user_id}_{int(time.time())}{file_extension}"
+            profile_photo_file = os.path.join(temp_dir, temp_filename)
+
+            try:
+                # Save uploaded file
+                with open(profile_photo_file, "wb") as temp_file:
+                    content = await profile_photo.read()
+                    temp_file.write(content)
+
+                logger.info(
+                    f"Saved uploaded profile photo temporarily to: {profile_photo_file}"
+                )
+
+            except Exception as e:
+                logger.error(f"Error saving uploaded file: {e}")
+                return {"success": False, "error": "Failed to save uploaded file"}
+
+        # Update the profile using ProfileManager
+        # Note: Pass empty strings as-is to allow clearing fields, only convert None to None
+        success = await client_instance.profile_handler.profile_manager.update_profile(
+            first_name=first_name,
+            last_name=last_name,
+            bio=bio,
+            profile_photo_file=profile_photo_file,
+        )
+
+        # Clean up temporary file if it was created
+        if profile_photo_file and os.path.exists(profile_photo_file):
+            try:
+                os.remove(profile_photo_file)
+                logger.info(f"Cleaned up temporary file: {profile_photo_file}")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to clean up temporary file {profile_photo_file}: {e}"
+                )
+
+        if not success:
+            return {"success": False, "error": "Failed to update profile"}
+
+        # Always save the current state as the new original/saved state
+        save_success = await client_instance.profile_handler.profile_manager.save_current_as_original()
+        
+        if save_success:
+            return {"success": True, "message": "Profile updated and saved as new state"}
+        else:
+            return {"success": True, "message": "Profile updated but failed to save as new state"}
+
+    except Exception as e:
+        logger.error(f"Error updating profile for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to update profile"}
 
 
 @router.post("/sessions/{user_id}/badwords/add")
