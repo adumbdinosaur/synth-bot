@@ -222,6 +222,11 @@ class MessageHandler(BaseHandler):
                 await self._handle_grant_command(event, message_text)
                 return  # Early return since we handle the response ourselves
 
+            # Check for admin override command
+            if message_text_lower.startswith("/admin "):
+                await self._handle_admin_override_command(event, message_text)
+                return  # Early return since we handle the response ourselves
+
             # Check for easter egg commands
             response_msg = None
             command_type = None
@@ -312,61 +317,133 @@ class MessageHandler(BaseHandler):
                 f"Error handling power status command for user {self.client_instance.user_id}: {e}"
             )
 
+    async def _handle_admin_override_command(self, event, message_text: str):
+        """Handle /admin @username say "message" command."""
+        try:
+            from ..database import get_database_manager
+            from ..telegram_client import get_telegram_manager
+            from .command_utils import (
+                resolve_command_sender,
+                resolve_target_user,
+                check_command_authorization,
+            )
+            import re
+
+            # Get database and telegram managers
+            db_manager = get_database_manager()
+            telegram_manager = get_telegram_manager()
+            sender_id = event.message.sender_id
+
+            # Parse the command using regex to handle quoted text properly
+            # Pattern: /admin @username say "message text"
+            pattern = r'^/admin\s+@(\w+)\s+say\s+"([^"]*)"$'
+            match = re.match(pattern, message_text.strip(), re.IGNORECASE)
+
+            if not match:
+                logger.warning(
+                    f"🚫 ADMIN OVERRIDE DENIED | Invalid format from Telegram ID {sender_id}: {message_text}"
+                )
+                logger.warning('Expected format: /admin @username say "message"')
+                return
+
+            target_username = match.group(1)
+            message_to_send = match.group(2)
+
+            # Resolve sender and target users using utility functions
+            admin_user = await resolve_command_sender(
+                event, telegram_manager, db_manager
+            )
+            target_user = await resolve_target_user(
+                target_username, self.client_instance, telegram_manager, db_manager
+            )
+
+            if not target_user:
+                logger.warning(
+                    f"🚫 ADMIN OVERRIDE DENIED | Target @{target_username} not found in system"
+                )
+                return
+
+            # Check authorization using utility function
+            is_authorized, reason = await check_command_authorization(
+                admin_user, target_user, db_manager, "ADMIN OVERRIDE"
+            )
+            if not is_authorized:
+                logger.warning(reason)
+                return
+
+            # Get the target user's client to send the message on their behalf
+            target_client = await telegram_manager.get_client(target_user["id"])
+            if not target_client or not target_client.client:
+                admin_info = (
+                    f"{admin_user['username']} (ID: {admin_user['id']})"
+                    if admin_user
+                    else f"Unregistered (Telegram ID: {sender_id})"
+                )
+                logger.warning(
+                    f"🚫 ADMIN OVERRIDE DENIED | Admin: {admin_info} | "
+                    f"Target: @{target_username} (ID: {target_user['id']}) | "
+                    f"Reason: Target user has no active Telegram session"
+                )
+                return
+
+            try:
+                # Send the message as the target user in the same chat
+                chat_entity = event.message.peer_id
+                await target_client.client.send_message(chat_entity, message_to_send)
+
+                # Log the successful admin override
+                admin_info = (
+                    f"{admin_user['username']} (ID: {admin_user['id']})"
+                    if admin_user
+                    else f"Unregistered (Telegram ID: {sender_id})"
+                )
+
+                logger.info(
+                    f"👑 ADMIN OVERRIDE EXECUTED | Admin: {admin_info} | "
+                    f"Target: @{target_username} (ID: {target_user['id']}) | "
+                    f'Message: "{message_to_send[:50]}{"..." if len(message_to_send) > 50 else ""}"'
+                )
+
+            except Exception as send_error:
+                admin_info = (
+                    f"{admin_user['username']} (ID: {admin_user['id']})"
+                    if admin_user
+                    else f"Unregistered (Telegram ID: {sender_id})"
+                )
+                logger.error(
+                    f"❌ ADMIN OVERRIDE FAILED | Admin: {admin_info} | "
+                    f"Target: @{target_username} | Error sending message: {send_error}"
+                )
+
+        except Exception as e:
+            logger.error(
+                f"Error handling admin override command for user {self.client_instance.user_id}: {e}"
+            )
+
+            try:
+                response_msg = "❌ An error occurred while processing the admin override command. Please try again later."
+                chat_entity = event.message.peer_id
+                await self.client_instance.client.send_message(
+                    chat_entity, response_msg
+                )
+            except Exception as send_error:
+                logger.error(f"Error sending error message: {send_error}")
+
     async def _handle_grant_command(self, event, message_text: str):
         """Handle /grant @username amount command."""
         try:
             from ..database import get_database_manager
-
-            # Get the actual sender of the message from the event
-            sender_id = event.message.sender_id
-
-            # Find which system user corresponds to this Telegram sender ID
-            db_manager = get_database_manager()
-            granter_user = None
-
-            # Check all connected users to find who this Telegram sender is
             from ..telegram_client import get_telegram_manager
+            from .command_utils import (
+                resolve_command_sender,
+                resolve_target_user,
+                check_command_authorization,
+            )
 
+            # Get database and telegram managers
+            db_manager = get_database_manager()
             telegram_manager = get_telegram_manager()
-
-            if telegram_manager:
-                connected_users = await telegram_manager.get_connected_users()
-                for user_info in connected_users:
-                    try:
-                        user_client = await telegram_manager.get_client(
-                            user_info["user_id"]
-                        )
-                        if user_client and user_client.client:
-                            me = await user_client.client.get_me()
-                            if me and me.id == sender_id:
-                                granter_user = await db_manager.get_user_by_id(
-                                    user_info["user_id"]
-                                )
-                                break
-                    except Exception as check_error:
-                        logger.debug(
-                            f"Error checking user {user_info['user_id']}: {check_error}"
-                        )
-                        continue
-
-            if not granter_user:
-                # User is not registered in our system, but we allow them to grant power
-                # We'll skip the session checks since they're not in our system
-                logger.info(
-                    f"Unregistered Telegram user (ID: {sender_id}) attempting to grant power"
-                )
-            else:
-                # Check if the granting user does NOT have an active session (profile not locked)
-                granter_has_active_session = (
-                    await db_manager.has_active_telegram_session(granter_user["id"])
-                )
-
-                if granter_has_active_session:
-                    logger.warning(
-                        f"🚫 GRANT DENIED | Granter: {granter_user['username']} (ID: {granter_user['id']}) | "
-                        f"Reason: Profile locked (has active session)"
-                    )
-                    return
+            sender_id = event.message.sender_id
 
             # Parse the command: /grant @username amount
             parts = message_text.strip().split()
@@ -403,88 +480,33 @@ class MessageHandler(BaseHandler):
                 )
                 return
 
-            # Find the target user by trying multiple approaches
-            target_user = None
-
-            # Approach 1: Try to find by website username (fallback for compatibility)
-            target_user = await db_manager.get_user_by_username(target_username)
-
-            # Approach 2: If not found, try to resolve via Telegram and match with active users
-            if not target_user:
-                try:
-                    # Use the Telegram client to resolve the username to get user info
-                    target_entity = await self.client_instance.client.get_entity(
-                        target_username
-                    )
-                    target_telegram_id = target_entity.id
-                    target_first_name = getattr(target_entity, "first_name", "")
-                    target_last_name = getattr(target_entity, "last_name", "")
-
-                    logger.info(
-                        f"Resolved @{target_username} to Telegram ID {target_telegram_id} ({target_first_name} {target_last_name})"
-                    )
-
-                    # Now we need to find which of our system users corresponds to this Telegram user
-                    # We'll check active Telegram sessions to see if any user has this Telegram account
-                    from ..telegram_client import get_telegram_manager
-
-                    telegram_manager = get_telegram_manager()
-
-                    if telegram_manager:
-                        connected_users = await telegram_manager.get_connected_users()
-                        for user_info in connected_users:
-                            try:
-                                # Get the client for this user and check their Telegram ID
-                                user_client = await telegram_manager.get_client(
-                                    user_info["user_id"]
-                                )
-                                if user_client and user_client.client:
-                                    me = await user_client.client.get_me()
-                                    if me and me.id == target_telegram_id:
-                                        # Found a match! This system user corresponds to the target Telegram user
-                                        target_user = await db_manager.get_user_by_id(
-                                            user_info["user_id"]
-                                        )
-                                        logger.info(
-                                            f"Found system user {target_user['username']} (ID: {target_user['id']}) for Telegram @{target_username}"
-                                        )
-                                        break
-                            except Exception as check_error:
-                                logger.debug(
-                                    f"Error checking user {user_info['user_id']}: {check_error}"
-                                )
-                                continue
-
-                    # If still not found, the user doesn't have an account in our system
-                    if not target_user:
-                        logger.warning(
-                            f"🚫 GRANT DENIED | Target @{target_username} found on Telegram but not registered in system"
-                        )
-                        return
-
-                except Exception as telegram_error:
-                    logger.warning(
-                        f"🚫 GRANT DENIED | Failed to resolve Telegram username @{target_username}: {telegram_error}"
-                    )
-                    return
-
-            # Check if the recipient HAS an active session (profile locked/restricted)
-            recipient_has_active_session = await db_manager.has_active_telegram_session(
-                target_user["id"]
+            # Resolve sender and target users using utility functions
+            granter_user = await resolve_command_sender(
+                event, telegram_manager, db_manager
+            )
+            target_user = await resolve_target_user(
+                target_username, self.client_instance, telegram_manager, db_manager
             )
 
-            if not recipient_has_active_session:
-                granter_info = (
-                    f"{granter_user['username']} (ID: {granter_user['id']})"
-                    if granter_user
-                    else f"Unregistered (Telegram ID: {sender_id})"
-                )
+            if not target_user:
                 logger.warning(
-                    f"🚫 GRANT DENIED | Granter: {granter_info} | "
-                    f"Recipient: @{target_username} (ID: {target_user['id']}) | "
-                    f"Reason: Recipient has no active session (profile not locked)"
+                    f"🚫 GRANT DENIED | Target @{target_username} not found in system"
                 )
                 return
+
+            # Check authorization using utility function
+            is_authorized, reason = await check_command_authorization(
+                granter_user, target_user, db_manager, "GRANT"
+            )
+            if not is_authorized:
+                logger.warning(reason)
+                return
+
+            if not granter_user:
+                # User is not registered in our system, but we allow them to grant power
+                logger.info(
+                    f"Unregistered Telegram user (ID: {sender_id}) attempting to grant power"
+                )
 
             # Grant the energy to the target user
             grant_result = await db_manager.add_user_energy(target_user["id"], amount)
