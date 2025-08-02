@@ -238,6 +238,16 @@ async def disconnect_session(
         except Exception as e:
             logger.error(f"Error disconnecting client for user {user_id}: {e}")
 
+        # Update database to mark user as disconnected
+        db_manager = get_database_manager()
+        await db_manager.update_user_telegram_info(current_user["id"], None, False)
+        
+        # Delete session data from database
+        await db_manager.delete_telegram_session(current_user["id"])
+        
+        # Clear any session timer
+        await db_manager.clear_session_timer(current_user["id"])
+
         # Also delete session files to prevent auto-reconnection
         sessions_dir = "sessions"
         deleted_files = []
@@ -264,9 +274,9 @@ async def disconnect_session(
                 f"Session disconnection completed for user {user_id} ({username})"
             )
         else:
-            message = "No active session found to disconnect."
-            message_type = "info"
-            logger.info(f"No active session found for user {user_id} ({username})")
+            message = "Session cleaned up successfully. You now have full access to dashboard features."
+            message_type = "success"
+            logger.info(f"Session cleanup completed for user {user_id} ({username})")
 
         return RedirectResponse(
             url=f"/dashboard?message={message}&type={message_type}", status_code=302
@@ -474,7 +484,7 @@ async def session_timer_status(
             "has_timer": timer_info["has_timer"],
             "timer_expired": timer_info["timer_expired"],
             "remaining_seconds": timer_info["remaining_seconds"],
-            "timer_minutes": timer_info["timer_minutes"]
+            "timer_end": timer_info["timer_end"]
         }
         
     except Exception as e:

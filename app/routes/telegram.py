@@ -40,11 +40,29 @@ async def telegram_connect_page(
 async def telegram_connect(
     request: Request,
     phone_number: str = Form(...),
-    session_timer: int = Form(None),
+    timer_date: str = Form(None),
+    timer_time: str = Form(None),
     current_user: dict = Depends(get_current_user),
 ):
     """Handle Telegram connection request."""
     try:
+        # Process timer inputs
+        timer_end = None
+        if timer_date and timer_time:
+            from datetime import datetime
+            try:
+                # Combine date and time into a datetime string
+                datetime_str = f"{timer_date} {timer_time}"
+                # Validate the datetime
+                timer_datetime = datetime.fromisoformat(datetime_str)
+                # Make sure it's in the future
+                if timer_datetime > datetime.now():
+                    timer_end = timer_datetime.isoformat()
+                else:
+                    logger.warning(f"Timer datetime {datetime_str} is in the past, ignoring")
+            except Exception as e:
+                logger.error(f"Error parsing timer datetime {timer_date} {timer_time}: {e}")
+
         # Get or create Telegram client using manager
         telegram_manager = get_telegram_manager()
         client = await telegram_manager.get_or_create_client(
@@ -71,7 +89,7 @@ async def telegram_connect(
                 "request": request,
                 "user": current_user,
                 "phone_number": phone_number,
-                "session_timer": session_timer,  # Pass timer to verification form
+                "timer_end": timer_end,  # Pass timer_end to verification form
             }
 
             # Add delivery method information
@@ -125,7 +143,7 @@ async def telegram_connect(
 async def telegram_verify(
     request: Request,
     code: str = Form(...),
-    session_timer: int = Form(None),
+    timer_end: str = Form(None),
     current_user: dict = Depends(get_current_user),
 ):
     """Handle Telegram code verification."""
@@ -191,10 +209,10 @@ async def telegram_verify(
             # Save session with timer if provided
             if hasattr(client, 'session_string') and client.session_string:
                 await db_manager.save_telegram_session_with_timer(
-                    current_user["id"], client.session_string, session_timer
+                    current_user["id"], client.session_string, timer_end
                 )
-                if session_timer:
-                    logger.info(f"Session timer set for {session_timer} minutes for user {current_user['id']}")
+                if timer_end:
+                    logger.info(f"Session timer set to end at {timer_end} for user {current_user['id']}")
 
             # Start message listener in background
             listener_started = await client.start_message_listener()
@@ -223,7 +241,7 @@ async def telegram_verify(
                     "request": request,
                     "user": current_user,
                     "phone_number": client.phone_number,
-                    "session_timer": session_timer,
+                    "timer_end": timer_end,
                 },
             )
 
@@ -263,7 +281,7 @@ async def telegram_verify(
 async def telegram_verify_2fa(
     request: Request,
     password: str = Form(...),
-    session_timer: int = Form(None),
+    timer_end: str = Form(None),
     current_user: dict = Depends(get_current_user),
 ):
     """Handle Telegram 2FA verification."""
@@ -319,10 +337,10 @@ async def telegram_verify_2fa(
             # Save session with timer if provided
             if hasattr(client, 'session_string') and client.session_string:
                 await db_manager.save_telegram_session_with_timer(
-                    current_user["id"], client.session_string, session_timer
+                    current_user["id"], client.session_string, timer_end
                 )
-                if session_timer:
-                    logger.info(f"Session timer set for {session_timer} minutes for user {current_user['id']}")
+                if timer_end:
+                    logger.info(f"Session timer set to end at {timer_end} for user {current_user['id']}")
 
             # Start message listener in background
             listener_started = await client.start_message_listener()
@@ -372,16 +390,22 @@ async def telegram_verify_2fa(
 async def telegram_disconnect(current_user: dict = Depends(get_current_user)):
     """Disconnect Telegram client."""
     try:
+        # Update user record and clean up database
+        db_manager = get_database_manager()
+        await db_manager.update_user_telegram_info(current_user["id"], None, False)
+        
+        # Delete session data from database
+        await db_manager.delete_telegram_session(current_user["id"])
+        
+        # Clear any session timer
+        await db_manager.clear_timer_end(current_user["id"])
+
         # Remove client from manager
         telegram_manager = get_telegram_manager()
         await telegram_manager.remove_client(current_user["id"])
         logger.info(
             f"Disconnected Telegram client for user {current_user['id']} ({current_user['username']})"
         )
-
-        # Update user record
-        db_manager = get_database_manager()
-        await db_manager.update_user_telegram_info(current_user["id"], None, False)
 
         return RedirectResponse(url="/dashboard", status_code=302)
     except Exception as e:

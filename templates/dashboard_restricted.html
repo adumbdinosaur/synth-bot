@@ -120,7 +120,7 @@
                     <small class="text-muted mt-2 d-block">
                         <i class="fas fa-warning me-1"></i>
                         {% if timer_info and timer_info.has_timer and not timer_info.timer_expired %}
-                        Timer set for {{ timer_info.timer_minutes }} minutes from session start.
+                        Timer set to end at {{ timer_info.timer_end[:16] if timer_info.timer_end else 'Unknown' }} ({{ timer_info.timer_end[11:16] if timer_info.timer_end else 'Unknown' }}).
                         {% else %}
                         This will stop all automated Telegram activities for your account.
                         {% endif %}

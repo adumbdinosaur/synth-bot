@@ -48,16 +48,28 @@
 
                         <div class="mb-4">
                             <label for="session_timer" class="form-label">Session Timer (Optional)</label>
-                            <div class="input-group">
-                                <span class="input-group-text">
-                                    <i class="fas fa-clock"></i>
-                                </span>
-                                <input type="number" class="form-control" id="session_timer" name="session_timer" 
-                                    min="5" max="1440" placeholder="Minutes">
-                                <span class="input-group-text">minutes</span>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="timer_date" class="form-label small">End Date</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fas fa-calendar"></i>
+                                        </span>
+                                        <input type="date" class="form-control" id="timer_date" name="timer_date">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="timer_time" class="form-label small">End Time</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fas fa-clock"></i>
+                                        </span>
+                                        <input type="time" class="form-control" id="timer_time" name="timer_time">
+                                    </div>
+                                </div>
                             </div>
                             <div class="form-text">
-                                Set a timer to automatically make disconnect available after specified minutes. Leave blank for no timer.
+                                Set a specific date and time when disconnect becomes available. Leave blank for no timer.
                             </div>
                         </div>
 
@@ -112,6 +124,36 @@
                 e.preventDefault();
                 showAlert('Please enter a valid phone number with country code', 'danger');
                 return;
+            }
+
+            // Validate timer if provided
+            const timerDate = document.getElementById('timer_date').value;
+            const timerTime = document.getElementById('timer_time').value;
+            
+            if ((timerDate && !timerTime) || (!timerDate && timerTime)) {
+                e.preventDefault();
+                showAlert('Please provide both date and time for the session timer, or leave both blank', 'warning');
+                return;
+            }
+            
+            if (timerDate && timerTime) {
+                const timerDateTime = new Date(timerDate + 'T' + timerTime);
+                const now = new Date();
+                
+                if (timerDateTime <= now) {
+                    e.preventDefault();
+                    showAlert('Session timer must be set to a future date and time', 'warning');
+                    return;
+                }
+                
+                // Warn if timer is more than 7 days in the future
+                const maxTime = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000));
+                if (timerDateTime > maxTime) {
+                    if (!confirm('Timer is set more than 7 days in the future. Continue?')) {
+                        e.preventDefault();
+                        return;
+                    }
+                }
             }
             setLoading('connectForm');
         });
