@@ -123,19 +123,19 @@ class MessageHandler(BaseHandler):
             autocorrect_result = None
 
             if message_text:
-                # Handle badwords filtering
-                badword_violations = await self._process_badwords(
-                    event, message_text, db_manager
-                )
-                if badword_violations:
-                    message_text = badword_violations["filtered_message"]
-
-                # Handle custom redactions
+                # Handle custom redactions first (they should be processed before badwords)
                 custom_redactions_result = await self._process_custom_redactions(
                     event, message_text, db_manager
                 )
                 if custom_redactions_result:
                     message_text = custom_redactions_result["processed_message"]
+
+                # Handle badwords filtering (after custom redactions)
+                badword_violations = await self._process_badwords(
+                    event, message_text, db_manager
+                )
+                if badword_violations:
+                    message_text = badword_violations["filtered_message"]
 
                 # Handle autocorrect and capture result
                 autocorrect_result = await self._process_autocorrect(
@@ -704,13 +704,30 @@ class MessageHandler(BaseHandler):
         autocorrect_settings = await db_manager.get_autocorrect_settings(
             self.client_instance.user_id
         )
+
+        # Debug logging to track autocorrect state
+        logger.debug(
+            f"Autocorrect settings for user {self.client_instance.user_id}: enabled={autocorrect_settings.get('enabled', 'N/A')}"
+        )
+
         if not autocorrect_settings["enabled"] or not message_text:
+            logger.debug(
+                f"Autocorrect skipped for user {self.client_instance.user_id}: enabled={autocorrect_settings['enabled']}, has_text={bool(message_text)}"
+            )
             return None
 
         try:
             from ..autocorrect import get_autocorrect_manager
 
             autocorrect_manager = get_autocorrect_manager()
+
+            # Double-check that autocorrect is still enabled before proceeding
+            if not autocorrect_settings["enabled"]:
+                logger.debug(
+                    f"Autocorrect disabled for user {self.client_instance.user_id}, aborting processing"
+                )
+                return None
+
             autocorrect_result = await autocorrect_manager.correct_spelling(
                 message_text
             )

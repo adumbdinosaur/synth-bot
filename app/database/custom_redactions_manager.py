@@ -21,7 +21,7 @@ class CustomRedactionsManager(BaseDatabaseManager):
                 cursor = await db.execute(
                     """SELECT original_word, replacement_word, penalty, case_sensitive, created_at 
                        FROM user_custom_redactions WHERE user_id = ? 
-                       ORDER BY original_word""",
+                       ORDER BY LENGTH(original_word) DESC, original_word""",
                     (user_id,),
                 )
                 rows = await cursor.fetchall()
