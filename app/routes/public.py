@@ -74,9 +74,13 @@ async def public_sessions_dashboard(
                 if telegram_user.get("username"):
                     session["display_name"] = f"@{telegram_user['username']}"
                 else:
-                    session["display_name"] = session["username"] or f"User {session['user_id']}"
+                    session["display_name"] = (
+                        session["username"] or f"User {session['user_id']}"
+                    )
             else:
-                session["display_name"] = session["username"] or f"User {session['user_id']}"
+                session["display_name"] = (
+                    session["username"] or f"User {session['user_id']}"
+                )
 
         return templates.TemplateResponse(
             "public_sessions_dashboard.html",

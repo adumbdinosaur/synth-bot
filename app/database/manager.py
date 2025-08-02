@@ -242,6 +242,19 @@ class DatabaseManager(BaseDatabaseManager):
     async def has_active_telegram_session(self, user_id: int):
         return await self.sessions.has_active_telegram_session(user_id)
 
+    # Session timer management
+    async def save_telegram_session_with_timer(self, user_id: int, session_data: str, timer_minutes: int = None):
+        return await self.sessions.save_telegram_session_with_timer(user_id, session_data, timer_minutes)
+
+    async def get_session_timer_info(self, user_id: int):
+        return await self.sessions.get_session_timer_info(user_id)
+
+    async def update_session_timer(self, user_id: int, timer_minutes: int = None):
+        return await self.sessions.update_session_timer(user_id, timer_minutes)
+
+    async def clear_session_timer(self, user_id: int):
+        return await self.sessions.clear_session_timer(user_id)
+
     # Authentication
     async def validate_invite_code(self, code: str):
         return await self.auth.validate_invite_code(code)

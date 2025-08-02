@@ -89,9 +89,25 @@
                 <div class="card-body">
                     <p class="card-text">
                         Your Neural Interface session is currently active and connected.
+                        {% if timer_info and timer_info.has_timer and not timer_info.timer_expired %}
+                        Session timer is active. Disconnect will be available when the timer expires.
+                        {% else %}
                         Disconnect to access full dashboard functionality.
+                        {% endif %}
                     </p>
                     <div class="d-grid gap-2">
+                        {% if timer_info and timer_info.has_timer and not timer_info.timer_expired %}
+                        <!-- Show countdown instead of disconnect button -->
+                        <div class="alert alert-warning text-center">
+                            <i class="fas fa-clock me-2"></i>
+                            <strong>Session Timer Active</strong>
+                            <div class="mt-2">
+                                <span class="fs-4" id="countdown-timer">Calculating...</span>
+                            </div>
+                            <small class="d-block mt-1">Disconnect will be available when timer expires</small>
+                        </div>
+                        {% else %}
+                        <!-- Show disconnect button -->
                         <form method="post" action="/disconnect-session"
                             onsubmit="return confirm('Are you sure you want to disconnect your Neural Interface session? This will stop all automated activities.');">
                             <button type="submit" class="btn btn-danger btn-lg w-100">
@@ -99,10 +115,15 @@
                                 Disconnect Neural Interface
                             </button>
                         </form>
+                        {% endif %}
                     </div>
                     <small class="text-muted mt-2 d-block">
                         <i class="fas fa-warning me-1"></i>
+                        {% if timer_info and timer_info.has_timer and not timer_info.timer_expired %}
+                        Timer set for {{ timer_info.timer_minutes }} minutes from session start.
+                        {% else %}
                         This will stop all automated Telegram activities for your account.
+                        {% endif %}
                     </small>
                 </div>
             </div>
@@ -400,6 +421,49 @@
         if (refreshInterval) {
             clearInterval(refreshInterval);
         }
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+        }
     });
+
+    // Session timer countdown functionality
+    {% if timer_info and timer_info.has_timer and not timer_info.timer_expired %}
+    let countdownInterval;
+    let remainingSeconds = {{ timer_info.remaining_seconds }};
+
+    function updateCountdown() {
+        const hours = Math.floor(remainingSeconds / 3600);
+        const minutes = Math.floor((remainingSeconds % 3600) / 60);
+        const seconds = remainingSeconds % 60;
+
+        let display = '';
+        if (hours > 0) {
+            display = `${hours}h ${minutes}m ${seconds}s`;
+        } else if (minutes > 0) {
+            display = `${minutes}m ${seconds}s`;
+        } else {
+            display = `${seconds}s`;
+        }
+
+        const timerElement = document.getElementById('countdown-timer');
+        if (timerElement) {
+            timerElement.textContent = display;
+        }
+
+        remainingSeconds--;
+
+        // When timer expires, reload the page to show disconnect button
+        if (remainingSeconds < 0) {
+            clearInterval(countdownInterval);
+            window.location.reload();
+        }
+    }
+
+    // Start countdown when page loads
+    document.addEventListener('DOMContentLoaded', function () {
+        updateCountdown(); // Update immediately
+        countdownInterval = setInterval(updateCountdown, 1000); // Update every second
+    });
+    {% endif %}
 </script>
 {% endblock %}

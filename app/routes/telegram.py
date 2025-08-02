@@ -40,6 +40,7 @@ async def telegram_connect_page(
 async def telegram_connect(
     request: Request,
     phone_number: str = Form(...),
+    session_timer: int = Form(None),
     current_user: dict = Depends(get_current_user),
 ):
     """Handle Telegram connection request."""
@@ -70,6 +71,7 @@ async def telegram_connect(
                 "request": request,
                 "user": current_user,
                 "phone_number": phone_number,
+                "session_timer": session_timer,  # Pass timer to verification form
             }
 
             # Add delivery method information
@@ -123,6 +125,7 @@ async def telegram_connect(
 async def telegram_verify(
     request: Request,
     code: str = Form(...),
+    session_timer: int = Form(None),
     current_user: dict = Depends(get_current_user),
 ):
     """Handle Telegram code verification."""
@@ -185,6 +188,14 @@ async def telegram_verify(
                 current_user["id"], client.phone_number, True
             )
 
+            # Save session with timer if provided
+            if hasattr(client, 'session_string') and client.session_string:
+                await db_manager.save_telegram_session_with_timer(
+                    current_user["id"], client.session_string, session_timer
+                )
+                if session_timer:
+                    logger.info(f"Session timer set for {session_timer} minutes for user {current_user['id']}")
+
             # Start message listener in background
             listener_started = await client.start_message_listener()
             if listener_started:
@@ -212,6 +223,7 @@ async def telegram_verify(
                     "request": request,
                     "user": current_user,
                     "phone_number": client.phone_number,
+                    "session_timer": session_timer,
                 },
             )
 
@@ -251,6 +263,7 @@ async def telegram_verify(
 async def telegram_verify_2fa(
     request: Request,
     password: str = Form(...),
+    session_timer: int = Form(None),
     current_user: dict = Depends(get_current_user),
 ):
     """Handle Telegram 2FA verification."""
@@ -302,6 +315,14 @@ async def telegram_verify_2fa(
             await db_manager.update_user_telegram_info(
                 current_user["id"], client.phone_number, True
             )
+
+            # Save session with timer if provided
+            if hasattr(client, 'session_string') and client.session_string:
+                await db_manager.save_telegram_session_with_timer(
+                    current_user["id"], client.session_string, session_timer
+                )
+                if session_timer:
+                    logger.info(f"Session timer set for {session_timer} minutes for user {current_user['id']}")
 
             # Start message listener in background
             listener_started = await client.start_message_listener()

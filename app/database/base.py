@@ -117,10 +117,27 @@ class BaseDatabaseManager:
                         session_data TEXT NOT NULL,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        session_timer_minutes INTEGER DEFAULT NULL,
+                        session_timer_end TIMESTAMP DEFAULT NULL,
                         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
                     )
                 """
                 )
+
+                # Add timer columns to existing sessions (migration)
+                try:
+                    await db.execute(
+                        "ALTER TABLE telegram_sessions ADD COLUMN session_timer_minutes INTEGER DEFAULT NULL"
+                    )
+                except Exception:
+                    pass  # Column already exists
+
+                try:
+                    await db.execute(
+                        "ALTER TABLE telegram_sessions ADD COLUMN session_timer_end TIMESTAMP DEFAULT NULL"
+                    )
+                except Exception:
+                    pass  # Column already exists
 
                 # Messages table
                 await db.execute(

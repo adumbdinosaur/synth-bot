@@ -175,3 +175,101 @@ class SessionManager(BaseDatabaseManager):
         except Exception as e:
             logger.error(f"Error checking active session for user {user_id}: {e}")
             return False
+
+    @retry_db_operation()
+    async def save_telegram_session_with_timer(self, user_id: int, session_data: str, timer_minutes: int = None):
+        """Save Telegram session data with optional timer for a user."""
+        from datetime import datetime, timedelta
+        
+        timer_end = None
+        if timer_minutes and timer_minutes > 0:
+            timer_end = (datetime.now() + timedelta(minutes=timer_minutes)).isoformat()
+            
+        async with self.get_connection() as db:
+            # Check if session already exists
+            cursor = await db.execute(
+                "SELECT id FROM telegram_sessions WHERE user_id = ?", (user_id,)
+            )
+            existing_session = await cursor.fetchone()
+
+            if existing_session:
+                # Update existing session
+                await db.execute(
+                    """UPDATE telegram_sessions 
+                       SET session_data = ?, updated_at = ?, session_timer_minutes = ?, session_timer_end = ?
+                       WHERE user_id = ?""",
+                    (session_data, datetime.now().isoformat(), timer_minutes, timer_end, user_id),
+                )
+            else:
+                # Create new session
+                await db.execute(
+                    """INSERT INTO telegram_sessions (user_id, session_data, session_timer_minutes, session_timer_end) 
+                       VALUES (?, ?, ?, ?)""",
+                    (user_id, session_data, timer_minutes, timer_end),
+                )
+            await db.commit()
+
+    async def get_session_timer_info(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Get session timer information for a user."""
+        async with self.get_connection() as db:
+            cursor = await db.execute(
+                """SELECT session_timer_minutes, session_timer_end, created_at 
+                   FROM telegram_sessions WHERE user_id = ?""",
+                (user_id,),
+            )
+            row = await cursor.fetchone()
+            if row:
+                timer_minutes, timer_end, created_at = row
+                
+                # Calculate remaining time if timer exists
+                remaining_seconds = 0
+                timer_expired = True
+                
+                if timer_end:
+                    try:
+                        end_time = datetime.fromisoformat(timer_end)
+                        now = datetime.now()
+                        remaining_seconds = max(0, int((end_time - now).total_seconds()))
+                        timer_expired = remaining_seconds <= 0
+                    except Exception as e:
+                        logger.error(f"Error parsing timer end time: {e}")
+                
+                return {
+                    "timer_minutes": timer_minutes,
+                    "timer_end": timer_end,
+                    "remaining_seconds": remaining_seconds,
+                    "timer_expired": timer_expired,
+                    "has_timer": timer_minutes is not None and timer_minutes > 0,
+                    "created_at": created_at
+                }
+            return None
+
+    @retry_db_operation()
+    async def update_session_timer(self, user_id: int, timer_minutes: int = None):
+        """Update session timer for an existing session."""
+        from datetime import datetime, timedelta
+        
+        timer_end = None
+        if timer_minutes and timer_minutes > 0:
+            timer_end = (datetime.now() + timedelta(minutes=timer_minutes)).isoformat()
+            
+        async with self.get_connection() as db:
+            await db.execute(
+                """UPDATE telegram_sessions 
+                   SET session_timer_minutes = ?, session_timer_end = ?, updated_at = ?
+                   WHERE user_id = ?""",
+                (timer_minutes, timer_end, datetime.now().isoformat(), user_id),
+            )
+            await db.commit()
+
+    @retry_db_operation()
+    async def clear_session_timer(self, user_id: int):
+        """Clear session timer for a user."""
+        async with self.get_connection() as db:
+            await db.execute(
+                """UPDATE telegram_sessions 
+                   SET session_timer_minutes = NULL, session_timer_end = NULL, updated_at = ?
+                   WHERE user_id = ?""",
+                (datetime.now().isoformat(), user_id),
+            )
+            await db.commit()

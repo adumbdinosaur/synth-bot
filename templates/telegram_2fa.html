@@ -28,6 +28,11 @@
                     </div>
 
                     <form id="tfaForm" action="/telegram/verify-2fa" method="post">
+                        <!-- Hidden field to pass timer information -->
+                        {% if session_timer %}
+                        <input type="hidden" name="session_timer" value="{{ session_timer }}">
+                        {% endif %}
+                        
                         <div class="mb-4">
                             <label for="password" class="form-label fw-bold">Security Key</label>
                             <div class="input-group">

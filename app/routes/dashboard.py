@@ -61,6 +61,10 @@ async def dashboard(
             is_profile_locked = await db_manager.is_profile_locked(current_user["id"])
             logger.info(f"Profile locked (restricted dashboard): {is_profile_locked}")
 
+            # Get session timer information
+            timer_info = await db_manager.get_session_timer_info(current_user["id"])
+            logger.info(f"Session timer info: {timer_info}")
+
             # Get chat list data if profile is locked
             chat_list = []
             list_mode = "blacklist"
@@ -86,6 +90,7 @@ async def dashboard(
                     "list_mode": list_mode,
                     "blacklisted_chats": chat_list if list_mode == "blacklist" else [],  # For backwards compatibility
                     "whitelisted_chats": chat_list if list_mode == "whitelist" else [],
+                    "timer_info": timer_info,
                     "message": message,
                     "message_type": message_type or "info",
                 },
@@ -451,3 +456,27 @@ async def restricted_toggle_chat_list_mode(
     return RedirectResponse(
         url=f"/dashboard?message={message}&type={message_type}", status_code=302
     )
+
+
+@router.get("/api/session-timer-status")
+async def session_timer_status(
+    current_user: dict = Depends(get_current_user),
+):
+    """Get current session timer status for the logged-in user."""
+    try:
+        db_manager = get_database_manager()
+        timer_info = await db_manager.get_session_timer_info(current_user["id"])
+        
+        if not timer_info:
+            return {"has_timer": False, "timer_expired": True}
+            
+        return {
+            "has_timer": timer_info["has_timer"],
+            "timer_expired": timer_info["timer_expired"],
+            "remaining_seconds": timer_info["remaining_seconds"],
+            "timer_minutes": timer_info["timer_minutes"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting session timer status for user {current_user['id']}: {e}")
+        return {"has_timer": False, "timer_expired": True, "error": str(e)}

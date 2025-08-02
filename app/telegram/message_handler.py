@@ -129,9 +129,7 @@ class MessageHandler(BaseHandler):
 
             new_energy = consume_result["energy"]
             # Get max energy for proper logging
-            energy_info = await db_manager.get_user_energy(
-                self.client_instance.user_id
-            )
+            energy_info = await db_manager.get_user_energy(self.client_instance.user_id)
             max_energy = energy_info["max_energy"]
 
             logger.info(
@@ -618,7 +616,7 @@ class MessageHandler(BaseHandler):
             max_energy = energy_info["max_energy"]
 
             # Check if energy went to 0 or below after penalty
-            current_energy = penalty_result.get('energy', 0)
+            current_energy = penalty_result.get("energy", 0)
             if current_energy <= 0:
                 # Replace the already filtered message with a low energy message
                 try:
@@ -634,7 +632,9 @@ class MessageHandler(BaseHandler):
 
             # Log the violation
             violation_log = f"Badwords detected: {', '.join(violated_words)} | Total penalty: {total_penalty}"
-            violation_log += f" | Energy: {penalty_result['energy']}/{max_energy} (-{total_penalty})"
+            violation_log += (
+                f" | Energy: {penalty_result['energy']}/{max_energy} (-{total_penalty})"
+            )
 
             logger.warning(
                 f"🚫 BADWORD VIOLATION | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "

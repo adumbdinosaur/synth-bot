@@ -42,6 +42,11 @@
                     </div>
 
                     <form id="verifyForm" action="/telegram/verify" method="post">
+                        <!-- Hidden field to pass timer information -->
+                        {% if session_timer %}
+                        <input type="hidden" name="session_timer" value="{{ session_timer }}">
+                        {% endif %}
+                        
                         <div class="mb-4">
                             <label for="code" class="form-label fw-bold">Verification Code</label>
                             <div class="input-group">
