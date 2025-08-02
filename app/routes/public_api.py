@@ -728,7 +728,7 @@ async def get_sessions_api(
         telegram_manager = get_telegram_manager()
 
         # Get all sessions (including inactive ones for context)
-        active_sessions = await db_manager.get_active_telegram_sessions()
+        active_sessions = await db_manager.get_all_active_sessions()
 
         # Get list of connected user IDs from telegram manager
         connected_users = telegram_manager.get_connected_users()

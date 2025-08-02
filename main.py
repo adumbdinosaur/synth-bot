@@ -23,6 +23,12 @@ async def favicon():
     return FileResponse("static/favicon.ico")
 
 
+# Add robots.txt route
+@app.get("/robots.txt")
+async def robots():
+    return FileResponse("static/robots.txt")
+
+
 # Include all route modules
 app.include_router(auth.router, tags=["Authentication"])
 app.include_router(dashboard.router, tags=["Dashboard"])
