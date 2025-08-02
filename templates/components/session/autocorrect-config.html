@@ -1,0 +1,97 @@
+<!-- Autocorrect Configuration Section Component -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card collapsible-section">
+            <div class="card-header" data-bs-toggle="collapse" data-bs-target="#autocorrectCollapse"
+                aria-expanded="false" aria-controls="autocorrectCollapse">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4><i class="fas fa-spell-check"></i> Autocorrect Configuration</h4>
+                        <p class="text-muted mb-0">Configure automatic spelling correction powered by OpenAI
+                        </p>
+                    </div>
+                    <i class="fas fa-chevron-down collapse-toggle collapsed"></i>
+                </div>
+            </div>
+            <div class="collapse" id="autocorrectCollapse">
+                <div class="card-body">
+                    <form method="POST" action="/public/sessions/{{ session.user_id }}/autocorrect">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="card border-secondary">
+                                    <div class="card-body">
+                                        <h5><i class="fas fa-toggle-on"></i> Enable/Disable</h5>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" role="switch"
+                                                id="autocorrect_enabled" name="enabled" value="true" {% if
+                                                autocorrect_settings and autocorrect_settings.enabled %}checked{% endif
+                                                %}>
+                                            <label class="form-check-label" for="autocorrect_enabled">
+                                                <strong>Enable Autocorrect</strong>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">
+                                            When enabled, messages will be automatically spell-checked and
+                                            corrected to American English
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-secondary">
+                                    <div class="card-body">
+                                        <label for="penalty_per_correction" class="form-label">
+                                            <i class="fas fa-bolt"></i> Penalty per Correction
+                                        </label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="penalty_per_correction"
+                                                name="penalty_per_correction"
+                                                value="{{ autocorrect_settings.penalty_per_correction if autocorrect_settings else 5 }}"
+                                                min="1" max="50" required>
+                                            <span class="input-group-text">⚡ per word</span>
+                                        </div>
+                                        <small class="text-muted">
+                                            Energy penalty applied for each word corrected (1-50 points)
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="alert alert-warning">
+                                    <h6><i class="fas fa-info-circle"></i> How Autocorrect Works</h6>
+                                    <ul class="mb-0">
+                                        <li><strong>Spelling Check:</strong> Messages are checked for
+                                            spelling errors using OpenAI API</li>
+                                        <li><strong>American English:</strong> Words are corrected to
+                                            American English standard spelling</li>
+                                        <li><strong>Conservative Approach:</strong> Only corrects known
+                                            misspellings, preserves sentence structure</li>
+                                        <li><strong>Energy Cost:</strong> {{
+                                            autocorrect_settings.penalty_per_correction if
+                                            autocorrect_settings else 5 }} energy points deducted per
+                                            corrected word</li>
+                                        <li><strong>Message Replacement:</strong> Original message is
+                                            deleted and replaced with corrected version</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save"></i> Save Autocorrect Settings
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

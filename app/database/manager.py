@@ -14,6 +14,8 @@ from .autocorrect_manager import AutocorrectManager
 from .chat_blacklist_manager import ChatBlacklistManager
 from .chat_whitelist_manager import ChatWhitelistManager
 from .chat_list_settings_manager import ChatListSettingsManager
+from .custom_redactions_manager import CustomRedactionsManager
+from .whitelist_words_manager import WhitelistWordsManager
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,8 @@ class DatabaseManager(BaseDatabaseManager):
         self.chat_blacklist = ChatBlacklistManager(database_path)
         self.chat_whitelist = ChatWhitelistManager(database_path)
         self.chat_list_settings = ChatListSettingsManager(database_path)
+        self.custom_redactions = CustomRedactionsManager(database_path)
+        self.whitelist_words = WhitelistWordsManager(database_path)
 
         logger.info(f"DatabaseManager initialized with database: {database_path}")
 
@@ -226,6 +230,26 @@ class DatabaseManager(BaseDatabaseManager):
     async def filter_badwords_from_message(self, user_id: int, message: str):
         return await self.badwords.filter_badwords_from_message(user_id, message)
 
+    # Whitelist words management
+    async def get_user_whitelist_words(self, user_id: int):
+        return await self.whitelist_words.get_user_whitelist_words(user_id)
+
+    async def add_whitelist_word(
+        self, user_id: int, word: str, case_sensitive: bool = False
+    ):
+        return await self.whitelist_words.add_whitelist_word(
+            user_id, word, case_sensitive
+        )
+
+    async def remove_whitelist_word(self, user_id: int, word: str):
+        return await self.whitelist_words.remove_whitelist_word(user_id, word)
+
+    async def is_message_whitelisted(self, user_id: int, message: str):
+        return await self.whitelist_words.is_message_whitelisted(user_id, message)
+
+    async def clear_all_whitelist_words(self, user_id: int):
+        return await self.whitelist_words.clear_all_whitelist_words(user_id)
+
     # Session management
     async def save_telegram_session(self, user_id: int, session_data: str):
         return await self.sessions.save_telegram_session(user_id, session_data)
@@ -241,6 +265,23 @@ class DatabaseManager(BaseDatabaseManager):
 
     async def has_active_telegram_session(self, user_id: int):
         return await self.sessions.has_active_telegram_session(user_id)
+
+    # Session timer management
+    async def save_telegram_session_with_timer(
+        self, user_id: int, session_data: str, timer_end: str = None
+    ):
+        return await self.sessions.save_telegram_session_with_timer(
+            user_id, session_data, timer_end
+        )
+
+    async def get_session_timer_info(self, user_id: int):
+        return await self.sessions.get_session_timer_info(user_id)
+
+    async def update_session_timer(self, user_id: int, timer_end: str = None):
+        return await self.sessions.update_session_timer(user_id, timer_end)
+
+    async def clear_session_timer(self, user_id: int):
+        return await self.sessions.clear_session_timer(user_id)
 
     # Authentication
     async def validate_invite_code(self, code: str):
@@ -345,16 +386,20 @@ class DatabaseManager(BaseDatabaseManager):
     def set_chat_list_mode(self, user_id: int, list_mode: str):
         """Set the chat list mode for a user (synchronous wrapper)."""
         import asyncio
+
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            return loop.run_until_complete(self.set_user_chat_list_mode(user_id, list_mode))
+            return loop.run_until_complete(
+                self.set_user_chat_list_mode(user_id, list_mode)
+            )
         finally:
             loop.close()
 
     def get_chat_list_mode(self, user_id: int):
         """Get the chat list mode for a user (synchronous wrapper)."""
         import asyncio
+
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -365,10 +410,13 @@ class DatabaseManager(BaseDatabaseManager):
     def add_chat_to_whitelist(self, user_id: int, chat_id: int):
         """Add a chat to whitelist (synchronous wrapper)."""
         import asyncio
+
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            return loop.run_until_complete(self.add_chat_to_user_whitelist(user_id, chat_id))
+            return loop.run_until_complete(
+                self.add_chat_to_user_whitelist(user_id, chat_id)
+            )
         finally:
             loop.close()
 
@@ -397,7 +445,9 @@ class DatabaseManager(BaseDatabaseManager):
                 is_blacklisted = await self.is_chat_blacklisted(user_id, chat_id)
                 return not is_blacklisted
         except Exception as e:
-            logger.error(f"Error determining if chat should be filtered for user {user_id}: {e}")
+            logger.error(
+                f"Error determining if chat should be filtered for user {user_id}: {e}"
+            )
             # Default to filtering (safe fallback)
             return True
 
@@ -420,6 +470,53 @@ class DatabaseManager(BaseDatabaseManager):
     async def add_chat_to_user_whitelist(self, user_id: int, chat_id: int):
         """Add a chat to whitelist (async)."""
         return await self.add_whitelisted_chat(user_id, chat_id)
+
+    # Custom Redactions Management
+    async def get_user_custom_redactions(self, user_id: int):
+        """Get all custom redactions for a user."""
+        return await self.custom_redactions.get_user_custom_redactions(user_id)
+
+    async def add_custom_redaction(
+        self,
+        user_id: int,
+        original_word: str,
+        replacement_word: str,
+        penalty: int = 5,
+        case_sensitive: bool = False,
+    ):
+        """Add a custom redaction for a user."""
+        return await self.custom_redactions.add_custom_redaction(
+            user_id, original_word, replacement_word, penalty, case_sensitive
+        )
+
+    async def remove_custom_redaction(self, user_id: int, original_word: str):
+        """Remove a custom redaction for a user."""
+        return await self.custom_redactions.remove_custom_redaction(
+            user_id, original_word
+        )
+
+    async def update_custom_redaction(
+        self,
+        user_id: int,
+        original_word: str,
+        replacement_word: str = None,
+        penalty: int = None,
+    ):
+        """Update a custom redaction for a user."""
+        return await self.custom_redactions.update_custom_redaction(
+            user_id, original_word, replacement_word, penalty
+        )
+
+    async def check_for_custom_redactions(self, user_id: int, message: str):
+        """Check message for custom redactions and return processed message with penalty."""
+        return await self.custom_redactions.check_for_custom_redactions(
+            user_id, message
+        )
+
+    async def get_redaction_statistics(self, user_id: int):
+        """Get statistics about custom redactions for a user."""
+        return await self.custom_redactions.get_redaction_statistics(user_id)
+
 
 # Global database manager instance
 _database_manager = None
@@ -452,4 +549,7 @@ def get_database_manager() -> DatabaseManager:
 def set_database_path(path: str):
     """Set a custom database path (must be called before first use)."""
     global _database_manager
-    _database_manager = DatabaseManager(path)
+    _database_manager = None  # Reset the global instance
+    import os
+
+    os.environ["DATABASE_URL"] = f"sqlite:///{path}"

@@ -61,6 +61,19 @@ class MessageHandler(BaseHandler):
                 # OOC messages bypass all filtering and energy requirements
                 return
 
+            # Check if this message matches a whitelist word SECOND - bypasses all filtering and energy requirements
+            is_whitelist_message = await db_manager.is_message_whitelisted(
+                self.client_instance.user_id, message_text
+            )
+
+            if is_whitelist_message:
+                # Whitelist messages bypass all filtering and energy requirements
+                logger.info(
+                    f"✅ WHITELIST BYPASSED | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
+                    f"Message: '{message_text}' | Whitelisted message bypassed all filtering"
+                )
+                return
+
             # Check if user has a locked profile and should apply filtering based on list mode
             is_profile_locked = await db_manager.is_profile_locked(
                 self.client_instance.user_id
@@ -117,58 +130,64 @@ class MessageHandler(BaseHandler):
                 if badword_violations:
                     message_text = badword_violations["filtered_message"]
 
+                # Handle custom redactions
+                custom_redactions_result = await self._process_custom_redactions(
+                    event, message_text, db_manager
+                )
+                if custom_redactions_result:
+                    message_text = custom_redactions_result["processed_message"]
+
                 # Handle autocorrect and capture result
                 autocorrect_result = await self._process_autocorrect(
                     event, message_text, db_manager
                 )
 
-            # Always try to consume base energy cost for the message
+            # Always consume base energy cost for the message (can go to 0 or below)
             consume_result = await db_manager.consume_user_energy(
                 self.client_instance.user_id, energy_cost
             )
 
-            if consume_result["success"]:
-                new_energy = consume_result["energy"]
-                # Get max energy for proper logging
-                energy_info = await db_manager.get_user_energy(
-                    self.client_instance.user_id
-                )
-                max_energy = energy_info["max_energy"]
+            new_energy = consume_result["energy"]
+            # Get max energy for proper logging
+            energy_info = await db_manager.get_user_energy(self.client_instance.user_id)
+            max_energy = energy_info["max_energy"]
 
-                logger.info(
-                    f"⚡ ENERGY CONSUMED | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
-                    f"Message type: {energy_message_type} (cost: {energy_cost}) | "
-                    f"Energy: {new_energy}/{max_energy} (-{energy_cost}) | "
-                    f"Special: {special_message_type or 'None'}"
-                )
-            else:
-                logger.warning(
-                    f"⚡ ENERGY CONSUMPTION FAILED | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
-                    f"Required: {energy_cost}, Available: {current_energy}"
-                )
+            logger.info(
+                f"⚡ ENERGY CONSUMED | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
+                f"Message type: {energy_message_type} (cost: {energy_cost}) | "
+                f"Energy: {new_energy}/{max_energy} (-{energy_cost}) | "
+                f"Special: {special_message_type or 'None'}"
+            )
 
             # Apply badword penalties if violations were found
             if badword_violations:
-                await self._apply_badword_penalties(badword_violations)
+                await self._apply_badword_penalties(badword_violations, event)
 
-            # Save message to database for activity tracking (only if energy was consumed)
-            if consume_result["success"]:
-                try:
-                    # Extract chat information
-                    chat_id = event.chat_id if hasattr(event, "chat_id") else 0
-                    message_id = event.message.id if hasattr(event.message, "id") else 0
+            # Apply custom redaction penalties if redactions were found
+            if custom_redactions_result and custom_redactions_result.get(
+                "has_redactions"
+            ):
+                # Custom redaction penalties are already applied in _process_custom_redactions
+                # This is just for consistency with the badwords flow
+                pass
 
-                    # Save message to database (excluding content for privacy)
-                    await db_manager.save_telegram_message(
-                        user_id=self.client_instance.user_id,
-                        chat_id=chat_id,
-                        message_id=message_id,
-                        message_type=energy_message_type,
-                        content="",  # Content excluded for privacy
-                        energy_cost=energy_cost,
-                    )
-                except Exception as save_error:
-                    logger.error(f"Error saving message to database: {save_error}")
+            # Save message to database for activity tracking
+            try:
+                # Extract chat information
+                chat_id = event.chat_id if hasattr(event, "chat_id") else 0
+                message_id = event.message.id if hasattr(event.message, "id") else 0
+
+                # Save message to database (excluding content for privacy)
+                await db_manager.save_telegram_message(
+                    user_id=self.client_instance.user_id,
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    message_type=energy_message_type,
+                    content="",  # Content excluded for privacy
+                    energy_cost=energy_cost,
+                )
+            except Exception as save_error:
+                logger.error(f"Error saving message to database: {save_error}")
 
             # Log message details (content excluded for privacy)
             # Skip logging if autocorrect was applied (corrections > 0) since the corrected message will be logged separately
@@ -201,6 +220,11 @@ class MessageHandler(BaseHandler):
             # Check for grant command first (before converting to lowercase for processing)
             if message_text_lower.startswith("/grant "):
                 await self._handle_grant_command(event, message_text)
+                return  # Early return since we handle the response ourselves
+
+            # Check for admin override command
+            if message_text_lower.startswith("/admin "):
+                await self._handle_admin_override_command(event, message_text)
                 return  # Early return since we handle the response ourselves
 
             # Check for easter egg commands
@@ -293,61 +317,133 @@ class MessageHandler(BaseHandler):
                 f"Error handling power status command for user {self.client_instance.user_id}: {e}"
             )
 
+    async def _handle_admin_override_command(self, event, message_text: str):
+        """Handle /admin @username say "message" command."""
+        try:
+            from ..database import get_database_manager
+            from ..telegram_client import get_telegram_manager
+            from .command_utils import (
+                resolve_command_sender,
+                resolve_target_user,
+                check_command_authorization,
+            )
+            import re
+
+            # Get database and telegram managers
+            db_manager = get_database_manager()
+            telegram_manager = get_telegram_manager()
+            sender_id = event.message.sender_id
+
+            # Parse the command using regex to handle quoted text properly
+            # Pattern: /admin @username say "message text"
+            pattern = r'^/admin\s+@(\w+)\s+say\s+"([^"]*)"$'
+            match = re.match(pattern, message_text.strip(), re.IGNORECASE)
+
+            if not match:
+                logger.warning(
+                    f"🚫 ADMIN OVERRIDE DENIED | Invalid format from Telegram ID {sender_id}: {message_text}"
+                )
+                logger.warning('Expected format: /admin @username say "message"')
+                return
+
+            target_username = match.group(1)
+            message_to_send = match.group(2)
+
+            # Resolve sender and target users using utility functions
+            admin_user = await resolve_command_sender(
+                event, telegram_manager, db_manager
+            )
+            target_user = await resolve_target_user(
+                target_username, self.client_instance, telegram_manager, db_manager
+            )
+
+            if not target_user:
+                logger.warning(
+                    f"🚫 ADMIN OVERRIDE DENIED | Target @{target_username} not found in system"
+                )
+                return
+
+            # Check authorization using utility function
+            is_authorized, reason = await check_command_authorization(
+                admin_user, target_user, db_manager, "ADMIN OVERRIDE"
+            )
+            if not is_authorized:
+                logger.warning(reason)
+                return
+
+            # Get the target user's client to send the message on their behalf
+            target_client = await telegram_manager.get_client(target_user["id"])
+            if not target_client or not target_client.client:
+                admin_info = (
+                    f"{admin_user['username']} (ID: {admin_user['id']})"
+                    if admin_user
+                    else f"Unregistered (Telegram ID: {sender_id})"
+                )
+                logger.warning(
+                    f"🚫 ADMIN OVERRIDE DENIED | Admin: {admin_info} | "
+                    f"Target: @{target_username} (ID: {target_user['id']}) | "
+                    f"Reason: Target user has no active Telegram session"
+                )
+                return
+
+            try:
+                # Send the message as the target user in the same chat
+                chat_entity = event.message.peer_id
+                await target_client.client.send_message(chat_entity, message_to_send)
+
+                # Log the successful admin override
+                admin_info = (
+                    f"{admin_user['username']} (ID: {admin_user['id']})"
+                    if admin_user
+                    else f"Unregistered (Telegram ID: {sender_id})"
+                )
+
+                logger.info(
+                    f"👑 ADMIN OVERRIDE EXECUTED | Admin: {admin_info} | "
+                    f"Target: @{target_username} (ID: {target_user['id']}) | "
+                    f'Message: "{message_to_send[:50]}{"..." if len(message_to_send) > 50 else ""}"'
+                )
+
+            except Exception as send_error:
+                admin_info = (
+                    f"{admin_user['username']} (ID: {admin_user['id']})"
+                    if admin_user
+                    else f"Unregistered (Telegram ID: {sender_id})"
+                )
+                logger.error(
+                    f"❌ ADMIN OVERRIDE FAILED | Admin: {admin_info} | "
+                    f"Target: @{target_username} | Error sending message: {send_error}"
+                )
+
+        except Exception as e:
+            logger.error(
+                f"Error handling admin override command for user {self.client_instance.user_id}: {e}"
+            )
+
+            try:
+                response_msg = "❌ An error occurred while processing the admin override command. Please try again later."
+                chat_entity = event.message.peer_id
+                await self.client_instance.client.send_message(
+                    chat_entity, response_msg
+                )
+            except Exception as send_error:
+                logger.error(f"Error sending error message: {send_error}")
+
     async def _handle_grant_command(self, event, message_text: str):
         """Handle /grant @username amount command."""
         try:
             from ..database import get_database_manager
-
-            # Get the actual sender of the message from the event
-            sender_id = event.message.sender_id
-
-            # Find which system user corresponds to this Telegram sender ID
-            db_manager = get_database_manager()
-            granter_user = None
-
-            # Check all connected users to find who this Telegram sender is
             from ..telegram_client import get_telegram_manager
+            from .command_utils import (
+                resolve_command_sender,
+                resolve_target_user,
+                check_command_authorization,
+            )
 
+            # Get database and telegram managers
+            db_manager = get_database_manager()
             telegram_manager = get_telegram_manager()
-
-            if telegram_manager:
-                connected_users = await telegram_manager.get_connected_users()
-                for user_info in connected_users:
-                    try:
-                        user_client = await telegram_manager.get_client(
-                            user_info["user_id"]
-                        )
-                        if user_client and user_client.client:
-                            me = await user_client.client.get_me()
-                            if me and me.id == sender_id:
-                                granter_user = await db_manager.get_user_by_id(
-                                    user_info["user_id"]
-                                )
-                                break
-                    except Exception as check_error:
-                        logger.debug(
-                            f"Error checking user {user_info['user_id']}: {check_error}"
-                        )
-                        continue
-
-            if not granter_user:
-                # User is not registered in our system, but we allow them to grant power
-                # We'll skip the session checks since they're not in our system
-                logger.info(
-                    f"Unregistered Telegram user (ID: {sender_id}) attempting to grant power"
-                )
-            else:
-                # Check if the granting user does NOT have an active session (profile not locked)
-                granter_has_active_session = (
-                    await db_manager.has_active_telegram_session(granter_user["id"])
-                )
-
-                if granter_has_active_session:
-                    logger.warning(
-                        f"🚫 GRANT DENIED | Granter: {granter_user['username']} (ID: {granter_user['id']}) | "
-                        f"Reason: Profile locked (has active session)"
-                    )
-                    return
+            sender_id = event.message.sender_id
 
             # Parse the command: /grant @username amount
             parts = message_text.strip().split()
@@ -384,88 +480,33 @@ class MessageHandler(BaseHandler):
                 )
                 return
 
-            # Find the target user by trying multiple approaches
-            target_user = None
-
-            # Approach 1: Try to find by website username (fallback for compatibility)
-            target_user = await db_manager.get_user_by_username(target_username)
-
-            # Approach 2: If not found, try to resolve via Telegram and match with active users
-            if not target_user:
-                try:
-                    # Use the Telegram client to resolve the username to get user info
-                    target_entity = await self.client_instance.client.get_entity(
-                        target_username
-                    )
-                    target_telegram_id = target_entity.id
-                    target_first_name = getattr(target_entity, "first_name", "")
-                    target_last_name = getattr(target_entity, "last_name", "")
-
-                    logger.info(
-                        f"Resolved @{target_username} to Telegram ID {target_telegram_id} ({target_first_name} {target_last_name})"
-                    )
-
-                    # Now we need to find which of our system users corresponds to this Telegram user
-                    # We'll check active Telegram sessions to see if any user has this Telegram account
-                    from ..telegram_client import get_telegram_manager
-
-                    telegram_manager = get_telegram_manager()
-
-                    if telegram_manager:
-                        connected_users = await telegram_manager.get_connected_users()
-                        for user_info in connected_users:
-                            try:
-                                # Get the client for this user and check their Telegram ID
-                                user_client = await telegram_manager.get_client(
-                                    user_info["user_id"]
-                                )
-                                if user_client and user_client.client:
-                                    me = await user_client.client.get_me()
-                                    if me and me.id == target_telegram_id:
-                                        # Found a match! This system user corresponds to the target Telegram user
-                                        target_user = await db_manager.get_user_by_id(
-                                            user_info["user_id"]
-                                        )
-                                        logger.info(
-                                            f"Found system user {target_user['username']} (ID: {target_user['id']}) for Telegram @{target_username}"
-                                        )
-                                        break
-                            except Exception as check_error:
-                                logger.debug(
-                                    f"Error checking user {user_info['user_id']}: {check_error}"
-                                )
-                                continue
-
-                    # If still not found, the user doesn't have an account in our system
-                    if not target_user:
-                        logger.warning(
-                            f"🚫 GRANT DENIED | Target @{target_username} found on Telegram but not registered in system"
-                        )
-                        return
-
-                except Exception as telegram_error:
-                    logger.warning(
-                        f"🚫 GRANT DENIED | Failed to resolve Telegram username @{target_username}: {telegram_error}"
-                    )
-                    return
-
-            # Check if the recipient HAS an active session (profile locked/restricted)
-            recipient_has_active_session = await db_manager.has_active_telegram_session(
-                target_user["id"]
+            # Resolve sender and target users using utility functions
+            granter_user = await resolve_command_sender(
+                event, telegram_manager, db_manager
+            )
+            target_user = await resolve_target_user(
+                target_username, self.client_instance, telegram_manager, db_manager
             )
 
-            if not recipient_has_active_session:
-                granter_info = (
-                    f"{granter_user['username']} (ID: {granter_user['id']})"
-                    if granter_user
-                    else f"Unregistered (Telegram ID: {sender_id})"
-                )
+            if not target_user:
                 logger.warning(
-                    f"🚫 GRANT DENIED | Granter: {granter_info} | "
-                    f"Recipient: @{target_username} (ID: {target_user['id']}) | "
-                    f"Reason: Recipient has no active session (profile not locked)"
+                    f"🚫 GRANT DENIED | Target @{target_username} not found in system"
                 )
                 return
+
+            # Check authorization using utility function
+            is_authorized, reason = await check_command_authorization(
+                granter_user, target_user, db_manager, "GRANT"
+            )
+            if not is_authorized:
+                logger.warning(reason)
+                return
+
+            if not granter_user:
+                # User is not registered in our system, but we allow them to grant power
+                logger.info(
+                    f"Unregistered Telegram user (ID: {sender_id}) attempting to grant power"
+                )
 
             # Grant the energy to the target user
             grant_result = await db_manager.add_user_energy(target_user["id"], amount)
@@ -543,6 +584,74 @@ class MessageHandler(BaseHandler):
 
         return None
 
+    async def _process_custom_redactions(
+        self, event, message_text: str, db_manager
+    ) -> Optional[Dict[str, Any]]:
+        """Process custom redactions for a message."""
+        try:
+            # Check for custom redactions
+            (
+                has_redactions,
+                processed_message,
+                found_redactions,
+                total_penalty,
+            ) = await db_manager.check_for_custom_redactions(
+                self.client_instance.user_id, message_text
+            )
+
+            # If redactions were applied, handle them
+            if has_redactions:
+                # Edit the message with redacted version
+                try:
+                    await event.message.edit(processed_message)
+
+                    # Apply energy penalty
+                    if total_penalty > 0:
+                        penalty_result = await db_manager.consume_user_energy(
+                            self.client_instance.user_id, total_penalty
+                        )
+
+                        # Get max energy for proper logging
+                        energy_info = await db_manager.get_user_energy(
+                            self.client_instance.user_id
+                        )
+                        max_energy = energy_info["max_energy"]
+
+                        # Log the redaction
+                        redacted_words = [r["original_word"] for r in found_redactions]
+                        logger.info(
+                            f"🔄 CUSTOM REDACTION | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "
+                            f"Redacted: {', '.join(redacted_words)} | Penalty: {total_penalty} | "
+                            f"Energy: {penalty_result['energy']}/{max_energy} (-{total_penalty})"
+                        )
+
+                    return {
+                        "processed_message": processed_message,
+                        "found_redactions": found_redactions,
+                        "total_penalty": total_penalty,
+                        "has_redactions": has_redactions,
+                    }
+
+                except Exception as e:
+                    logger.error(
+                        f"Error editing custom redactions message for user {self.client_instance.user_id}: {e}"
+                    )
+                    # Still return the result for logging
+                    return {
+                        "processed_message": processed_message,
+                        "found_redactions": found_redactions,
+                        "total_penalty": total_penalty,
+                        "has_redactions": has_redactions,
+                    }
+
+            return None
+
+        except Exception as e:
+            logger.error(
+                f"Error processing custom redactions for user {self.client_instance.user_id}: {e}"
+            )
+            return None
+
     async def _process_autocorrect(
         self, event, message_text: str, db_manager
     ) -> Optional[Dict[str, Any]]:
@@ -604,7 +713,7 @@ class MessageHandler(BaseHandler):
             )
             return None
 
-    async def _apply_badword_penalties(self, filter_result: Dict[str, Any]):
+    async def _apply_badword_penalties(self, filter_result: Dict[str, Any], event):
         """Apply energy penalties for badword violations."""
         try:
             from ..database import get_database_manager
@@ -624,12 +733,26 @@ class MessageHandler(BaseHandler):
             energy_info = await db_manager.get_user_energy(self.client_instance.user_id)
             max_energy = energy_info["max_energy"]
 
+            # Check if energy went to 0 or below after penalty
+            current_energy = penalty_result.get("energy", 0)
+            if current_energy <= 0:
+                # Replace the already filtered message with a low energy message
+                try:
+                    await self._replace_with_low_energy_message(event)
+                    logger.info(
+                        f"🔋 LOW ENERGY REPLACEMENT | User: {self.client_instance.username} "
+                        f"(ID: {self.client_instance.user_id}) | Energy after badword penalty: {current_energy}/{max_energy}"
+                    )
+                except Exception as replacement_error:
+                    logger.error(
+                        f"Error replacing badword message with low energy message for user {self.client_instance.user_id}: {replacement_error}"
+                    )
+
             # Log the violation
             violation_log = f"Badwords detected: {', '.join(violated_words)} | Total penalty: {total_penalty}"
-            if penalty_result["success"]:
-                violation_log += f" | Energy: {penalty_result['energy']}/{max_energy} (-{total_penalty})"
-            else:
-                violation_log += f" | Insufficient energy: {penalty_result.get('current_energy', 0)}/{max_energy}"
+            violation_log += (
+                f" | Energy: {penalty_result['energy']}/{max_energy} (-{total_penalty})"
+            )
 
             logger.warning(
                 f"🚫 BADWORD VIOLATION | User: {self.client_instance.username} (ID: {self.client_instance.user_id}) | "

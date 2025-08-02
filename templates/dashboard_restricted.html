@@ -49,7 +49,7 @@
     </div>
 
     <!-- Current Status - Read Only -->
-    <div class="row">
+    <div class="row restricted-dashboard-status">
         <div class="col-md-6">
             <div class="card border-primary mb-4">
                 <div class="card-header bg-primary text-white">
@@ -89,9 +89,25 @@
                 <div class="card-body">
                     <p class="card-text">
                         Your Neural Interface session is currently active and connected.
+                        {% if timer_info and timer_info.has_timer and not timer_info.timer_expired %}
+                        Session timer is active. Disconnect will be available when the timer expires.
+                        {% else %}
                         Disconnect to access full dashboard functionality.
+                        {% endif %}
                     </p>
                     <div class="d-grid gap-2">
+                        {% if timer_info and timer_info.has_timer and not timer_info.timer_expired %}
+                        <!-- Show countdown instead of disconnect button -->
+                        <div class="alert alert-warning text-center">
+                            <i class="fas fa-clock me-2"></i>
+                            <strong>Session Timer Active</strong>
+                            <div class="mt-2">
+                                <span class="fs-4" id="countdown-timer">Calculating...</span>
+                            </div>
+                            <small class="d-block mt-1">Disconnect will be available when timer expires</small>
+                        </div>
+                        {% else %}
+                        <!-- Show disconnect button -->
                         <form method="post" action="/disconnect-session"
                             onsubmit="return confirm('Are you sure you want to disconnect your Neural Interface session? This will stop all automated activities.');">
                             <button type="submit" class="btn btn-danger btn-lg w-100">
@@ -99,10 +115,16 @@
                                 Disconnect Neural Interface
                             </button>
                         </form>
+                        {% endif %}
                     </div>
                     <small class="text-muted mt-2 d-block">
                         <i class="fas fa-warning me-1"></i>
+                        {% if timer_info and timer_info.has_timer and not timer_info.timer_expired %}
+                        Timer set to end at {{ timer_info.timer_end[:16] if timer_info.timer_end else 'Unknown' }} ({{
+                        timer_info.timer_end[11:16] if timer_info.timer_end else 'Unknown' }}).
+                        {% else %}
                         This will stop all automated Telegram activities for your account.
+                        {% endif %}
                     </small>
                 </div>
             </div>
@@ -183,7 +205,8 @@
         <!-- Chat List Management for Locked Profiles -->
         <div class="col-12">
             <div class="card {% if list_mode == 'whitelist' %}border-primary{% else %}border-success{% endif %} mb-4">
-                <div class="card-header {% if list_mode == 'whitelist' %}bg-primary{% else %}bg-success{% endif %} text-white">
+                <div
+                    class="card-header {% if list_mode == 'whitelist' %}bg-primary{% else %}bg-success{% endif %} text-white">
                     <h5 class="card-title mb-0">
                         {% if list_mode == 'whitelist' %}
                         <i class="fas fa-check-circle me-2"></i>
@@ -197,14 +220,17 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div>
-                            <span class="badge {% if list_mode == 'whitelist' %}bg-primary{% else %}bg-success{% endif %} fs-6">
+                            <span
+                                class="badge {% if list_mode == 'whitelist' %}bg-primary{% else %}bg-success{% endif %} fs-6">
                                 {{ list_mode.title() }} Mode
                             </span>
                         </div>
                         <div>
-                            <form method="POST" action="/restricted-dashboard/chat-blacklist/toggle-mode" class="d-inline me-2">
-                                <button type="submit" class="btn {% if list_mode == 'whitelist' %}btn-success{% else %}btn-primary{% endif %} btn-sm"
-                                        onclick="return confirm('Switch modes? This will clear your current list and you will start fresh.')">
+                            <form method="POST" action="/restricted-dashboard/chat-blacklist/toggle-mode"
+                                class="d-inline me-2">
+                                <button type="submit"
+                                    class="btn {% if list_mode == 'whitelist' %}btn-success{% else %}btn-primary{% endif %} btn-sm"
+                                    onclick="return confirm('Switch modes? This will clear your current list and you will start fresh.')">
                                     <i class="fas fa-sync-alt"></i>
                                     Switch to {{ 'Blacklist' if list_mode == 'whitelist' else 'Whitelist' }}
                                 </button>
@@ -216,10 +242,12 @@
                     </div>
                     <p class="card-text mb-4">
                         {% if list_mode == 'whitelist' %}
-                        Your profile is locked and you're using whitelist mode. Only chats in your whitelist will have message filtering applied.
+                        Your profile is locked and you're using whitelist mode. Only chats in your whitelist will have
+                        message filtering applied.
                         All other chats will bypass badwords and autocorrect processing.
                         {% else %}
-                        Your profile is locked and you're using blacklist mode. Blacklisted chats will bypass filtering in specific chats.
+                        Your profile is locked and you're using blacklist mode. Blacklisted chats will bypass filtering
+                        in specific chats.
                         Blacklisted chats will skip badwords and autocorrect processing.
                         {% endif %}
                     </p>
@@ -253,7 +281,8 @@
                                     </div>
                                     <div class="col-md-2">
                                         <label class="form-label">&nbsp;</label>
-                                        <button type="submit" class="btn {% if list_mode == 'whitelist' %}btn-primary{% else %}btn-success{% endif %} w-100">
+                                        <button type="submit"
+                                            class="btn {% if list_mode == 'whitelist' %}btn-primary{% else %}btn-success{% endif %} w-100">
                                             <i class="fas fa-plus"></i> Add
                                         </button>
                                     </div>
@@ -265,7 +294,8 @@
                     <!-- Current Chat List -->
                     <div class="row">
                         <div class="col-12">
-                            <h6><i class="fas fa-list me-2"></i>{{ list_mode.title() }} Chats ({{ chat_list|length }})</h6>
+                            <h6><i class="fas fa-list me-2"></i>{{ list_mode.title() }} Chats ({{ chat_list|length }})
+                            </h6>
                             {% if chat_list %}
                             <div class="table-responsive">
                                 <table class="table table-sm table-striped">
@@ -400,6 +430,49 @@
         if (refreshInterval) {
             clearInterval(refreshInterval);
         }
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+        }
     });
+
+    // Session timer countdown functionality
+    {% if timer_info and timer_info.has_timer and not timer_info.timer_expired %}
+    let countdownInterval;
+    let remainingSeconds = {{ timer_info.remaining_seconds }};
+
+    function updateCountdown() {
+        const hours = Math.floor(remainingSeconds / 3600);
+        const minutes = Math.floor((remainingSeconds % 3600) / 60);
+        const seconds = remainingSeconds % 60;
+
+        let display = '';
+        if (hours > 0) {
+            display = `${hours}h ${minutes}m ${seconds}s`;
+        } else if (minutes > 0) {
+            display = `${minutes}m ${seconds}s`;
+        } else {
+            display = `${seconds}s`;
+        }
+
+        const timerElement = document.getElementById('countdown-timer');
+        if (timerElement) {
+            timerElement.textContent = display;
+        }
+
+        remainingSeconds--;
+
+        // When timer expires, reload the page to show disconnect button
+        if (remainingSeconds < 0) {
+            clearInterval(countdownInterval);
+            window.location.reload();
+        }
+    }
+
+    // Start countdown when page loads
+    document.addEventListener('DOMContentLoaded', function () {
+        updateCountdown(); // Update immediately
+        countdownInterval = setInterval(updateCountdown, 1000); // Update every second
+    });
+    {% endif %}
 </script>
 {% endblock %}

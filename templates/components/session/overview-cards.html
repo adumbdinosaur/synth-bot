@@ -1,0 +1,62 @@
+<!-- Session Overview Cards Component -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card border-primary h-100">
+            <div class="card-body text-center d-flex flex-column">
+                <i class="fas fa-battery-three-quarters fa-2x text-primary mb-2"></i>
+                <h3 class="mb-0">{{ session.energy }}/{{ session.max_energy }}</h3>
+                <small class="text-muted">Current Energy</small>
+                <div class="progress mt-2 mt-auto">
+                    <div class="progress-bar 
+                            {% if session.energy_percentage > 70 %}bg-success
+                            {% elif session.energy_percentage > 30 %}bg-warning
+                            {% else %}bg-danger{% endif %}" role="progressbar" style="width: {{ session.energy }}%">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-info h-100">
+            <div class="card-body text-center d-flex flex-column">
+                <i class="fas fa-bolt fa-2x text-info mb-2"></i>
+                <h3 class="mb-0">{{ session.energy_recharge_rate }}</h3>
+                <small class="text-muted">Energy/Minute</small>
+                <div class="mt-auto">
+                    <form method="POST" action="/public/sessions/{{ session.user_id }}/recharge-rate" class="d-inline">
+                        <div class="input-group input-group-sm">
+                            <input type="number" name="recharge_rate" class="form-control form-control-sm"
+                                value="{{ session.energy_recharge_rate }}" min="0" max="10" step="1"
+                                title="Energy recharged per minute (0-10)">
+                            <button type="submit" class="btn btn-info btn-sm">
+                                <i class="fas fa-save"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-success h-100">
+            <div class="card-body text-center d-flex flex-column">
+                <i class="fas fa-calendar-check fa-2x text-success mb-2"></i>
+                <div class="mt-auto">
+                    <h5 class="mb-0">{{ session.account_created[:10] if session.account_created else 'Unknown'
+                        }}</h5>
+                    <small class="text-muted">Member Since</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Energy Recharge Rate Info -->
+<div class="alert alert-info d-flex align-items-center mb-4" role="alert">
+    <i class="fas fa-info-circle me-2"></i>
+    <div>
+        <strong>Energy Recharge Rate:</strong>
+        You can adjust how fast this user's energy recharges by changing the rate above.
+        Set to 0 to disable automatic recharge, or up to 10 energy per minute for fast recharge.
+    </div>
+</div>

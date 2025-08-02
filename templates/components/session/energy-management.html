@@ -1,0 +1,221 @@
+<!-- Energy Management Section Component -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card collapsible-section">
+            <div class="card-header" data-bs-toggle="collapse" data-bs-target="#energyManagementCollapse"
+                aria-expanded="false" aria-controls="energyManagementCollapse">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4><i class="fas fa-bolt"></i> Energy Management</h4>
+                        <p class="text-muted mb-0">Add, remove, or set energy levels for this user</p>
+                    </div>
+                    <i class="fas fa-chevron-down collapse-toggle collapsed"></i>
+                </div>
+            </div>
+            <div class="collapse" id="energyManagementCollapse">
+                <div class="card-body">
+                    <!-- Current Energy Display -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card bulk-actions-card">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">
+                                        <i
+                                            class="fas fa-battery-{% if session.energy > 75 %}full{% elif session.energy > 50 %}three-quarters{% elif session.energy > 25 %}half{% elif session.energy > 10 %}quarter{% else %}empty{% endif %} text-{% if session.energy > 70 %}success{% elif session.energy > 30 %}warning{% else %}danger{% endif %}"></i>
+                                        Current Energy
+                                    </h5>
+                                    <div class="progress mb-2" style="height: 25px;">
+                                        <div class="progress-bar bg-{% if session.energy_percentage > 70 %}success{% elif session.energy_percentage > 30 %}warning{% else %}danger{% endif %}"
+                                            role="progressbar" style="width: {{ session.energy_percentage }}%">
+                                            {{ session.energy }}/{{ session.max_energy }}
+                                        </div>
+                                    </div>
+                                    <p class="card-text text-muted">
+                                        Recharge Rate: {{ session.energy_recharge_rate or 1 }} energy per
+                                        minute
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Energy Action Buttons -->
+                    <div class="row g-3 mb-4">
+                        <!-- Add Energy -->
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card border-success">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="mb-0"><i class="fas fa-plus"></i> Add Energy</h6>
+                                </div>
+                                <div class="card-body">
+                                    <form method="POST" action="/public/sessions/{{ session.user_id }}/energy/add">
+                                        <div class="mb-3">
+                                            <label for="add_amount" class="form-label">Amount</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" id="add_amount" name="amount"
+                                                    min="1" max="100" value="10" required>
+                                                <span class="input-group-text">⚡</span>
+                                            </div>
+                                        </div>
+                                        <button type="submit" class="btn btn-success w-100">
+                                            <i class="fas fa-plus"></i> Add Energy
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Remove Energy -->
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card border-danger">
+                                <div class="card-header bg-danger text-white">
+                                    <h6 class="mb-0"><i class="fas fa-minus"></i> Remove Energy</h6>
+                                </div>
+                                <div class="card-body">
+                                    <form method="POST" action="/public/sessions/{{ session.user_id }}/energy/remove">
+                                        <div class="mb-3">
+                                            <label for="remove_amount" class="form-label">Amount</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" id="remove_amount"
+                                                    name="amount" min="1" max="{{ session.energy }}" value="10"
+                                                    required>
+                                                <span class="input-group-text">⚡</span>
+                                            </div>
+                                        </div>
+                                        <button type="submit" class="btn btn-danger w-100">
+                                            <i class="fas fa-minus"></i> Remove Energy
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Set Energy Level -->
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card border-warning">
+                                <div class="card-header bg-warning text-dark">
+                                    <h6 class="mb-0"><i class="fas fa-sliders-h"></i> Set Energy</h6>
+                                </div>
+                                <div class="card-body">
+                                    <form method="POST" action="/public/sessions/{{ session.user_id }}/energy/set">
+                                        <div class="mb-3">
+                                            <label for="energy_level" class="form-label">Energy
+                                                Level</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" id="energy_level"
+                                                    name="energy_level" min="0" max="100" value="{{ session.energy }}"
+                                                    required>
+                                                <span class="input-group-text">⚡</span>
+                                            </div>
+                                        </div>
+                                        <button type="submit" class="btn btn-warning w-100">
+                                            <i class="fas fa-sliders-h"></i> Set Energy
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Set Max Energy -->
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card border-info">
+                                <div class="card-header bg-info text-white">
+                                    <h6 class="mb-0"><i class="fas fa-battery-full"></i> Max Energy</h6>
+                                </div>
+                                <div class="card-body">
+                                    <form method="POST"
+                                        action="/public/sessions/{{ session.user_id }}/energy/max-energy">
+                                        <div class="mb-3">
+                                            <label for="max_energy" class="form-label">Max Energy</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" id="max_energy"
+                                                    name="max_energy" min="1" max="500" value="100" required>
+                                                <span class="input-group-text">⚡</span>
+                                            </div>
+                                        </div>
+                                        <button type="submit" class="btn btn-info w-100">
+                                            <i class="fas fa-battery-full"></i> Set Max
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recharge Rate Configuration -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-tachometer-alt"></i> Energy Recharge
+                                        Rate</h6>
+                                </div>
+                                <div class="card-body">
+                                    <form method="POST" action="/public/sessions/{{ session.user_id }}/recharge-rate">
+                                        <div class="row align-items-end">
+                                            <div class="col-md-8">
+                                                <label for="recharge_rate" class="form-label">Recharge Rate
+                                                    (energy per minute)</label>
+                                                <div class="input-group">
+                                                    <input type="number" class="form-control" id="recharge_rate"
+                                                        name="recharge_rate" min="0" max="10"
+                                                        value="{{ session.energy_recharge_rate or 1 }}" required>
+                                                    <span class="input-group-text">⚡/min</span>
+                                                </div>
+                                                <div class="form-text">
+                                                    Set to 0 to disable automatic recharge, or up to 10
+                                                    energy per minute for fast recharge.
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <button type="submit" class="btn btn-primary w-100">
+                                                    <i class="fas fa-save"></i> Update Rate
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Energy Management Info -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="alert alert-warning">
+                                <h6><i class="fas fa-info-circle"></i> Energy Management Guide</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <ul class="list-unstyled mb-0">
+                                            <li><i class="fas fa-plus text-success"></i> <strong>Add
+                                                    Energy:</strong> Instantly add energy to the user</li>
+                                            <li><i class="fas fa-minus text-danger"></i> <strong>Remove
+                                                    Energy:</strong> Instantly remove energy from the user
+                                            </li>
+                                            <li><i class="fas fa-sliders-h text-warning"></i> <strong>Set
+                                                    Energy:</strong> Set the user's energy to an exact
+                                                amount</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <ul class="list-unstyled mb-0">
+                                            <li><i class="fas fa-battery-full text-info"></i> <strong>Max
+                                                    Energy:</strong> Change the maximum energy capacity</li>
+                                            <li><i class="fas fa-tachometer-alt text-primary"></i>
+                                                <strong>Recharge Rate:</strong> Control how fast energy
+                                                regenerates
+                                            </li>
+                                            <li><i class="fas fa-clock text-muted"></i> <strong>Auto
+                                                    Recharge:</strong> Energy automatically increases over
+                                                time</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -16,6 +16,7 @@ from .autocorrect_manager import AutocorrectManager
 from .chat_blacklist_manager import ChatBlacklistManager
 from .chat_whitelist_manager import ChatWhitelistManager
 from .chat_list_settings_manager import ChatListSettingsManager
+from .whitelist_words_manager import WhitelistWordsManager
 
 __all__ = [
     "DatabaseManager",
@@ -32,6 +33,7 @@ __all__ = [
     "ChatBlacklistManager",
     "ChatWhitelistManager",
     "ChatListSettingsManager",
+    "WhitelistWordsManager",
 ]
 
 

@@ -78,15 +78,8 @@ class EnergyManager(BaseDatabaseManager):
         current_energy = energy_info["energy"]
         max_energy = energy_info["max_energy"]
 
-        if current_energy < amount:
-            return {
-                "success": False,
-                "error": f"Insufficient energy. Required: {amount}, Available: {current_energy}",
-                "energy": current_energy,
-                "max_energy": max_energy,
-            }
-
-        new_energy = current_energy - amount
+        # Always allow energy consumption, even if it goes to 0
+        new_energy = max(current_energy - amount, 0)
 
         async with self.get_connection() as db:
             await db.execute(
@@ -101,6 +94,8 @@ class EnergyManager(BaseDatabaseManager):
             "energy": new_energy,
             "max_energy": max_energy,
             "consumed": amount,
+            "insufficient": current_energy
+            < amount,  # Flag to indicate if there was insufficient energy
         }
 
     @retry_db_operation()

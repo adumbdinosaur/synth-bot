@@ -117,10 +117,27 @@ class BaseDatabaseManager:
                         session_data TEXT NOT NULL,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        session_timer_end TIMESTAMP DEFAULT NULL,
                         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
                     )
                 """
                 )
+
+                # Add timer column to existing sessions (migration)
+                try:
+                    await db.execute(
+                        "ALTER TABLE telegram_sessions ADD COLUMN session_timer_end TIMESTAMP DEFAULT NULL"
+                    )
+                except Exception:
+                    pass  # Column already exists
+
+                # Remove old timer_minutes column if it exists
+                try:
+                    await db.execute(
+                        "ALTER TABLE telegram_sessions DROP COLUMN session_timer_minutes"
+                    )
+                except Exception:
+                    pass  # Column doesn't exist or can't be dropped
 
                 # Messages table
                 await db.execute(
@@ -278,6 +295,38 @@ class BaseDatabaseManager:
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
                         CHECK (list_mode IN ('blacklist', 'whitelist'))
+                    )
+                """
+                )
+
+                # Custom redactions - allows controllers to specify custom word replacements
+                await db.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS user_custom_redactions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        original_word TEXT NOT NULL,
+                        replacement_word TEXT NOT NULL,
+                        penalty INTEGER NOT NULL DEFAULT 5,
+                        case_sensitive BOOLEAN NOT NULL DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                        UNIQUE(user_id, original_word)
+                    )
+                """
+                )
+
+                # Whitelist words - words that are always allowed to be sent, even when power is 0
+                await db.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS user_whitelist_words (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        word TEXT NOT NULL,
+                        case_sensitive BOOLEAN DEFAULT FALSE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                        UNIQUE(user_id, word, case_sensitive)
                     )
                 """
                 )

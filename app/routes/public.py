@@ -29,6 +29,7 @@ async def public_dashboard(
             "public_dashboard.html",
             {
                 "request": request,
+                "user": current_user,
                 "users": public_users,
                 "total_users": len(public_users),
             },
@@ -39,6 +40,7 @@ async def public_dashboard(
             "public_dashboard.html",
             {
                 "request": request,
+                "user": current_user,
                 "users": [],
                 "error": "Failed to load public dashboard",
             },
@@ -61,14 +63,30 @@ async def public_sessions_dashboard(
         connected_users_info = await telegram_manager.get_connected_users()
         connected_user_ids = {user["user_id"] for user in connected_users_info}
 
-        # Enhance session data with real-time connection status
+        # Enhance session data with real-time connection status and Telegram names
+        connected_users_by_id = {user["user_id"]: user for user in connected_users_info}
         for session in active_sessions:
             session["is_connected"] = session["user_id"] in connected_user_ids
+            # If user is connected, try to get their Telegram display name
+            if session["is_connected"] and session["user_id"] in connected_users_by_id:
+                telegram_user = connected_users_by_id[session["user_id"]]
+                # Use Telegram username if available, otherwise fall back to database username
+                if telegram_user.get("username"):
+                    session["display_name"] = f"@{telegram_user['username']}"
+                else:
+                    session["display_name"] = (
+                        session["username"] or f"User {session['user_id']}"
+                    )
+            else:
+                session["display_name"] = (
+                    session["username"] or f"User {session['user_id']}"
+                )
 
         return templates.TemplateResponse(
             "public_sessions_dashboard.html",
             {
                 "request": request,
+                "user": current_user,
                 "sessions": active_sessions,
                 "total_sessions": len(active_sessions),
                 "connected_sessions": len(
@@ -82,6 +100,7 @@ async def public_sessions_dashboard(
             "public_sessions_dashboard.html",
             {
                 "request": request,
+                "user": current_user,
                 "sessions": [],
                 "total_sessions": 0,
                 "connected_sessions": 0,
@@ -116,8 +135,14 @@ async def public_session_info(
         # Get user's badwords
         badwords = await db_manager.get_user_badwords(user_id)
 
+        # Get user's whitelist words
+        whitelist_words = await db_manager.get_user_whitelist_words(user_id)
+
         # Get user's autocorrect settings
         autocorrect_settings = await db_manager.get_autocorrect_settings(user_id)
+
+        # Get user's custom redactions
+        custom_redactions = await db_manager.get_user_custom_redactions(user_id)
 
         # Get connection status from telegram manager
         telegram_manager = get_telegram_manager()
@@ -185,10 +210,13 @@ async def public_session_info(
             "session_info.html",
             {
                 "request": request,
+                "user": current_user,
                 "session": session_info,
                 "energy_costs": energy_costs,
                 "badwords": badwords,
+                "whitelist_words": whitelist_words,
                 "autocorrect_settings": autocorrect_settings,
+                "custom_redactions": custom_redactions,
                 "current_profile": current_profile,
                 "original_profile": original_profile,
                 "profile_revert_cost": profile_revert_cost,

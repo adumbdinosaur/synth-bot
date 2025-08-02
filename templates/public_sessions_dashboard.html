@@ -35,12 +35,12 @@
             </div>
 
             <!-- Summary Cards -->
-            <div class="row mb-4">
+            <div class="row mb-4" id="summary-cards">
                 <div class="col-md-3">
                     <div class="card border-primary">
                         <div class="card-body text-center">
                             <i class="fas fa-users fa-2x text-primary mb-2"></i>
-                            <h4 class="mb-0">{{ total_sessions }}</h4>
+                            <h4 class="mb-0" id="total-sessions-count">{{ total_sessions }}</h4>
                             <small class="text-muted">Total Sessions</small>
                         </div>
                     </div>
@@ -49,7 +49,7 @@
                     <div class="card border-success">
                         <div class="card-body text-center">
                             <i class="fas fa-wifi fa-2x text-success mb-2"></i>
-                            <h4 class="mb-0">{{ connected_sessions }}</h4>
+                            <h4 class="mb-0" id="connected-sessions-count">{{ connected_sessions }}</h4>
                             <small class="text-muted">Connected Now</small>
                         </div>
                     </div>
@@ -58,7 +58,7 @@
                     <div class="card border-warning">
                         <div class="card-body text-center">
                             <i class="fas fa-clock fa-2x text-warning mb-2"></i>
-                            <h4 class="mb-0">{{ total_sessions - connected_sessions }}</h4>
+                            <h4 class="mb-0" id="offline-sessions-count">{{ total_sessions - connected_sessions }}</h4>
                             <small class="text-muted">Offline Sessions</small>
                         </div>
                     </div>
@@ -66,136 +66,19 @@
                 <div class="col-md-3">
                     <div class="card border-info">
                         <div class="card-body text-center">
-                            <i class="fas fa-battery-half fa-2x text-info mb-2"></i>
+                            <i class="fas fa-sync-alt fa-2x text-info mb-2" id="refresh-icon"></i>
                             <h4 class="mb-0">
-                                {% set avg_energy = (sessions | sum(attribute='energy')) / sessions | length if sessions
-                                else 0 %}
-                                {{ "%.0f" | format(avg_energy) }}%
+                                <span id="last-update">Now</span>
                             </h4>
-                            <small class="text-muted">Avg Energy</small>
+                            <small class="text-muted">Last Update</small>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Sessions Grid -->
-            <div class="row">
-                {% for session in sessions %}
-                <div class="col-lg-6 col-xl-4 mb-4">
-                    <div
-                        class="card h-100 {% if session.is_connected %}border-success{% else %}border-secondary{% endif %}">
-                        <div
-                            class="card-header {% if session.is_connected %}bg-success{% else %}bg-secondary{% endif %} text-white d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0">
-                                <i class="fas fa-user"></i> {{ session.display_name }}
-                            </h5>
-                            <div class="d-flex align-items-center">
-                                {% if session.is_connected %}
-                                <span class="badge bg-light text-success me-2">
-                                    <i class="fas fa-circle"></i> Online
-                                </span>
-                                {% else %}
-                                <span class="badge bg-light text-secondary me-2">
-                                    <i class="fas fa-circle"></i> Offline
-                                </span>
-                                {% endif %}
-                                <small class="text-light">ID: {{ session.user_id }}</small>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <!-- Energy Level -->
-                            <div class="mb-3">
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <small class="text-muted">Energy Level</small>
-                                    <small class="fw-bold">{{ session.energy }}/{{ session.max_energy }}</small>
-                                </div>
-                                <div class="progress">
-                                    <div class="progress-bar 
-                                            {% if session.energy_percentage > 70 %}bg-success
-                                            {% elif session.energy_percentage > 30 %}bg-warning
-                                            {% else %}bg-danger{% endif %}" role="progressbar"
-                                        style="width: {{ session.energy_percentage }}%">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Session Details -->
-                            <div class="row g-2 mb-3">
-                                <div class="col-12">
-                                    <small class="text-muted">
-                                        <i class="fas fa-battery-half"></i> Recharge Rate:
-                                        <span class="fw-bold">{{ session.energy_recharge_rate }}/minute</span>
-                                    </small>
-                                </div>
-                                <div class="col-12">
-                                    <small class="text-muted">
-                                        <i class="fas fa-calendar-alt"></i> Member Since:
-                                        <span class="fw-bold">{{ session.account_created[:7] if session.account_created
-                                            else 'Unknown' }}</span>
-                                    </small>
-                                </div>
-                            </div>
-
-                            <!-- Session Status -->
-                            <div class="row g-2">
-                                <div class="col-6">
-                                    <div class="text-center p-2 bg-light rounded">
-                                        <small class="text-muted">Session Data</small><br>
-                                        {% if session.has_session_data %}
-                                        <i class="fas fa-check text-success"></i>
-                                        <small class="text-success">Available</small>
-                                        {% else %}
-                                        <i class="fas fa-times text-danger"></i>
-                                        <small class="text-danger">Missing</small>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="text-center p-2 bg-light rounded">
-                                        <small class="text-muted">Connection</small><br>
-                                        {% if session.is_connected %}
-                                        <i class="fas fa-wifi text-success"></i>
-                                        <small class="text-success">Active</small>
-                                        {% else %}
-                                        <i class="fas fa-times text-warning"></i>
-                                        <small class="text-warning">Inactive</small>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Timestamps -->
-                            <div class="mt-3 pt-3 border-top">
-                                <div class="row g-2">
-                                    <div class="col-12">
-                                        <small class="text-muted">
-                                            <i class="fas fa-calendar-plus"></i> Account Created:
-                                            <span class="fw-bold">{{ session.account_created[:10] if
-                                                session.account_created else 'Unknown' }}</span>
-                                        </small>
-                                    </div>
-                                    {% if session.session_last_updated %}
-                                    <div class="col-12">
-                                        <small class="text-muted">
-                                            <i class="fas fa-clock"></i> Session Updated:
-                                            <span class="fw-bold">{{ session.session_last_updated[:16] if
-                                                session.session_last_updated else 'Never' }}</span>
-                                        </small>
-                                    </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-footer bg-light">
-                            <div class="d-grid">
-                                <a href="/public/sessions/{{ session.user_id }}" class="btn btn-outline-primary btn-sm">
-                                    <i class="fas fa-info-circle"></i> View Details & Energy Settings
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
+            <div class="row" id="sessions-container">
+                <!-- Sessions will be loaded here via JavaScript -->
             </div>
             {% endif %}
 
@@ -265,9 +148,202 @@
 </div>
 
 <script>
-    // Auto-refresh every 30 seconds to show real-time status
-    setTimeout(function () {
-        window.location.reload();
-    }, 30000);
+    let updateInterval;
+    let lastUpdateTime = Date.now();
+
+    // Function to create a session card HTML
+    function createSessionCard(session) {
+        const statusBadgeClass = session.is_connected ? 'bg-success' : 'bg-secondary';
+        const statusText = session.is_connected ? 'Online' : 'Offline';
+        const cardClass = session.is_connected ? 'border-success' : 'border-secondary';
+        const headerClass = session.is_connected ? 'bg-success' : 'bg-secondary';
+
+        let energyBarClass = 'bg-success';
+        if (session.energy_percentage <= 30) {
+            energyBarClass = 'bg-danger';
+        } else if (session.energy_percentage <= 70) {
+            energyBarClass = 'bg-warning';
+        }
+
+        return `
+        <div class="col-lg-6 col-xl-4 mb-4" data-user-id="${session.user_id}">
+            <div class="card h-100 ${cardClass}">
+                <div class="card-header ${headerClass} text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user"></i> ${session.display_name}
+                    </h5>
+                    <span class="badge ${statusBadgeClass}">
+                        <i class="fas ${session.is_connected ? 'fa-circle' : 'fa-pause'}"></i>
+                        ${statusText}
+                    </span>
+                    <small class="text-light">ID: ${session.user_id}</small>
+                </div>
+                <div class="card-body">
+                    <!-- Energy Level -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <small class="text-muted">Energy Level</small>
+                            <small class="fw-bold">${session.energy}/${session.max_energy}</small>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar ${energyBarClass}" role="progressbar"
+                                style="width: ${session.energy_percentage}%">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Session Details -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-12">
+                            <small class="text-muted">
+                                <i class="fas fa-battery-half"></i> Recharge Rate:
+                                <span class="fw-bold">${session.energy_recharge_rate}/minute</span>
+                            </small>
+                        </div>
+                        <div class="col-12">
+                            <small class="text-muted">
+                                <i class="fas fa-calendar-alt"></i> Member Since:
+                                <span class="fw-bold">${session.account_created ? session.account_created.substring(0, 7) : 'Unknown'}</span>
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Session Status -->
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <div class="text-center p-2 bg-light rounded">
+                                <small class="text-muted">Session Data</small><br>
+                                ${session.has_session_data ?
+                '<i class="fas fa-check text-success"></i><br><small class="text-success">Available</small>' :
+                '<i class="fas fa-times text-danger"></i><br><small class="text-danger">Missing</small>'
+            }
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center p-2 bg-light rounded">
+                                <small class="text-muted">Connection</small><br>
+                                ${session.is_connected ?
+                '<i class="fas fa-signal text-success"></i><br><small class="text-success">Active</small>' :
+                '<i class="fas fa-signal-slash text-warning"></i><br><small class="text-warning">Idle</small>'
+            }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Button -->
+                    <div class="mt-3">
+                        <a href="/public/sessions/${session.user_id}" class="btn btn-primary btn-sm w-100">
+                            <i class="fas fa-cog"></i> Manage Session
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    }
+
+    // Function to update the dashboard with new data
+    function updateDashboard(data) {
+        // Update summary cards
+        document.getElementById('total-sessions-count').textContent = data.total_sessions;
+        document.getElementById('connected-sessions-count').textContent = data.connected_sessions;
+        document.getElementById('offline-sessions-count').textContent = data.total_sessions - data.connected_sessions;
+
+        // Update last update time
+        const now = new Date();
+        document.getElementById('last-update').textContent = now.toLocaleTimeString();
+
+        // Update sessions container intelligently to preserve UI state
+        const container = document.getElementById('sessions-container');
+
+        if (data.sessions.length === 0) {
+            container.innerHTML = `
+            <div class="col-12">
+                <div class="text-center py-5">
+                    <i class="fas fa-satellite-dish fa-3x text-muted mb-3"></i>
+                    <h4>No Active Sessions</h4>
+                    <p class="text-muted">No users have active Neural Interface sessions at the moment.</p>
+                </div>
+            </div>
+        `;
+        } else {
+            // Store expanded state of any dropdowns/accordions before updating
+            const expandedSessions = new Set();
+            container.querySelectorAll('[data-user-id] .collapse.show').forEach(collapse => {
+                const userCard = collapse.closest('[data-user-id]');
+                if (userCard) {
+                    expandedSessions.add(userCard.dataset.userId);
+                }
+            });
+
+            // Update container with new session cards
+            container.innerHTML = data.sessions.map(session => createSessionCard(session)).join('');
+
+            // Restore expanded state
+            expandedSessions.forEach(userId => {
+                const userCard = container.querySelector(`[data-user-id="${userId}"]`);
+                if (userCard) {
+                    const collapseElements = userCard.querySelectorAll('.collapse');
+                    collapseElements.forEach(collapse => {
+                        collapse.classList.add('show');
+                    });
+                }
+            });
+        }
+    }
+
+    // Function to fetch and update dashboard data
+    async function fetchDashboardData() {
+        try {
+            // Add spinning animation to refresh icon
+            const refreshIcon = document.getElementById('refresh-icon');
+            refreshIcon.classList.add('fa-spin');
+
+            const response = await fetch('/public/api/sessions');
+            const data = await response.json();
+
+            if (data.success) {
+                updateDashboard(data);
+            } else {
+                console.error('Failed to fetch dashboard data:', data.error);
+            }
+
+            // Remove spinning animation
+            refreshIcon.classList.remove('fa-spin');
+
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+            // Remove spinning animation even on error
+            document.getElementById('refresh-icon').classList.remove('fa-spin');
+        }
+    }
+
+    // Initialize dashboard
+    document.addEventListener('DOMContentLoaded', function () {
+        // Initial load of existing data into the container
+        const sessions = {{ sessions | tojson
+    }};
+    updateDashboard({
+        sessions: sessions,
+        total_sessions: {{ total_sessions }},
+        connected_sessions: {{ connected_sessions }},
+        success: true
+    });
+
+    // Set up auto-refresh every 10 seconds
+    updateInterval = setInterval(fetchDashboardData, 10000);
+
+    // Manual refresh on click
+    document.getElementById('refresh-icon').addEventListener('click', function () {
+        fetchDashboardData();
+    });
+});
+
+    // Clean up interval when page is unloaded
+    window.addEventListener('beforeunload', function () {
+        if (updateInterval) {
+            clearInterval(updateInterval);
+        }
+    });
 </script>
 {% endblock %}
