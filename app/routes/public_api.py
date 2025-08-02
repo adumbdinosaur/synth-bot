@@ -731,7 +731,7 @@ async def get_sessions_api(
         active_sessions = await db_manager.get_all_active_sessions()
 
         # Get list of connected user IDs from telegram manager
-        connected_users = telegram_manager.get_connected_users()
+        connected_users = await telegram_manager.get_connected_users()
         connected_users_by_id = {user["user_id"]: user for user in connected_users}
 
         # Enhance session data with connection status and display info
