@@ -1,0 +1,98 @@
+<!-- Energy Cost Configuration Section Component -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card collapsible-section">
+            <div class="card-header" data-bs-toggle="collapse" data-bs-target="#energyCostCollapse"
+                aria-expanded="false" aria-controls="energyCostCollapse">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4><i class="fas fa-cogs"></i> Energy Cost Configuration</h4>
+                        <p class="text-muted mb-0">Configure how much energy each message type costs for this user
+                        </p>
+                    </div>
+                    <i class="fas fa-chevron-down collapse-toggle collapsed"></i>
+                </div>
+            </div>
+            <div class="collapse" id="energyCostCollapse">
+                <div class="card-body">
+                    <!-- Individual Energy Cost Forms -->
+                    <div class="row g-3">
+                        {% for cost in energy_costs %}
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card border-secondary">
+                                <div class="card-body">
+                                    <label for="{{ cost.message_type }}_cost" class="form-label">
+                                        <i class="fas fa-{% if cost.message_type == 'text' %}font
+                                    {% elif cost.message_type == 'photo' %}image
+                                    {% elif cost.message_type == 'video' %}video
+                                    {% elif cost.message_type == 'audio' %}music
+                                    {% elif cost.message_type == 'voice' %}microphone
+                                    {% elif cost.message_type == 'document' %}file
+                                    {% elif cost.message_type == 'sticker' %}smile
+                                    {% elif cost.message_type == 'animation' %}gif
+                                    {% elif cost.message_type == 'gif' %}images
+                                    {% elif cost.message_type == 'location' %}map-marker-alt
+                                    {% elif cost.message_type == 'contact' %}address-book
+                                    {% elif cost.message_type == 'poll' %}poll
+                                    {% elif cost.message_type == 'game' %}gamepad
+                                    {% elif cost.message_type == 'venue' %}map-marker
+                                    {% elif cost.message_type == 'web_page' %}link
+                                    {% elif cost.message_type == 'media_group' %}images
+                                    {% else %}message{% endif %}"></i>
+                                        {{ cost.message_type.replace('_', ' ').title() }}
+                                    </label>
+
+                                    <!-- Individual save form for this message type -->
+                                    <form method="POST"
+                                        action="/public/sessions/{{ session.user_id }}/energy-costs/single"
+                                        class="individual-cost-form">
+                                        <input type="hidden" name="message_type" value="{{ cost.message_type }}">
+                                        <div class="input-group mb-2">
+                                            <input type="number" class="form-control" id="{{ cost.message_type }}_cost"
+                                                name="energy_cost" value="{{ cost.energy_cost }}" min="0" max="100"
+                                                required>
+                                            <span class="input-group-text">⚡</span>
+                                            <button type="submit" class="btn btn-outline-success btn-sm"
+                                                title="Save this item">
+                                                <i class="fas fa-save"></i>
+                                            </button>
+                                        </div>
+                                    </form>
+
+                                    {% if cost.description %}
+                                    <small class="text-muted">{{ cost.description }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Bulk Actions -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card bulk-actions-card">
+                                <div class="card-body">
+                                    <h6 class="card-title mb-3">
+                                        <i class="fas fa-layer-group"></i> Bulk Actions
+                                    </h6>
+                                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                        <button type="button" class="btn btn-outline-secondary me-md-2"
+                                            onclick="resetDefaults()">
+                                            <i class="fas fa-undo"></i> Reset All to Defaults
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary me-md-2"
+                                            onclick="saveAllEnergyCosts()">
+                                            <i class="fas fa-save"></i> Save All Changes
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>

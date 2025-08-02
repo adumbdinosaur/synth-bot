@@ -237,6 +237,22 @@ h6 {
     box-shadow: 0 0 10px rgba(142, 36, 170, 0.3);
 }
 
+/* Improve badge and small component readability */
+.badge {
+    font-size: 0.8rem !important;
+    /* Slightly larger than default */
+    padding: 0.35em 0.65em !important;
+    /* More padding for better touch targets */
+    font-weight: 500;
+}
+
+/* Button text improvements */
+.btn-sm {
+    font-size: 0.85rem !important;
+    /* Increased from very small default */
+    padding: 0.4rem 0.8rem !important;
+}
+
 /* Cards */
 .card {
     background: rgba(26, 26, 26, 0.9);
@@ -296,6 +312,18 @@ h6 {
     font-weight: 700;
     text-transform: uppercase;
     margin-bottom: 1rem;
+}
+
+/* Override Bootstrap light elements for consistent dark theme */
+.card.border-secondary,
+.card.border-light {
+    border-color: var(--cyber-light-grey) !important;
+    background-color: rgba(28, 28, 28, 0.6);
+}
+
+.card.border-secondary .card-body,
+.card.border-light .card-body {
+    color: var(--cyber-text);
 }
 
 /* Feature Cards */
@@ -392,7 +420,7 @@ h6 {
     font-family: var(--font-primary);
     font-weight: 600;
     text-transform: uppercase;
-    font-size: 0.9rem;
+    font-size: 1rem;
     letter-spacing: 0.5px;
 }
 
@@ -455,6 +483,9 @@ h6 {
     border-left: 4px solid;
     font-family: var(--font-primary);
     font-weight: 500;
+    font-size: 0.95rem !important;
+    /* Slightly larger alert text */
+    line-height: 1.5;
 }
 
 .alert-success {
@@ -479,6 +510,48 @@ h6 {
     background: rgba(74, 158, 255, 0.1);
     border-left-color: var(--cyber-blue);
     color: var(--cyber-blue);
+}
+
+/* Fix table header text color */
+.table-dark th {
+    color: var(--cyber-text) !important;
+    font-weight: 600;
+    border-bottom-color: var(--cyber-light-grey);
+}
+
+/* Consistent explainer box styling - purple theme with better readability */
+.alert-info,
+.alert-warning {
+    background-color: rgba(121, 134, 203, 0.15) !important;
+    border-color: var(--cyber-purple) !important;
+    color: var(--cyber-text) !important;
+    border-left: 4px solid var(--cyber-purple);
+}
+
+.alert-info h6,
+.alert-warning h6 {
+    color: var(--cyber-purple) !important;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.alert-info .fas,
+.alert-warning .fas {
+    color: var(--cyber-purple) !important;
+}
+
+.alert-info strong,
+.alert-warning strong {
+    color: var(--cyber-cyan) !important;
+}
+
+.alert-info code,
+.alert-warning code {
+    background-color: rgba(45, 45, 45, 0.8);
+    color: var(--cyber-yellow);
+    border: 1px solid var(--cyber-light-grey);
+    padding: 2px 4px;
+    border-radius: 3px;
 }
 
 /* Bootstrap Component Overrides for Better Visibility */
@@ -562,8 +635,40 @@ h6 {
     text-shadow: 0 0 3px rgba(121, 134, 203, 0.4);
 }
 
+/* Improve readability of small text elements */
+small,
+.small {
+    font-size: 0.9rem !important;
+    /* Increased from default 0.875rem */
+    line-height: 1.4;
+}
+
 .text-muted {
-    color: #888 !important;
+    font-size: 0.95rem !important;
+    /* Slightly larger for better readability */
+    color: var(--cyber-text-muted) !important;
+    line-height: 1.5;
+}
+
+/* Card subtitle text improvements */
+.card-header p.text-muted,
+.card-body .text-muted {
+    font-size: 0.95rem !important;
+}
+
+/* Form text and help text improvements */
+.form-text {
+    font-size: 0.9rem !important;
+    /* Increased from default */
+    color: var(--cyber-text-muted) !important;
+    line-height: 1.4;
+    margin-top: 0.5rem;
+}
+
+/* Input group text improvements */
+.input-group-text {
+    font-size: 0.95rem !important;
+    /* Slightly larger for better readability */
 }
 
 /* Message Content */
@@ -629,25 +734,41 @@ h6 {
 /* Tables */
 .table {
     color: #e0e0e0;
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--cyber-text);
+    --bs-table-border-color: var(--cyber-light-grey);
+}
+
+.table> :not(caption)>*>* {
+    border-bottom-color: var(--cyber-light-grey);
 }
 
 .table-dark {
-    background: rgba(26, 26, 26, 0.9);
-    border-color: var(--cyber-light-grey);
+    --bs-table-bg: rgba(45, 45, 45, 0.8);
+    --bs-table-color: var(--cyber-text);
+    --bs-table-border-color: var(--cyber-light-grey);
 }
 
 .table-dark th {
-    border-color: var(--cyber-light-grey);
-    color: var(--cyber-cyan);
-    font-family: var(--font-header);
-    font-weight: 700;
-    text-transform: uppercase;
-    font-size: 0.9rem;
-    letter-spacing: 0.5px;
+    color: var(--cyber-text) !important;
+    font-weight: 600;
+    border-bottom-color: var(--cyber-light-grey);
 }
 
-.table-dark td {
-    border-color: var(--cyber-light-grey);
+.table td,
+.table th {
+    font-size: 0.95rem !important;
+    /* Slightly larger table text */
+    line-height: 1.4;
+}
+
+.table small {
+    font-size: 0.85rem !important;
+    /* Larger small text in tables */
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(74, 158, 255, 0.1) !important;
 }
 
 /* Progress Bars */
@@ -728,6 +849,53 @@ h6 {
     animation: pulse 1.5s infinite;
 }
 
+/* Custom improvements for session info components */
+
+/* Remove scroll decorators from number input fields */
+input[type="number"] {
+    -webkit-appearance: textfield;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Tone down bright backgrounds for lightning emoji input-group-text */
+.input-group-text {
+    background-color: rgba(45, 45, 45, 0.8) !important;
+    border-color: var(--cyber-light-grey) !important;
+    color: var(--cyber-text) !important;
+    border-radius: 0;
+    font-family: var(--font-primary);
+}
+
+.input-group-text:contains("⚡") {
+    background-color: rgba(45, 45, 45, 0.6) !important;
+}
+
+/* Better integration with the cyberpunk theme */
+.input-group .form-control {
+    border-right: none;
+}
+
+.input-group .form-control:focus {
+    border-color: var(--cyber-blue);
+    box-shadow: none;
+}
+
+.input-group .input-group-text {
+    border-left: none;
+}
+
+.input-group:focus-within .input-group-text {
+    border-color: var(--cyber-blue);
+    background-color: rgba(74, 158, 255, 0.1) !important;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .hero-section {
@@ -746,4 +914,31 @@ h6 {
     .rptr-logo {
         font-size: 1.2rem;
     }
+}
+
+/* Bulk actions styling for consistent dark theme */
+.bulk-actions-card {
+    background-color: rgba(45, 45, 45, 0.4) !important;
+    border-color: var(--cyber-light-grey) !important;
+}
+
+/* Ensure form elements in cards have proper theming */
+.card .form-label {
+    color: var(--cyber-cyan);
+}
+
+.card .text-muted {
+    color: var(--cyber-text-muted) !important;
+}
+
+/* Ensure all sections have consistent width */
+.row .col-12 .card,
+.row .col-12 .card.collapsible-section {
+    width: 100%;
+    max-width: none;
+}
+
+/* Fix any potential flex or grid issues */
+.container .row .col-md-12>* {
+    width: 100%;
 }

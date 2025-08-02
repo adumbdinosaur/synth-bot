@@ -1,0 +1,204 @@
+<!-- Badwords Management Section Component -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card collapsible-section">
+            <div class="card-header" data-bs-toggle="collapse" data-bs-target="#badwordsCollapse" aria-expanded="false"
+                aria-controls="badwordsCollapse">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4><i class="fas fa-ban"></i> Badwords Management</h4>
+                        <p class="text-muted mb-0">Manage words that trigger automatic filtering and energy
+                            penalties</p>
+                    </div>
+                    <i class="fas fa-chevron-down collapse-toggle collapsed"></i>
+                </div>
+            </div>
+            <div class="collapse" id="badwordsCollapse">
+                <div class="card-body">
+                    <!-- Add New Badword Form -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5><i class="fas fa-plus"></i> Add New Badword</h5>
+                            <form method="POST" action="/public/sessions/{{ session.user_id }}/badwords/add">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="word" class="form-label">Word</label>
+                                        <input type="text" class="form-control" id="word" name="word"
+                                            placeholder="Enter badword" required maxlength="50">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="penalty" class="form-label">Energy Penalty</label>
+                                        <input type="number" class="form-control" id="penalty" name="penalty" value="5"
+                                            min="1" max="100" required>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Options</label>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="case_sensitive"
+                                                name="case_sensitive" value="true">
+                                            <label class="form-check-label" for="case_sensitive">
+                                                Case Sensitive
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">&nbsp;</label>
+                                        <button type="submit" class="btn btn-danger w-100">
+                                            <i class="fas fa-plus"></i> Add
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Current Badwords List -->
+                    <div class="row">
+                        <div class="col-12">
+                            <h5><i class="fas fa-list"></i> Current Badwords ({{ badwords|length }})</h5>
+                            {% if badwords %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Word</th>
+                                            <th>Energy Penalty</th>
+                                            <th>Case Sensitive</th>
+                                            <th>Added</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for badword in badwords %}
+                                        <tr>
+                                            <td>
+                                                <code class="text-danger">{{ badword.word }}</code>
+                                            </td>
+                                            <td>
+                                                <form method="POST"
+                                                    action="/public/sessions/{{ session.user_id }}/badwords/update"
+                                                    class="d-inline">
+                                                    <input type="hidden" name="word" value="{{ badword.word }}">
+                                                    <div class="input-group input-group-sm" style="width: 120px;">
+                                                        <input type="number" class="form-control" name="penalty"
+                                                            value="{{ badword.penalty }}" min="1" max="100" required>
+                                                        <button type="submit" class="btn btn-outline-primary btn-sm">
+                                                            <i class="fas fa-save"></i>
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </td>
+                                            <td>
+                                                {% if badword.case_sensitive %}
+                                                <span class="badge bg-warning">
+                                                    <i class="fas fa-check"></i> Yes
+                                                </span>
+                                                {% else %}
+                                                <span class="badge bg-secondary">
+                                                    <i class="fas fa-times"></i> No
+                                                </span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    {{ badword.created_at[:10] if badword.created_at else
+                                                    'Unknown' }}
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <form method="POST"
+                                                    action="/public/sessions/{{ session.user_id }}/badwords/remove"
+                                                    class="d-inline">
+                                                    <input type="hidden" name="word" value="{{ badword.word }}">
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm"
+                                                        onclick="return confirm('Remove badword \'{{ badword.word }}\'?')">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i>
+                                No badwords configured for this user. Add some above to enable message
+                                filtering.
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Bulk Badwords Actions -->
+                    {% if badwords %}
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card bulk-actions-card">
+                                <div class="card-body">
+                                    <h6 class="card-title mb-3">
+                                        <i class="fas fa-layer-group"></i> Bulk Actions
+                                    </h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <form method="POST"
+                                                action="/public/sessions/{{ session.user_id }}/badwords/bulk-update"
+                                                class="d-inline">
+                                                <div class="input-group">
+                                                    <span class="input-group-text">Set all penalties to:</span>
+                                                    <input type="number" class="form-control" name="penalty" value="5"
+                                                        min="1" max="100" required>
+                                                    <span class="input-group-text">⚡</span>
+                                                    <button type="submit" class="btn btn-outline-warning">
+                                                        <i class="fas fa-edit"></i> Update All
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                                <button type="button" class="btn btn-outline-danger"
+                                                    onclick="clearAllBadwords()">
+                                                    <i class="fas fa-trash-alt"></i> Clear All Badwords
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Badwords Info -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="alert alert-warning">
+                                <h6><i class="fas fa-exclamation-triangle"></i> How Badwords Work</h6>
+                                <ul class="mb-0">
+                                    <li><strong>Detection:</strong> Messages containing badwords are
+                                        automatically detected
+                                    </li>
+                                    <li><strong>Filtering:</strong> Badwords are replaced with
+                                        <code>&lt;redacted&gt;</code> in the message
+                                    </li>
+                                    <li><strong>Energy Penalty:</strong> User loses energy equal to the
+                                        penalty
+                                        for each badword used
+                                    </li>
+                                    <li><strong>Case Sensitivity:</strong> Choose whether matching should be
+                                        case-sensitive or not
+                                    </li>
+                                    <li><strong>Multiple Words:</strong> If a message contains multiple
+                                        badwords, all penalties are combined
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
