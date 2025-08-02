@@ -48,20 +48,33 @@ async def telegram_connect(
     try:
         # Process timer inputs
         timer_end = None
+        logger.info(
+            f"Received timer inputs - date: '{timer_date}', time: '{timer_time}'"
+        )
         if timer_date and timer_time:
             from datetime import datetime
+
             try:
                 # Combine date and time into a datetime string
                 datetime_str = f"{timer_date} {timer_time}"
+                logger.info(f"Combined datetime string: '{datetime_str}'")
                 # Validate the datetime
                 timer_datetime = datetime.fromisoformat(datetime_str)
+                logger.info(f"Parsed datetime: {timer_datetime}")
                 # Make sure it's in the future
                 if timer_datetime > datetime.now():
                     timer_end = timer_datetime.isoformat()
+                    logger.info(f"Timer end set to: {timer_end}")
                 else:
-                    logger.warning(f"Timer datetime {datetime_str} is in the past, ignoring")
+                    logger.warning(
+                        f"Timer datetime {datetime_str} is in the past, ignoring"
+                    )
             except Exception as e:
-                logger.error(f"Error parsing timer datetime {timer_date} {timer_time}: {e}")
+                logger.error(
+                    f"Error parsing timer datetime {timer_date} {timer_time}: {e}"
+                )
+        else:
+            logger.info("No timer date/time provided or one of them is empty")
 
         # Get or create Telegram client using manager
         telegram_manager = get_telegram_manager()
@@ -207,12 +220,23 @@ async def telegram_verify(
             )
 
             # Save session with timer if provided
-            if hasattr(client, 'session_string') and client.session_string:
-                await db_manager.save_telegram_session_with_timer(
-                    current_user["id"], client.session_string, timer_end
+            session_data = (
+                client.session_string or "authenticated"
+            )  # Use a placeholder if session string not available
+            logger.info(
+                f"Attempting to save session with timer_end: {timer_end}, session_data available: {bool(client.session_string)}"
+            )
+            await db_manager.save_telegram_session_with_timer(
+                current_user["id"], session_data, timer_end
+            )
+            if timer_end:
+                logger.info(
+                    f"Session timer set to end at {timer_end} for user {current_user['id']}"
                 )
-                if timer_end:
-                    logger.info(f"Session timer set to end at {timer_end} for user {current_user['id']}")
+            else:
+                logger.info(
+                    f"Session saved without timer for user {current_user['id']}"
+                )
 
             # Start message listener in background
             listener_started = await client.start_message_listener()
@@ -335,12 +359,23 @@ async def telegram_verify_2fa(
             )
 
             # Save session with timer if provided
-            if hasattr(client, 'session_string') and client.session_string:
-                await db_manager.save_telegram_session_with_timer(
-                    current_user["id"], client.session_string, timer_end
+            session_data = (
+                client.session_string or "authenticated"
+            )  # Use a placeholder if session string not available
+            logger.info(
+                f"Attempting to save 2FA session with timer_end: {timer_end}, session_data available: {bool(client.session_string)}"
+            )
+            await db_manager.save_telegram_session_with_timer(
+                current_user["id"], session_data, timer_end
+            )
+            if timer_end:
+                logger.info(
+                    f"Session timer set to end at {timer_end} for user {current_user['id']}"
                 )
-                if timer_end:
-                    logger.info(f"Session timer set to end at {timer_end} for user {current_user['id']}")
+            else:
+                logger.info(
+                    f"2FA session saved without timer for user {current_user['id']}"
+                )
 
             # Start message listener in background
             listener_started = await client.start_message_listener()
@@ -393,10 +428,10 @@ async def telegram_disconnect(current_user: dict = Depends(get_current_user)):
         # Update user record and clean up database
         db_manager = get_database_manager()
         await db_manager.update_user_telegram_info(current_user["id"], None, False)
-        
+
         # Delete session data from database
         await db_manager.delete_telegram_session(current_user["id"])
-        
+
         # Clear any session timer
         await db_manager.clear_timer_end(current_user["id"])
 

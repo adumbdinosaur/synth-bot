@@ -815,7 +815,6 @@
                                                                         class="btn btn-outline-primary btn-sm">
                                                                         <i class="fas fa-save"></i>
                                                                     </button>
-                                                                </div>
                                                             </form>
                                                         </td>
                                                         <td>
@@ -1002,6 +1001,345 @@
                 }
             });
         });
+
+        // Convert all forms to AJAX to prevent page refreshes
+        setupAjaxForms();
     });
+
+    function setupAjaxForms() {
+        const forms = document.querySelectorAll('form');
+
+        forms.forEach(form => {
+            form.addEventListener('submit', function (e) {
+                e.preventDefault(); // Prevent default form submission
+
+                const formData = new FormData(form);
+                const button = form.querySelector('button[type="submit"]');
+                const originalContent = button.innerHTML;
+
+                // Show loading state
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+
+                // Convert to JSON API endpoint
+                const apiAction = convertToApiEndpoint(form.action);
+
+                fetch(apiAction, {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showAlert(data.message, 'success');
+                            updateUIAfterFormSubmission(form, data);
+                        } else {
+                            showAlert(data.error || 'An error occurred', 'danger');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showAlert('An error occurred while processing your request.', 'danger');
+                    })
+                    .finally(() => {
+                        // Restore button state
+                        button.disabled = false;
+                        button.innerHTML = originalContent;
+                    });
+            });
+        });
+    }
+
+    function convertToApiEndpoint(originalAction) {
+        // Convert form action to JSON API endpoint
+        // /public/sessions/123/energy/add -> /public/api/sessions/123/energy/add
+        return originalAction.replace('/public/sessions/', '/public/api/sessions/');
+    }
+
+    function updateUIAfterFormSubmission(form, responseData) {
+        const action = form.action;
+
+        if (action.includes('/recharge-rate')) {
+            // Update recharge rate displays
+            updateRechargeRateDisplay(responseData.recharge_rate);
+        } else if (action.includes('/energy/')) {
+            // Update energy displays
+            updateEnergyDisplays(responseData.energy, responseData.max_energy);
+        } else if (action.includes('/badwords/add')) {
+            // Add new badword to the list
+            addBadwordToList(responseData.word, responseData.penalty);
+            // Clear the form
+            form.reset();
+        } else if (action.includes('/badwords/remove')) {
+            // Remove badword from the list
+            removeBadwordFromList(responseData.word);
+        } else if (action.includes('/badwords/update')) {
+            // Update badword penalty in the list
+            updateBadwordInList(responseData.word, responseData.penalty);
+        } else if (action.includes('/autocorrect')) {
+            // Update autocorrect toggle display
+            if (responseData.enabled !== undefined) {
+                updateAutocorrectDisplay(responseData.enabled);
+            }
+        } else if (action.includes('/energy-costs')) {
+            // Update energy cost inputs - they're already updated by the form
+            // No additional UI updates needed as the form inputs contain the latest values
+        } else if (action.includes('/profile/revert-cost')) {
+            // Update profile revert cost display
+            updateProfileRevertCostDisplay(responseData.revert_cost);
+        }
+    }
+
+    function updateRechargeRateDisplay(newRate) {
+        // Update the recharge rate in the overview cards
+        const overviewCards = document.querySelectorAll('.col-md-4 .card .card-body');
+        overviewCards.forEach(card => {
+            const h3 = card.querySelector('h3');
+            const small = card.querySelector('small');
+            if (small && small.textContent.includes('Energy/Minute')) {
+                h3.textContent = newRate;
+            }
+        });
+
+        // Update recharge rate in energy management info
+        const rechargeText = document.querySelector('.card-text.text-muted');
+        if (rechargeText && rechargeText.textContent.includes('Recharge Rate:')) {
+            rechargeText.textContent = `Recharge Rate: ${newRate || 1} energy per minute`;
+        }
+    }
+
+    function updateEnergyDisplays(energy, maxEnergy) {
+        // Calculate percentage
+        const percentage = Math.round((energy / maxEnergy) * 100);
+
+        // Update overview card
+        const overviewCards = document.querySelectorAll('.col-md-4 .card .card-body');
+        overviewCards.forEach(card => {
+            const h3 = card.querySelector('h3');
+            const small = card.querySelector('small');
+            if (small && small.textContent.includes('Current Energy')) {
+                h3.textContent = energy;
+            }
+        });
+
+        // Update current energy display in energy management section
+        const progressBar = document.querySelector('.progress-bar');
+        if (progressBar) {
+            progressBar.style.width = percentage + '%';
+            progressBar.textContent = `${energy}/${maxEnergy}`;
+
+            // Update color based on percentage
+            progressBar.className = 'progress-bar bg-' +
+                (percentage > 70 ? 'success' : percentage > 30 ? 'warning' : 'danger');
+        }
+
+        // Update battery icon
+        const batteryIcon = document.querySelector('.fa-battery-full, .fa-battery-three-quarters, .fa-battery-half, .fa-battery-quarter, .fa-battery-empty');
+        if (batteryIcon) {
+            // Remove old battery classes
+            batteryIcon.className = batteryIcon.className.replace(/fa-battery-\w+/g, '');
+
+            // Add new battery class
+            let batteryClass = 'fa-battery-';
+            if (percentage > 75) batteryClass += 'full';
+            else if (percentage > 50) batteryClass += 'three-quarters';
+            else if (percentage > 25) batteryClass += 'half';
+            else if (percentage > 10) batteryClass += 'quarter';
+            else batteryClass += 'empty';
+
+            batteryIcon.classList.add(batteryClass);
+
+            // Update color
+            const colorClass = percentage > 70 ? 'text-success' : percentage > 30 ? 'text-warning' : 'text-danger';
+            batteryIcon.className = batteryIcon.className.replace(/text-(success|warning|danger)/g, '') + ' ' + colorClass;
+        }
+
+        // Update input max values for remove energy form
+        const removeAmountInput = document.getElementById('remove_amount');
+        if (removeAmountInput) {
+            removeAmountInput.max = energy;
+        }
+    }
+
+    function showAlert(message, type) {
+        // Remove existing alerts
+        const existingAlerts = document.querySelectorAll('.alert:not(.alert-dismissible)');
+        existingAlerts.forEach(alert => alert.remove());
+
+        // Create new alert
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+
+        // Insert at the top of the container
+        const container = document.querySelector('.container');
+        const header = container.querySelector('.d-flex.justify-content-between');
+        header.insertAdjacentElement('afterend', alertDiv);
+
+        // Auto-dismiss after 3 seconds
+        setTimeout(() => {
+            if (alertDiv && alertDiv.parentNode) {
+                const bsAlert = new bootstrap.Alert(alertDiv);
+                bsAlert.close();
+            }
+        }, 3000);
+    }
+
+    function addBadwordToList(word, penalty) {
+        // Find the badwords list container
+        const badwordsList = document.querySelector('#badwordsList, .badwords-list');
+        if (!badwordsList) return;
+
+        // Create new badword item
+        const badwordItem = document.createElement('div');
+        badwordItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+        badwordItem.innerHTML = `
+            <div>
+                <strong>${escapeHtml(word)}</strong>
+                <span class="badge bg-danger ms-2">${penalty} energy</span>
+            </div>
+            <div>
+                <form method="POST" action="/public/sessions/${getCurrentUserId()}/badwords/update" class="d-inline me-2">
+                    <input type="hidden" name="word" value="${escapeHtml(word)}">
+                    <div class="input-group input-group-sm" style="width: 120px;">
+                        <input type="number" name="penalty" class="form-control" value="${penalty}" min="1" max="100">
+                        <button type="submit" class="btn btn-outline-warning btn-sm">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </div>
+                </form>
+                <form method="POST" action="/public/sessions/${getCurrentUserId()}/badwords/remove" class="d-inline">
+                    <input type="hidden" name="word" value="${escapeHtml(word)}">
+                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
+            </div>
+        `;
+
+        // Add to the list
+        badwordsList.appendChild(badwordItem);
+
+        // Setup AJAX for the new forms
+        setupAjaxForElement(badwordItem);
+    }
+
+    function removeBadwordFromList(word) {
+        // Find and remove the badword item
+        const badwordItems = document.querySelectorAll('.list-group-item');
+        badwordItems.forEach(item => {
+            const wordElement = item.querySelector('strong');
+            if (wordElement && wordElement.textContent === word) {
+                item.remove();
+            }
+        });
+    }
+
+    function updateBadwordInList(word, penalty) {
+        // Find and update the badword penalty
+        const badwordItems = document.querySelectorAll('.list-group-item');
+        badwordItems.forEach(item => {
+            const wordElement = item.querySelector('strong');
+            if (wordElement && wordElement.textContent === word) {
+                const badge = item.querySelector('.badge');
+                if (badge) {
+                    badge.textContent = `${penalty} energy`;
+                }
+                const penaltyInput = item.querySelector('input[name="penalty"]');
+                if (penaltyInput) {
+                    penaltyInput.value = penalty;
+                }
+            }
+        });
+    }
+
+    function updateAutocorrectDisplay(enabled) {
+        // Update autocorrect toggle switch/checkbox
+        const autocorrectToggle = document.querySelector('input[name="autocorrect_enabled"]');
+        if (autocorrectToggle) {
+            if (autocorrectToggle.type === 'checkbox') {
+                autocorrectToggle.checked = enabled;
+            } else {
+                autocorrectToggle.value = enabled ? 'true' : 'false';
+            }
+        }
+
+        // Update any status displays
+        const statusElements = document.querySelectorAll('.autocorrect-status');
+        statusElements.forEach(el => {
+            el.textContent = enabled ? 'Enabled' : 'Disabled';
+            el.className = `autocorrect-status badge bg-${enabled ? 'success' : 'secondary'}`;
+        });
+    }
+
+    function setupAjaxForElement(element) {
+        // Setup AJAX for forms within a specific element
+        const forms = element.querySelectorAll('form');
+        forms.forEach(form => {
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+
+                const formData = new FormData(form);
+                const button = form.querySelector('button[type="submit"]');
+                const originalContent = button.innerHTML;
+
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+                const apiAction = convertToApiEndpoint(form.action);
+
+                fetch(apiAction, {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showAlert(data.message, 'success');
+                            updateUIAfterFormSubmission(form, data);
+                        } else {
+                            showAlert(data.error || 'An error occurred', 'danger');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showAlert('An error occurred while processing your request.', 'danger');
+                    })
+                    .finally(() => {
+                        button.disabled = false;
+                        button.innerHTML = originalContent;
+                    });
+            });
+        });
+    }
+
+    function getCurrentUserId() {
+        // Extract user ID from current URL
+        const pathParts = window.location.pathname.split('/');
+        return pathParts[pathParts.length - 1];
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function updateProfileRevertCostDisplay(revertCost) {
+        // Update profile revert cost input
+        const revertCostInput = document.querySelector('input[name="revert_cost"]');
+        if (revertCostInput) {
+            revertCostInput.value = revertCost;
+        }
+
+        // Update any display elements showing the revert cost
+        const revertCostDisplays = document.querySelectorAll('.revert-cost-display');
+        revertCostDisplays.forEach(el => {
+            el.textContent = revertCost;
+        });
+    }
 </script>
 {% endblock %}

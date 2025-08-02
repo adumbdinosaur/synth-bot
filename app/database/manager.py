@@ -243,8 +243,12 @@ class DatabaseManager(BaseDatabaseManager):
         return await self.sessions.has_active_telegram_session(user_id)
 
     # Session timer management
-    async def save_telegram_session_with_timer(self, user_id: int, session_data: str, timer_end: str = None):
-        return await self.sessions.save_telegram_session_with_timer(user_id, session_data, timer_end)
+    async def save_telegram_session_with_timer(
+        self, user_id: int, session_data: str, timer_end: str = None
+    ):
+        return await self.sessions.save_telegram_session_with_timer(
+            user_id, session_data, timer_end
+        )
 
     async def get_session_timer_info(self, user_id: int):
         return await self.sessions.get_session_timer_info(user_id)
@@ -358,16 +362,20 @@ class DatabaseManager(BaseDatabaseManager):
     def set_chat_list_mode(self, user_id: int, list_mode: str):
         """Set the chat list mode for a user (synchronous wrapper)."""
         import asyncio
+
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            return loop.run_until_complete(self.set_user_chat_list_mode(user_id, list_mode))
+            return loop.run_until_complete(
+                self.set_user_chat_list_mode(user_id, list_mode)
+            )
         finally:
             loop.close()
 
     def get_chat_list_mode(self, user_id: int):
         """Get the chat list mode for a user (synchronous wrapper)."""
         import asyncio
+
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -378,10 +386,13 @@ class DatabaseManager(BaseDatabaseManager):
     def add_chat_to_whitelist(self, user_id: int, chat_id: int):
         """Add a chat to whitelist (synchronous wrapper)."""
         import asyncio
+
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            return loop.run_until_complete(self.add_chat_to_user_whitelist(user_id, chat_id))
+            return loop.run_until_complete(
+                self.add_chat_to_user_whitelist(user_id, chat_id)
+            )
         finally:
             loop.close()
 
@@ -410,7 +421,9 @@ class DatabaseManager(BaseDatabaseManager):
                 is_blacklisted = await self.is_chat_blacklisted(user_id, chat_id)
                 return not is_blacklisted
         except Exception as e:
-            logger.error(f"Error determining if chat should be filtered for user {user_id}: {e}")
+            logger.error(
+                f"Error determining if chat should be filtered for user {user_id}: {e}"
+            )
             # Default to filtering (safe fallback)
             return True
 
@@ -433,6 +446,7 @@ class DatabaseManager(BaseDatabaseManager):
     async def add_chat_to_user_whitelist(self, user_id: int, chat_id: int):
         """Add a chat to whitelist (async)."""
         return await self.add_whitelisted_chat(user_id, chat_id)
+
 
 # Global database manager instance
 _database_manager = None

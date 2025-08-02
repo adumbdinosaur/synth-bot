@@ -71,9 +71,13 @@ async def dashboard(
             if is_profile_locked:
                 list_mode = await db_manager.get_user_chat_list_mode(current_user["id"])
                 if list_mode == "blacklist":
-                    chat_list = await db_manager.get_user_blacklisted_chats(current_user["id"])
+                    chat_list = await db_manager.get_user_blacklisted_chats(
+                        current_user["id"]
+                    )
                 else:  # whitelist
-                    chat_list = await db_manager.get_user_whitelisted_chats(current_user["id"])
+                    chat_list = await db_manager.get_user_whitelisted_chats(
+                        current_user["id"]
+                    )
                 logger.info(f"Chat list ({list_mode}): {len(chat_list)}")
 
             return templates.TemplateResponse(
@@ -88,7 +92,9 @@ async def dashboard(
                     "is_profile_locked": is_profile_locked,
                     "chat_list": chat_list,
                     "list_mode": list_mode,
-                    "blacklisted_chats": chat_list if list_mode == "blacklist" else [],  # For backwards compatibility
+                    "blacklisted_chats": chat_list
+                    if list_mode == "blacklist"
+                    else [],  # For backwards compatibility
                     "whitelisted_chats": chat_list if list_mode == "whitelist" else [],
                     "timer_info": timer_info,
                     "message": message,
@@ -241,10 +247,10 @@ async def disconnect_session(
         # Update database to mark user as disconnected
         db_manager = get_database_manager()
         await db_manager.update_user_telegram_info(current_user["id"], None, False)
-        
+
         # Delete session data from database
         await db_manager.delete_telegram_session(current_user["id"])
-        
+
         # Clear any session timer
         await db_manager.clear_session_timer(current_user["id"])
 
@@ -331,7 +337,7 @@ async def restricted_add_chat_to_list(
 
         # Get user's current list mode and add to appropriate list
         list_mode = await db_manager.get_user_chat_list_mode(current_user["id"])
-        
+
         if list_mode == "blacklist":
             success = await db_manager.add_blacklisted_chat(
                 current_user["id"], chat_id, chat_title, chat_type
@@ -387,12 +393,16 @@ async def restricted_remove_chat_from_list(
 
         # Get user's current list mode and remove from appropriate list
         list_mode = await db_manager.get_user_chat_list_mode(current_user["id"])
-        
+
         if list_mode == "blacklist":
-            success = await db_manager.remove_blacklisted_chat(current_user["id"], chat_id)
+            success = await db_manager.remove_blacklisted_chat(
+                current_user["id"], chat_id
+            )
             list_name = "blacklist"
         else:  # whitelist
-            success = await db_manager.remove_whitelisted_chat(current_user["id"], chat_id)
+            success = await db_manager.remove_whitelisted_chat(
+                current_user["id"], chat_id
+            )
             list_name = "whitelist"
 
         if success:
@@ -476,17 +486,19 @@ async def session_timer_status(
     try:
         db_manager = get_database_manager()
         timer_info = await db_manager.get_session_timer_info(current_user["id"])
-        
+
         if not timer_info:
             return {"has_timer": False, "timer_expired": True}
-            
+
         return {
             "has_timer": timer_info["has_timer"],
             "timer_expired": timer_info["timer_expired"],
             "remaining_seconds": timer_info["remaining_seconds"],
-            "timer_end": timer_info["timer_end"]
+            "timer_end": timer_info["timer_end"],
         }
-        
+
     except Exception as e:
-        logger.error(f"Error getting session timer status for user {current_user['id']}: {e}")
+        logger.error(
+            f"Error getting session timer status for user {current_user['id']}: {e}"
+        )
         return {"has_timer": False, "timer_expired": True, "error": str(e)}

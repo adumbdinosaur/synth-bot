@@ -133,7 +133,9 @@ class BaseDatabaseManager:
 
                 # Remove old timer_minutes column if it exists
                 try:
-                    await db.execute("ALTER TABLE telegram_sessions DROP COLUMN session_timer_minutes")
+                    await db.execute(
+                        "ALTER TABLE telegram_sessions DROP COLUMN session_timer_minutes"
+                    )
                 except Exception:
                     pass  # Column doesn't exist or can't be dropped
 

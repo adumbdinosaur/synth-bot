@@ -69,7 +69,8 @@
                                 </div>
                             </div>
                             <div class="form-text">
-                                Set a specific date and time when disconnect becomes available. Leave blank for no timer.
+                                Set a specific date and time when disconnect becomes available. Leave blank for no
+                                timer.
                             </div>
                         </div>
 
@@ -129,23 +130,23 @@
             // Validate timer if provided
             const timerDate = document.getElementById('timer_date').value;
             const timerTime = document.getElementById('timer_time').value;
-            
+
             if ((timerDate && !timerTime) || (!timerDate && timerTime)) {
                 e.preventDefault();
                 showAlert('Please provide both date and time for the session timer, or leave both blank', 'warning');
                 return;
             }
-            
+
             if (timerDate && timerTime) {
                 const timerDateTime = new Date(timerDate + 'T' + timerTime);
                 const now = new Date();
-                
+
                 if (timerDateTime <= now) {
                     e.preventDefault();
                     showAlert('Session timer must be set to a future date and time', 'warning');
                     return;
                 }
-                
+
                 // Warn if timer is more than 7 days in the future
                 const maxTime = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000));
                 if (timerDateTime > maxTime) {

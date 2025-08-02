@@ -88,6 +88,19 @@ class TelegramUserBot:
         """Check if the client is connected and authorized."""
         return self.connection_handler.is_connected
 
+    @property
+    def session_string(self) -> Optional[str]:
+        """Get the session string for saving to database."""
+        if self.client and hasattr(self.client, "session") and self.client.session:
+            try:
+                return self.client.session.save()
+            except Exception as e:
+                logger.error(
+                    f"Failed to get session string for user {self.user_id}: {e}"
+                )
+                return None
+        return None
+
     # Profile methods - delegated to ProfileHandler
     async def get_profile(self) -> Optional[Dict[str, Any]]:
         """Get current profile information for this user."""

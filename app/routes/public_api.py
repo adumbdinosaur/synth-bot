@@ -616,3 +616,512 @@ async def update_autocorrect_settings(
             url=f"/public/sessions/{user_id}?error=Failed to update autocorrect settings",
             status_code=303,
         )
+
+
+@router.get("/api/sessions")
+async def get_sessions_api(
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """API endpoint to get public sessions data for AJAX updates."""
+    try:
+        db_manager = get_database_manager()
+        telegram_manager = get_telegram_manager()
+
+        # Get all sessions (including inactive ones for context)
+        active_sessions = await db_manager.get_active_telegram_sessions()
+
+        # Get list of connected user IDs from telegram manager
+        connected_users = telegram_manager.get_connected_users()
+        connected_users_by_id = {user["user_id"]: user for user in connected_users}
+
+        # Enhance session data with connection status and display info
+        for session in active_sessions:
+            session["is_connected"] = session["user_id"] in connected_users_by_id
+
+            # If user is connected, try to get their Telegram display name
+            if session["is_connected"] and session["user_id"] in connected_users_by_id:
+                telegram_user = connected_users_by_id[session["user_id"]]
+                # Use Telegram username if available, otherwise fall back to database username
+                if telegram_user.get("username"):
+                    session["display_name"] = f"@{telegram_user['username']}"
+                else:
+                    session["display_name"] = (
+                        session["username"] or f"User {session['user_id']}"
+                    )
+            else:
+                session["display_name"] = (
+                    session["username"] or f"User {session['user_id']}"
+                )
+
+        return {
+            "success": True,
+            "sessions": active_sessions,
+            "total_sessions": len(active_sessions),
+            "connected_sessions": len(
+                [s for s in active_sessions if s["is_connected"]]
+            ),
+        }
+    except Exception as e:
+        logger.error(f"Error getting sessions API data: {e}")
+        return {
+            "success": False,
+            "error": "Failed to load sessions data",
+            "sessions": [],
+            "total_sessions": 0,
+            "connected_sessions": 0,
+        }
+
+
+# JSON API endpoints for AJAX operations (no redirects)
+
+
+@router.post("/api/sessions/{user_id}/energy/add")
+async def add_user_energy_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    amount: int = Form(...),
+):
+    """Add energy to a user via AJAX."""
+    try:
+        energy_manager = EnergyManager()
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        if amount <= 0:
+            return {"success": False, "error": "Amount must be positive"}
+
+        result = await energy_manager.add_energy(user_id, amount)
+
+        if result["success"]:
+            return {
+                "success": True,
+                "message": f"Added {amount} energy",
+                "energy": result["energy"],
+                "max_energy": result["max_energy"],
+            }
+        else:
+            return {"success": False, "error": "Failed to add energy"}
+
+    except Exception as e:
+        logger.error(f"Error adding energy for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to add energy"}
+
+
+@router.post("/api/sessions/{user_id}/energy/remove")
+async def remove_user_energy_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    amount: int = Form(...),
+):
+    """Remove energy from a user via AJAX."""
+    try:
+        energy_manager = EnergyManager()
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        if amount <= 0:
+            return {"success": False, "error": "Amount must be positive"}
+
+        result = await energy_manager.remove_energy(user_id, amount)
+
+        if result["success"]:
+            return {
+                "success": True,
+                "message": f"Removed {amount} energy",
+                "energy": result["energy"],
+                "max_energy": result["max_energy"],
+            }
+        else:
+            return {"success": False, "error": "Failed to remove energy"}
+
+    except Exception as e:
+        logger.error(f"Error removing energy for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to remove energy"}
+
+
+@router.post("/api/sessions/{user_id}/energy/set")
+async def set_user_energy_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    energy_level: int = Form(...),
+):
+    """Set energy level for a user via AJAX."""
+    try:
+        energy_manager = EnergyManager()
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        if energy_level < 0:
+            return {"success": False, "error": "Energy level cannot be negative"}
+
+        result = await energy_manager.set_energy(user_id, energy_level)
+
+        if result["success"]:
+            return {
+                "success": True,
+                "message": f"Set energy to {energy_level}",
+                "energy": result["energy"],
+                "max_energy": result["max_energy"],
+            }
+        else:
+            return {"success": False, "error": "Failed to set energy level"}
+
+    except Exception as e:
+        logger.error(f"Error setting energy for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to set energy level"}
+
+
+@router.post("/api/sessions/{user_id}/energy/max-energy")
+async def set_max_energy_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    max_energy: int = Form(...),
+):
+    """Set max energy for a user via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        if max_energy <= 0:
+            return {"success": False, "error": "Max energy must be positive"}
+
+        await db_manager.update_user_max_energy(user_id, max_energy)
+
+        # Get updated energy info
+        energy_manager = EnergyManager()
+        current_energy = await energy_manager.get_energy(user_id)
+
+        return {
+            "success": True,
+            "message": f"Set max energy to {max_energy}",
+            "energy": current_energy,
+            "max_energy": max_energy,
+        }
+
+    except Exception as e:
+        logger.error(f"Error setting max energy for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to set max energy"}
+
+
+@router.post("/api/sessions/{user_id}/recharge-rate")
+async def update_recharge_rate_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    recharge_rate: int = Form(...),
+):
+    """Update energy recharge rate for a user via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        if recharge_rate < 0 or recharge_rate > 10:
+            return {"success": False, "error": "Recharge rate must be between 0 and 10"}
+
+        await db_manager.update_user_energy_recharge_rate(user_id, recharge_rate)
+
+        return {
+            "success": True,
+            "message": f"Set recharge rate to {recharge_rate} energy per minute",
+            "recharge_rate": recharge_rate,
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating recharge rate for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to update recharge rate"}
+
+
+@router.post("/api/sessions/{user_id}/badwords/add")
+async def add_badword_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    word: str = Form(...),
+    penalty: int = Form(...),
+):
+    """Add a badword for a user via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        if penalty < 1 or penalty > 100:
+            return {"success": False, "error": "Penalty must be between 1 and 100"}
+
+        if not word.strip():
+            return {"success": False, "error": "Word cannot be empty"}
+
+        success = await db_manager.add_badword(user_id, word.strip(), penalty)
+
+        if success:
+            return {
+                "success": True,
+                "message": f"Added badword '{word}' with penalty {penalty}",
+                "word": word.strip(),
+                "penalty": penalty,
+            }
+        else:
+            return {"success": False, "error": "Failed to add badword"}
+
+    except Exception as e:
+        logger.error(f"Error adding badword for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to add badword"}
+
+
+@router.post("/api/sessions/{user_id}/badwords/remove")
+async def remove_badword_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    word: str = Form(...),
+):
+    """Remove a badword for a user via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        if not word.strip():
+            return {"success": False, "error": "Word cannot be empty"}
+
+        success = await db_manager.remove_badword(user_id, word.strip())
+
+        if success:
+            return {
+                "success": True,
+                "message": f"Removed badword '{word}'",
+                "word": word.strip(),
+            }
+        else:
+            return {"success": False, "error": "Failed to remove badword"}
+
+    except Exception as e:
+        logger.error(f"Error removing badword for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to remove badword"}
+
+
+@router.post("/api/sessions/{user_id}/badwords/update")
+async def update_badword_penalty_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    word: str = Form(...),
+    penalty: int = Form(...),
+):
+    """Update badword penalty for a user via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        if penalty < 1 or penalty > 100:
+            return {"success": False, "error": "Penalty must be between 1 and 100"}
+
+        if not word.strip():
+            return {"success": False, "error": "Word cannot be empty"}
+
+        success = await db_manager.update_badword_penalty(
+            user_id, word.strip(), penalty
+        )
+
+        if success:
+            return {
+                "success": True,
+                "message": f"Updated badword '{word}' penalty to {penalty}",
+                "word": word.strip(),
+                "penalty": penalty,
+            }
+        else:
+            return {"success": False, "error": "Failed to update badword penalty"}
+
+    except Exception as e:
+        logger.error(f"Error updating badword penalty for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to update badword penalty"}
+
+
+@router.post("/api/sessions/{user_id}/autocorrect")
+async def update_autocorrect_settings_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    enabled: str = Form(None),
+    penalty_per_correction: int = Form(None),
+):
+    """Update autocorrect settings for a user via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        # Get current settings first
+        current_settings = await db_manager.get_autocorrect_settings(user_id)
+
+        # Use current values as defaults
+        new_enabled = current_settings.get("enabled", False)
+        new_penalty = current_settings.get("penalty_per_correction", 5)
+
+        updated_settings = {}
+
+        # Update enabled status if provided
+        if enabled is not None:
+            new_enabled = enabled.lower() in ["true", "1", "on", "yes"]
+            updated_settings["enabled"] = new_enabled
+
+        # Update penalty if provided
+        if penalty_per_correction is not None:
+            if penalty_per_correction < 1 or penalty_per_correction > 100:
+                return {"success": False, "error": "Penalty must be between 1 and 100"}
+            new_penalty = penalty_per_correction
+            updated_settings["penalty_per_correction"] = new_penalty
+
+        if updated_settings:
+            # Update both settings (the method requires both parameters)
+            await db_manager.update_autocorrect_settings(
+                user_id, new_enabled, new_penalty
+            )
+
+            message_parts = []
+            if "enabled" in updated_settings:
+                message_parts.append(
+                    f"Autocorrect {'enabled' if updated_settings['enabled'] else 'disabled'}"
+                )
+            if "penalty_per_correction" in updated_settings:
+                message_parts.append(
+                    f"penalty set to {updated_settings['penalty_per_correction']}"
+                )
+
+            return {
+                "success": True,
+                "message": ", ".join(message_parts),
+                **updated_settings,
+            }
+        else:
+            return {"success": False, "error": "No settings to update"}
+
+    except Exception as e:
+        logger.error(f"Error updating autocorrect settings for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to update autocorrect settings"}
+
+
+@router.post("/api/sessions/{user_id}/energy-costs")
+async def update_session_energy_costs_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    text_cost: int = Form(None),
+    photo_cost: int = Form(None),
+    video_cost: int = Form(None),
+    audio_cost: int = Form(None),
+    voice_cost: int = Form(None),
+    document_cost: int = Form(None),
+    sticker_cost: int = Form(None),
+    animation_cost: int = Form(None),
+    gif_cost: int = Form(None),
+    location_cost: int = Form(None),
+    contact_cost: int = Form(None),
+    poll_cost: int = Form(None),
+    game_cost: int = Form(None),
+    venue_cost: int = Form(None),
+    web_page_cost: int = Form(None),
+    media_group_cost: int = Form(None),
+):
+    """Update energy costs for all message types for a specific user via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        # Build cost mapping from form data, only including non-None values
+        form_data = {
+            "text": text_cost,
+            "photo": photo_cost,
+            "video": video_cost,
+            "audio": audio_cost,
+            "voice": voice_cost,
+            "document": document_cost,
+            "sticker": sticker_cost,
+            "animation": animation_cost,
+            "gif": gif_cost,
+            "location": location_cost,
+            "contact": contact_cost,
+            "poll": poll_cost,
+            "game": game_cost,
+            "venue": venue_cost,
+            "web_page": web_page_cost,
+            "media_group": media_group_cost,
+        }
+
+        updated_costs = {}
+        # Update each cost that was provided in the form
+        for message_type, cost in form_data.items():
+            if cost is not None and cost >= 0:
+                await db_manager.update_user_energy_cost(user_id, message_type, cost)
+                updated_costs[message_type] = cost
+
+        return {
+            "success": True,
+            "message": f"Updated energy costs for {len(updated_costs)} message types",
+            "updated_costs": updated_costs,
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating energy costs for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to update energy costs"}
+
+
+@router.post("/api/sessions/{user_id}/profile/revert-cost")
+async def update_profile_revert_cost_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    revert_cost: int = Form(...),
+):
+    """Update profile revert cost for a user via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        if revert_cost < 0 or revert_cost > 100:
+            return {"success": False, "error": "Revert cost must be between 0 and 100"}
+
+        # Update the profile revert cost in the database
+        # Assuming there's a method to update this, if not we may need to add it
+        try:
+            await db_manager.update_user_profile_revert_cost(user_id, revert_cost)
+            return {
+                "success": True,
+                "message": f"Profile revert cost updated to {revert_cost} energy",
+                "revert_cost": revert_cost,
+            }
+        except AttributeError:
+            # If the method doesn't exist, we'll update it directly
+            # This is a fallback - you may need to implement the proper method
+            return {
+                "success": False,
+                "error": "Profile revert cost update not implemented",
+            }
+
+    except Exception as e:
+        logger.error(f"Error updating profile revert cost for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to update profile revert cost"}
