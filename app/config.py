@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from dotenv import load_dotenv
 
 from app.database import init_database_manager, get_database_manager
-from app.auth import get_password_hash
+from app.auth import get_password_hash, get_current_user
 from app.telegram_client import (
     initialize_telegram_manager,
     get_telegram_manager,
@@ -207,9 +207,17 @@ def create_exception_handlers(app: FastAPI, templates: Jinja2Templates):
                 if request.url.path.startswith("/api/"):
                     return JSONResponse(status_code=403, content={"detail": exc.detail})
                 # For web requests, show blocked page
+                # Try to get current user for proper navigation
+                current_user = None
+                try:
+                    current_user = await get_current_user(request)
+                except Exception:
+                    # If we can't get user, that's ok, navigation will show login/register
+                    pass
+                
                 return templates.TemplateResponse(
                     "dashboard_blocked.html",
-                    {"request": request, "message": exc.detail},
+                    {"request": request, "message": exc.detail, "user": current_user},
                 )
 
         # For other HTTP exceptions, let FastAPI handle them normally
