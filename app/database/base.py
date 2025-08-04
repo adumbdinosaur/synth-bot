@@ -93,7 +93,6 @@ class BaseDatabaseManager:
                     CREATE TABLE IF NOT EXISTS users (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         username TEXT UNIQUE NOT NULL,
-                        email TEXT UNIQUE NOT NULL,
                         hashed_password TEXT NOT NULL,
                         telegram_connected BOOLEAN DEFAULT FALSE,
                         phone_number TEXT,
@@ -107,6 +106,53 @@ class BaseDatabaseManager:
                     )
                 """
                 )
+
+                # Migration: Remove email column if it exists
+                try:
+                    # Check if email column exists
+                    cursor = await db.execute("PRAGMA table_info(users)")
+                    columns = await cursor.fetchall()
+                    has_email = any(col[1] == "email" for col in columns)
+
+                    if has_email:
+                        # SQLite doesn't support DROP COLUMN directly, so we need to recreate the table
+                        await db.execute("ALTER TABLE users RENAME TO users_old")
+                        await db.execute(
+                            """
+                            CREATE TABLE users (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                username TEXT UNIQUE NOT NULL,
+                                hashed_password TEXT NOT NULL,
+                                telegram_connected BOOLEAN DEFAULT FALSE,
+                                phone_number TEXT,
+                                energy INTEGER DEFAULT 100,
+                                max_energy INTEGER DEFAULT 100,
+                                energy_recharge_rate INTEGER DEFAULT 1,
+                                last_energy_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                is_admin BOOLEAN DEFAULT FALSE,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                            """
+                        )
+                        await db.execute(
+                            """
+                            INSERT INTO users (id, username, hashed_password, telegram_connected, phone_number, 
+                                             energy, max_energy, energy_recharge_rate, last_energy_update, 
+                                             is_admin, created_at, updated_at)
+                            SELECT id, username, hashed_password, telegram_connected, phone_number, 
+                                   energy, max_energy, energy_recharge_rate, last_energy_update, 
+                                   is_admin, created_at, updated_at
+                            FROM users_old
+                            """
+                        )
+                        await db.execute("DROP TABLE users_old")
+                        logger.info("✅ Migrated users table: removed email column")
+                except Exception as e:
+                    logger.warning(
+                        f"Email column migration warning (might already be done): {e}"
+                    )
+                    pass
 
                 # Telegram sessions table
                 await db.execute(

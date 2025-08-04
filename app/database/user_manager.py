@@ -30,13 +30,13 @@ class UserManager(BaseDatabaseManager):
             return dict(row) if row else None
 
     @retry_db_operation()
-    async def create_user(self, username: str, email: str, hashed_password: str) -> int:
+    async def create_user(self, username: str, hashed_password: str) -> int:
         """Create a new user and return the user ID."""
         async with self.get_connection() as db:
             cursor = await db.execute(
-                """INSERT INTO users (username, email, hashed_password, energy, max_energy, energy_recharge_rate, last_energy_update) 
-                   VALUES (?, ?, ?, 100, 100, 1, ?)""",
-                (username, email, hashed_password, datetime.now().isoformat()),
+                """INSERT INTO users (username, hashed_password, energy, max_energy, energy_recharge_rate, last_energy_update) 
+                   VALUES (?, ?, 100, 100, 1, ?)""",
+                (username, hashed_password, datetime.now().isoformat()),
             )
             await db.commit()
             return cursor.lastrowid
@@ -54,16 +54,14 @@ class UserManager(BaseDatabaseManager):
             await db.commit()
 
     @retry_db_operation()
-    async def create_admin_user(
-        self, username: str, email: str, hashed_password: str
-    ) -> int:
+    async def create_admin_user(self, username: str, hashed_password: str) -> int:
         """Create a new admin user and return the user ID."""
         async with self.get_connection() as db:
             cursor = await db.execute(
-                """INSERT INTO users (username, email, hashed_password, energy, max_energy, 
+                """INSERT INTO users (username, hashed_password, energy, max_energy, 
                    energy_recharge_rate, last_energy_update, is_admin) 
-                   VALUES (?, ?, ?, 100, 100, 1, ?, TRUE)""",
-                (username, email, hashed_password, datetime.now().isoformat()),
+                   VALUES (?, ?, 100, 100, 1, ?, TRUE)""",
+                (username, hashed_password, datetime.now().isoformat()),
             )
             await db.commit()
             return cursor.lastrowid

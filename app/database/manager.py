@@ -73,8 +73,8 @@ class DatabaseManager(BaseDatabaseManager):
     async def get_user_by_username(self, username: str):
         return await self.users.get_user_by_username(username)
 
-    async def create_user(self, username: str, email: str, hashed_password: str):
-        return await self.users.create_user(username, email, hashed_password)
+    async def create_user(self, username: str, hashed_password: str):
+        return await self.users.create_user(username, hashed_password)
 
     async def get_all_users(self):
         return await self.users.get_all_users()
@@ -128,8 +128,8 @@ class DatabaseManager(BaseDatabaseManager):
             user_id, phone_number, connected
         )
 
-    async def create_admin_user(self, username: str, email: str, hashed_password: str):
-        return await self.users.create_admin_user(username, email, hashed_password)
+    async def create_admin_user(self, username: str, hashed_password: str):
+        return await self.users.create_admin_user(username, hashed_password)
 
     async def toggle_admin_status(self, user_id: int) -> bool:
         return await self.users.toggle_admin_status(user_id)

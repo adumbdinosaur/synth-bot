@@ -64,7 +64,7 @@ class SessionManager(BaseDatabaseManager):
         try:
             async with self.get_connection() as db:
                 cursor = await db.execute(
-                    """SELECT u.id, u.username, u.email, u.energy, u.max_energy, 
+                    """SELECT u.id, u.username, u.energy, u.max_energy, 
                               u.energy_recharge_rate, u.last_energy_update, u.telegram_connected,
                               ts.session_data, ts.updated_at as session_updated_at
                        FROM users u
@@ -77,10 +77,10 @@ class SessionManager(BaseDatabaseManager):
                 sessions = []
                 for row in rows:
                     # Calculate current energy with recharge
-                    current_energy = row[3] if row[3] is not None else 100
-                    max_energy = row[4] if row[4] is not None else 100
-                    recharge_rate = row[5] if row[5] is not None else 1
-                    last_update = row[6]
+                    current_energy = row[2] if row[2] is not None else 100
+                    max_energy = row[3] if row[3] is not None else 100
+                    recharge_rate = row[4] if row[4] is not None else 1
+                    last_update = row[5]
 
                     if last_update:
                         try:
@@ -100,7 +100,6 @@ class SessionManager(BaseDatabaseManager):
                         {
                             "user_id": row[0],
                             "username": row[1],
-                            "email": row[2],
                             "energy": current_energy,
                             "max_energy": max_energy,
                             "energy_percentage": int(
@@ -110,10 +109,10 @@ class SessionManager(BaseDatabaseManager):
                             else 0,
                             "energy_recharge_rate": recharge_rate,
                             "last_energy_update": last_update,
-                            "telegram_connected": bool(row[7]),
-                            "has_session_data": row[8] is not None,
-                            "session_updated_at": row[9],
-                            "is_connected": bool(row[7]) and row[8] is not None,
+                            "telegram_connected": bool(row[6]),
+                            "has_session_data": row[7] is not None,
+                            "session_updated_at": row[8],
+                            "is_connected": bool(row[6]) and row[7] is not None,
                         }
                     )
 

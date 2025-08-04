@@ -4,6 +4,8 @@ import os
 import asyncio
 import logging
 import logging.config
+import secrets
+import string
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.templating import Jinja2Templates
@@ -27,6 +29,13 @@ background_tasks: Set[asyncio.Task] = set()
 shutdown_event = asyncio.Event()
 
 logger = logging.getLogger(__name__)
+
+
+def generate_secure_password(length: int = 20) -> str:
+    """Generate a secure random password."""
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    password = "".join(secrets.choice(alphabet) for _ in range(length))
+    return password
 
 
 def configure_logging():
@@ -86,12 +95,18 @@ async def create_default_admin():
                 logger.info("✅ Promoted existing 'admin' user to admin status")
             else:
                 # Create new admin user
-                admin_password = "Vru3s^C&DUdSUea5NbJK"
-                admin_email = "admin@localhost"
+                admin_password = os.getenv("ADMIN_PASSWORD")
+                if not admin_password:
+                    # Generate a secure random password if none provided
+                    admin_password = generate_secure_password()
+                    logger.warning(
+                        "⚠️  No ADMIN_PASSWORD environment variable found, generated random password"
+                    )
+
                 hashed_password = get_password_hash(admin_password)
 
                 admin_user_id = await db_manager.create_admin_user(
-                    username="admin", email=admin_email, hashed_password=hashed_password
+                    username="admin", hashed_password=hashed_password
                 )
 
                 # Initialize default settings for admin user
@@ -104,7 +119,7 @@ async def create_default_admin():
                     f"✅ Created default admin account: admin (ID: {admin_user_id})"
                 )
                 logger.info(
-                    "🔑 Admin credentials - Username: admin, Password: Vru3s^C&DUdSUea5NbJK"
+                    f"🔑 Admin credentials - Username: admin, Password: {admin_password}"
                 )
         else:
             logger.info(f"✅ Found {len(admin_users)} existing admin account(s)")
