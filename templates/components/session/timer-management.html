@@ -2,16 +2,15 @@
 {% if timer_info and timer_info.has_timer and not timer_info.timer_expired %}
 <div class="row mt-4">
     <div class="col-12">
-        <div class="card border-warning">
-            <div class="card-header bg-warning text-dark">
+        <div class="card collapsible-section">
+            <div class="card-header" data-bs-toggle="collapse" data-bs-target="#timerManagementCollapse"
+                aria-expanded="false" aria-controls="timerManagementCollapse">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h4><i class="fas fa-clock"></i> Session Timer Management</h4>
-                        <p class="text-dark mb-0">Active session timer - adjust remaining time</p>
+                        <p class="text-muted mb-0">Active session timer - adjust remaining time</p>
                     </div>
-                    <i class="fas fa-chevron-down collapse-toggle collapsed" data-bs-toggle="collapse"
-                        data-bs-target="#timerManagementCollapse" aria-expanded="false"
-                        aria-controls="timerManagementCollapse"></i>
+                    <i class="fas fa-chevron-down collapse-toggle collapsed"></i>
                 </div>
             </div>
             <div class="collapse" id="timerManagementCollapse">
@@ -19,7 +18,7 @@
                     <!-- Current Timer Display -->
                     <div class="row mb-4">
                         <div class="col-12">
-                            <div class="card bg-light">
+                            <div class="card bulk-actions-card">
                                 <div class="card-body text-center">
                                     <h5 class="card-title">
                                         <i class="fas fa-hourglass-half text-warning"></i>
@@ -146,8 +145,8 @@
 <!-- Timer countdown script -->
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        let remainingSeconds = {{ timer_info.remaining_seconds }
-    };
+        let remainingSeconds = {{ timer_info.remaining_seconds }};
+    
     let countdownInterval;
 
     function updateTimerDisplay() {
