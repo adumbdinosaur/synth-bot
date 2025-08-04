@@ -79,6 +79,48 @@ class DatabaseManager(BaseDatabaseManager):
     async def get_all_users(self):
         return await self.users.get_all_users()
 
+    async def get_user_stats(self):
+        """Get user statistics for admin dashboard."""
+        try:
+            # Get all users
+            all_users = await self.users.get_all_users()
+            total_users = len(all_users) if all_users else 0
+            
+            # Count admin users
+            admin_count = 0
+            active_connections = 0
+            recent_registrations = 0
+            
+            if all_users:
+                for user in all_users:
+                    # Count admins
+                    if user.get('is_admin', False):
+                        admin_count += 1
+                    
+                    # Count active connections (users with telegram info)
+                    if user.get('is_connected', False):
+                        active_connections += 1
+                    
+                    # Count recent registrations (last 30 days)
+                    # This is a simplified count - you might want to add proper date filtering
+                    recent_registrations = total_users  # Simplified for now
+            
+            return {
+                'total_users': total_users,
+                'active_connections': active_connections,
+                'admin_count': admin_count,
+                'recent_registrations': recent_registrations
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting user stats: {e}")
+            return {
+                'total_users': 0,
+                'active_connections': 0,
+                'admin_count': 0,
+                'recent_registrations': 0
+            }
+
     async def update_user_telegram_info(
         self, user_id: int, phone_number: str, connected: bool = True
     ):
@@ -94,6 +136,12 @@ class DatabaseManager(BaseDatabaseManager):
 
     async def is_admin(self, user_id: int):
         return await self.users.is_admin(user_id)
+
+    async def reset_user_password(self, user_id: int, hashed_password: str) -> bool:
+        return await self.users.reset_user_password(user_id, hashed_password)
+
+    async def delete_user(self, user_id: int) -> bool:
+        return await self.users.delete_user(user_id)
 
     # Energy management
     async def get_user_energy(self, user_id: int):

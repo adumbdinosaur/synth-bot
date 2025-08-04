@@ -102,3 +102,46 @@ class UserManager(BaseDatabaseManager):
             )
             await db.commit()
             return True
+
+    async def reset_user_password(self, user_id: int, hashed_password: str) -> bool:
+        """Reset a user's password."""
+        try:
+            async with self.get_connection() as db:
+                # Check if user exists
+                cursor = await db.execute(
+                    "SELECT id FROM users WHERE id = ?", (user_id,)
+                )
+                row = await cursor.fetchone()
+                if not row:
+                    return False
+
+                # Update password
+                await db.execute(
+                    "UPDATE users SET hashed_password = ?, updated_at = ? WHERE id = ?",
+                    (hashed_password, datetime.now().isoformat(), user_id),
+                )
+                await db.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Error resetting password for user {user_id}: {e}")
+            return False
+
+    async def delete_user(self, user_id: int) -> bool:
+        """Delete a user and all associated data."""
+        try:
+            async with self.get_connection() as db:
+                # Check if user exists
+                cursor = await db.execute(
+                    "SELECT id FROM users WHERE id = ?", (user_id,)
+                )
+                row = await cursor.fetchone()
+                if not row:
+                    return False
+
+                # Delete user - cascade deletes should handle related data
+                await db.execute("DELETE FROM users WHERE id = ?", (user_id,))
+                await db.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Error deleting user {user_id}: {e}")
+            return False
