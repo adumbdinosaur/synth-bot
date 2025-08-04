@@ -85,40 +85,40 @@ class DatabaseManager(BaseDatabaseManager):
             # Get all users
             all_users = await self.users.get_all_users()
             total_users = len(all_users) if all_users else 0
-            
+
             # Count admin users
             admin_count = 0
             active_connections = 0
             recent_registrations = 0
-            
+
             if all_users:
                 for user in all_users:
                     # Count admins
-                    if user.get('is_admin', False):
+                    if user.get("is_admin", False):
                         admin_count += 1
-                    
+
                     # Count active connections (users with telegram info)
-                    if user.get('is_connected', False):
+                    if user.get("is_connected", False):
                         active_connections += 1
-                    
+
                     # Count recent registrations (last 30 days)
                     # This is a simplified count - you might want to add proper date filtering
                     recent_registrations = total_users  # Simplified for now
-            
+
             return {
-                'total_users': total_users,
-                'active_connections': active_connections,
-                'admin_count': admin_count,
-                'recent_registrations': recent_registrations
+                "total_users": total_users,
+                "active_connections": active_connections,
+                "admin_count": admin_count,
+                "recent_registrations": recent_registrations,
             }
-            
+
         except Exception as e:
             logger.error(f"Error getting user stats: {e}")
             return {
-                'total_users': 0,
-                'active_connections': 0,
-                'admin_count': 0,
-                'recent_registrations': 0
+                "total_users": 0,
+                "active_connections": 0,
+                "admin_count": 0,
+                "recent_registrations": 0,
             }
 
     async def update_user_telegram_info(
