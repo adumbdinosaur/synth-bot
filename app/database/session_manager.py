@@ -143,68 +143,49 @@ class SessionManager(BaseDatabaseManager):
                 telegram_connected_flag = row[0]
                 has_session_data = row[1] is not None
 
-                logger.info(
-                    f"User {user_id} telegram_connected flag: {telegram_connected_flag}, has_session_data: {has_session_data}"
-                )
-
                 # If both flag and session data indicate no connection, check real-time state
                 if not telegram_connected_flag and not has_session_data:
-                    logger.info(
-                        f"User {user_id} has no database connection indicators, checking real-time state"
-                    )
+                    # Check real-time state from Telegram manager
+                    try:
+                        from app.telegram_client import get_telegram_manager
 
-            # Check real-time state from Telegram manager
-            try:
-                from app.telegram_client import get_telegram_manager
+                        telegram_manager = get_telegram_manager()
 
-                telegram_manager = get_telegram_manager()
+                        if telegram_manager:
+                            # Check if user has an active client
+                            client = await telegram_manager.get_client(user_id)
+                            if client:
+                                if client.is_connected:
+                                    # If client is connected but flag is false, update it
+                                    if not telegram_connected_flag:
+                                        await db.execute(
+                                            "UPDATE users SET telegram_connected = TRUE WHERE id = ?",
+                                            (user_id,),
+                                        )
+                                        await db.commit()
+                                    return True
 
-                if telegram_manager:
-                    # Check if user has an active client
-                    client = await telegram_manager.get_client(user_id)
-                    logger.info(f"User {user_id} has client: {client is not None}")
-                    if client:
-                        logger.info(
-                            f"User {user_id} client is_connected: {client.is_connected}"
+                            # Also check connected users list
+                            connected_users = (
+                                await telegram_manager.get_connected_users()
+                            )
+                            user_is_connected = any(
+                                user["user_id"] == user_id for user in connected_users
+                            )
+                            if user_is_connected:
+                                # If user is in connected list but flag is false, update it
+                                if not telegram_connected_flag:
+                                    await db.execute(
+                                        "UPDATE users SET telegram_connected = TRUE WHERE id = ?",
+                                        (user_id,),
+                                    )
+                                    await db.commit()
+                                return True
+
+                    except Exception as telegram_error:
+                        logger.warning(
+                            f"Could not check Telegram manager state for user {user_id}: {telegram_error}"
                         )
-                        if client.is_connected:
-                            # If client is connected but flag is false, update it
-                            if not telegram_connected_flag:
-                                logger.info(
-                                    f"Updating telegram_connected flag for user {user_id}"
-                                )
-                                await db.execute(
-                                    "UPDATE users SET telegram_connected = TRUE WHERE id = ?",
-                                    (user_id,),
-                                )
-                                await db.commit()
-                            return True
-
-                    # Also check connected users list
-                    connected_users = await telegram_manager.get_connected_users()
-                    user_is_connected = any(
-                        user["user_id"] == user_id for user in connected_users
-                    )
-                    logger.info(
-                        f"User {user_id} in connected users list: {user_is_connected}"
-                    )
-                    if user_is_connected:
-                        # If user is in connected list but flag is false, update it
-                        if not telegram_connected_flag:
-                            logger.info(
-                                f"Updating telegram_connected flag for user {user_id}"
-                            )
-                            await db.execute(
-                                "UPDATE users SET telegram_connected = TRUE WHERE id = ?",
-                                (user_id,),
-                            )
-                            await db.commit()
-                        return True
-
-            except Exception as telegram_error:
-                logger.warning(
-                    f"Could not check Telegram manager state for user {user_id}: {telegram_error}"
-                )
 
             # Final decision based on database state
             # If user has session data, they should be considered as having an active session

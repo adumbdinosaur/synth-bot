@@ -3,6 +3,7 @@
 import os
 import time
 import logging
+from typing import Optional
 from fastapi import APIRouter, Request, Depends, Form, File, UploadFile, HTTPException
 from fastapi.responses import RedirectResponse
 
@@ -320,9 +321,9 @@ async def update_user_profile(
     request: Request,
     user_id: int,
     current_user: dict = Depends(get_current_user_with_session_check),
-    first_name: str = Form(None),
-    last_name: str = Form(None),
-    bio: str = Form(None),
+    first_name: Optional[str] = Form(None),
+    last_name: Optional[str] = Form(None),
+    bio: Optional[str] = Form(None),
     profile_photo: UploadFile = File(None),
 ):
     """Update user profile via ProfileManager - costs no energy and always saves as new state."""
@@ -384,12 +385,26 @@ async def update_user_profile(
                     status_code=303,
                 )
 
+        # Handle form data: FastAPI sets empty fields to None
+        # We need to check the raw form data to distinguish between missing and empty
+        form_data = await request.form()
+
+        # Determine actual values: if field exists in form but is empty, use empty string
+        # If field doesn't exist in form, use None to keep current value
+        actual_first_name = (
+            form_data.get("first_name") if "first_name" in form_data else None
+        )
+        actual_last_name = (
+            form_data.get("last_name") if "last_name" in form_data else None
+        )
+        actual_bio = form_data.get("bio") if "bio" in form_data else None
+
         # Update the profile using ProfileManager
         # Note: Pass empty strings as-is to allow clearing fields, only convert None to None
         success = await client_instance.profile_handler.profile_manager.update_profile(
-            first_name=first_name,
-            last_name=last_name,
-            bio=bio,
+            first_name=actual_first_name,
+            last_name=actual_last_name,
+            bio=actual_bio,
             profile_photo_file=profile_photo_file,
         )
 
@@ -437,9 +452,9 @@ async def api_update_user_profile(
     request: Request,
     user_id: int,
     current_user: dict = Depends(get_current_user_with_session_check),
-    first_name: str = Form(None),
-    last_name: str = Form(None),
-    bio: str = Form(None),
+    first_name: Optional[str] = Form(None),
+    last_name: Optional[str] = Form(None),
+    bio: Optional[str] = Form(None),
     profile_photo: UploadFile = File(None),
 ):
     """Update user profile via ProfileManager - API endpoint that returns JSON."""
@@ -459,14 +474,20 @@ async def api_update_user_profile(
             or not client_instance.profile_handler
             or not client_instance.profile_handler.profile_manager
         ):
-            return {"success": False, "error": "User not connected or profile manager not available"}
+            return {
+                "success": False,
+                "error": "User not connected or profile manager not available",
+            }
 
         # Handle profile photo upload if provided
         profile_photo_file = None
         if profile_photo and profile_photo.filename:
             # Validate file type
             if not profile_photo.content_type.startswith("image/"):
-                return {"success": False, "error": "Invalid file type. Please upload an image file."}
+                return {
+                    "success": False,
+                    "error": "Invalid file type. Please upload an image file.",
+                }
 
             # Save uploaded file temporarily
             # Create temp directory if it doesn't exist
@@ -492,12 +513,26 @@ async def api_update_user_profile(
                 logger.error(f"Error saving uploaded file: {e}")
                 return {"success": False, "error": "Failed to save uploaded file"}
 
+        # Handle form data: FastAPI sets empty fields to None
+        # We need to check the raw form data to distinguish between missing and empty
+        form_data = await request.form()
+
+        # Determine actual values: if field exists in form but is empty, use empty string
+        # If field doesn't exist in form, use None to keep current value
+        actual_first_name = (
+            form_data.get("first_name") if "first_name" in form_data else None
+        )
+        actual_last_name = (
+            form_data.get("last_name") if "last_name" in form_data else None
+        )
+        actual_bio = form_data.get("bio") if "bio" in form_data else None
+
         # Update the profile using ProfileManager
         # Note: Pass empty strings as-is to allow clearing fields, only convert None to None
         success = await client_instance.profile_handler.profile_manager.update_profile(
-            first_name=first_name,
-            last_name=last_name,
-            bio=bio,
+            first_name=actual_first_name,
+            last_name=actual_last_name,
+            bio=actual_bio,
             profile_photo_file=profile_photo_file,
         )
 
@@ -516,11 +551,17 @@ async def api_update_user_profile(
 
         # Always save the current state as the new original/saved state
         save_success = await client_instance.profile_handler.profile_manager.save_current_as_original()
-        
+
         if save_success:
-            return {"success": True, "message": "Profile updated and saved as new state"}
+            return {
+                "success": True,
+                "message": "Profile updated and saved as new state",
+            }
         else:
-            return {"success": True, "message": "Profile updated but failed to save as new state"}
+            return {
+                "success": True,
+                "message": "Profile updated but failed to save as new state",
+            }
 
     except Exception as e:
         logger.error(f"Error updating profile for user {user_id}: {e}")
