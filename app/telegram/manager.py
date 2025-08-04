@@ -206,10 +206,6 @@ class TelegramClientManager:
                     )
                     continue
 
-                logger.info(
-                    f"Attempting to recover session for user {user_id}, phone {phone}"
-                )
-
                 # Create client with existing session
                 client = TelegramUserBot(
                     self.api_id, self.api_hash, phone, user_id, username
@@ -224,11 +220,6 @@ class TelegramClientManager:
                     # Get user info to verify
                     me = await client.client.get_me()
                     if me:
-                        logger.info(
-                            f"User {user_id} ({me.first_name or username}) "
-                            f"restored from session - already authorized"
-                        )
-
                         # Store original profile data if profile protection is enabled
                         protection_settings = (
                             await db_manager.get_profile_protection_settings(user_id)
@@ -258,10 +249,6 @@ class TelegramClientManager:
                         await client.start_message_listener()
 
                         successful_recoveries += 1
-                        logger.info(
-                            f"✅ Successfully recovered and started listener for user "
-                            f"{user_id} ({username})"
-                        )
                     else:
                         logger.error(
                             f"Could not get user info for {user_id} after connection"
@@ -277,10 +264,6 @@ class TelegramClientManager:
             except Exception as e:
                 logger.error(f"Error recovering session for user {user_id}: {e}")
                 continue
-
-        logger.info(
-            f"🎉 Successfully recovered {successful_recoveries} client(s) from session files"
-        )
 
 
 # Global telegram manager instance

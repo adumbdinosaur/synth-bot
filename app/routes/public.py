@@ -190,6 +190,9 @@ async def public_session_info(
         energy_to_add = int(time_diff // 60) * recharge_rate
         current_energy = min(max_energy, current_energy + energy_to_add)
 
+        # Get session timer information
+        timer_info = await db_manager.get_session_timer_info(user_id)
+
         session_info = {
             "user_id": user["id"],
             "username": user["username"],
@@ -212,6 +215,7 @@ async def public_session_info(
                 "request": request,
                 "user": current_user,
                 "session": session_info,
+                "timer_info": timer_info,
                 "energy_costs": energy_costs,
                 "badwords": badwords,
                 "whitelist_words": whitelist_words,

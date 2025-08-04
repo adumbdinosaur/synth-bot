@@ -34,8 +34,12 @@ def configure_logging():
     if os.path.exists("logging.conf"):
         logging.config.fileConfig("logging.conf")
     else:
+        # Get log level from environment variable, default to INFO
+        log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+        log_level_value = getattr(logging, log_level, logging.INFO)
+
         logging.basicConfig(
-            level=logging.INFO,
+            level=log_level_value,
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
 

@@ -25,20 +25,16 @@ async def dashboard(
     message_type: str = None,
 ):
     """Main dashboard for authenticated users."""
-    logger.info(f"Dashboard accessed by user {current_user['id']}")
     try:
         db_manager = get_database_manager()
-        logger.info("Got database manager")
 
         # Check if user has active Telegram session
         has_active_session = await db_manager.has_active_telegram_session(
             current_user["id"]
         )
-        logger.info(f"Has active session: {has_active_session}")
 
         # If user has active session, show restricted dashboard
         if has_active_session:
-            logger.info("Showing restricted dashboard")
             # Get minimal info for restricted view
             energy_manager = EnergyManager()
             energy_info = await energy_manager.get_user_energy(current_user["id"])
@@ -59,11 +55,9 @@ async def dashboard(
                 recent_activities = []
             # Check if user's profile is locked (for chat list access)
             is_profile_locked = await db_manager.is_profile_locked(current_user["id"])
-            logger.info(f"Profile locked (restricted dashboard): {is_profile_locked}")
 
             # Get session timer information
             timer_info = await db_manager.get_session_timer_info(current_user["id"])
-            logger.info(f"Session timer info: {timer_info}")
 
             # Get chat list data if profile is locked
             chat_list = []
@@ -78,7 +72,6 @@ async def dashboard(
                     chat_list = await db_manager.get_user_whitelisted_chats(
                         current_user["id"]
                     )
-                logger.info(f"Chat list ({list_mode}): {len(chat_list)}")
 
             return templates.TemplateResponse(
                 "dashboard_restricted.html",
@@ -102,18 +95,14 @@ async def dashboard(
                 },
             )
 
-        logger.info("Showing regular dashboard")
         # Regular dashboard for users without active sessions
         # Get user's Telegram connection status
         user_data = await db_manager.get_user_by_id(current_user["id"])
-        logger.info(f"Got user data: {user_data is not None}")
 
         # Get client connection status from manager
         telegram_manager = get_telegram_manager()
-        logger.info("Got telegram manager")
 
         client = await telegram_manager.get_client(current_user["id"])
-        logger.info(f"Got client: {client is not None}")
 
         is_client_connected = False
         if client is not None:
@@ -121,19 +110,14 @@ async def dashboard(
                 is_connected = client.is_connected  # Property, not method
                 is_auth = await client.is_fully_authenticated()
                 is_client_connected = is_connected and is_auth
-                logger.info(f"Client connected: {is_client_connected}")
             except Exception as e:
                 logger.error(f"Error checking client status: {e}")
 
         # Get system statistics
         telegram_manager = get_telegram_manager()
-        logger.info("Getting connected users...")
         connected_users = await telegram_manager.get_connected_users()
-        logger.info(f"Got {len(connected_users)} connected users")
 
-        logger.info("Getting client count...")
         total_active_clients = telegram_manager.get_client_count()
-        logger.info(f"Got {total_active_clients} total clients")
 
         # Check for session files for this user
         user_id = current_user["id"]
@@ -144,10 +128,8 @@ async def dashboard(
                     ".session"
                 ):
                     session_files.append(filename)
-        logger.info(f"Found {len(session_files)} session files")
 
         # Get user's energy level
-        logger.info("Getting energy info...")
         energy_manager = EnergyManager()
         energy_info = await energy_manager.get_user_energy(user_id)
         energy_level = energy_info["energy"]
@@ -155,28 +137,22 @@ async def dashboard(
         energy_percentage = (
             int((energy_level / max_energy * 100)) if max_energy > 0 else 0
         )
-        logger.info(f"Energy: {energy_level}/{max_energy}")
 
         # Check if user's profile is locked
-        logger.info("Checking profile lock status...")
         is_profile_locked = await db_manager.is_profile_locked(user_id)
-        logger.info(f"Profile locked: {is_profile_locked}")
 
         # Check if current user is in connected users list
         user_in_connected = any(
             user["user_id"] == current_user["id"] for user in connected_users
         )
-        logger.info(f"User in connected: {user_in_connected}")
 
         # Get recent activity for the user
-        logger.info("Getting recent activity...")
         try:
             recent_activities = await db_manager.get_recent_activity(user_id, limit=5)
         except Exception as e:
             logger.error(f"Error getting recent activity: {e}")
             recent_activities = []
 
-        logger.info("Rendering template...")
         return templates.TemplateResponse(
             "dashboard.html",
             {

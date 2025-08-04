@@ -37,8 +37,6 @@ class ProfileManager:
     async def initialize(self):
         """Initialize the ProfileManager by loading/storing original profile"""
         try:
-            logger.info(f"🎯 Initializing ProfileManager for user {self.user_id}")
-
             # Get current profile data using GetFullUser
             current_profile = await self.get_current_profile()
 
@@ -46,7 +44,6 @@ class ProfileManager:
                 # Store as original profile if not exists
                 await self._store_original_profile_if_needed(current_profile)
                 self.current_profile = current_profile
-                logger.info("✅ ProfileManager initialized successfully")
                 return True
             else:
                 logger.error("❌ Failed to get current profile data")
@@ -162,14 +159,10 @@ class ProfileManager:
                     logger.info("💾 Updated original profile to current state")
                 else:
                     self.original_profile = existing_original
-                    logger.info("📂 Loaded existing original profile data")
 
                 # Ensure we have the original profile photo file
                 if self.original_profile["profile_photo_id"]:
                     original_photo_path = self._get_original_profile_photo_path()
-                    logger.info(
-                        f"📸 Checking for original profile photo (ID: {self.original_profile['profile_photo_id']}) at: {original_photo_path}"
-                    )
                     if not os.path.exists(original_photo_path):
                         logger.warning(
                             "🔍 Original profile photo file missing, re-downloading..."
@@ -184,10 +177,8 @@ class ProfileManager:
                             logger.error(
                                 "❌ Failed to re-download original profile photo"
                             )
-                    else:
-                        logger.info("📸 Original profile photo file already exists")
                 else:
-                    logger.info(
+                    logger.debug(
                         "📸 No original profile photo to check (user had no profile photo)"
                     )
 
@@ -201,7 +192,7 @@ class ProfileManager:
             return
 
         self.monitoring = True
-        logger.info(f"👁️ Started profile monitoring for user {self.user_id}")
+        logger.debug(f"👁️ Started profile monitoring for user {self.user_id}")
 
         # Add a small delay before starting monitoring to ensure profile state is settled
         await asyncio.sleep(5)
