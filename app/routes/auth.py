@@ -60,7 +60,6 @@ async def register_page(request: Request):
 async def register(
     request: Request,
     username: str = Form(...),
-    email: str = Form(...),
     password: str = Form(...),
     invite_code: str = Form(...),
 ):
@@ -81,7 +80,7 @@ async def register(
         if existing_user:
             return templates.TemplateResponse(
                 "register.html",
-                {"request": request, "error": "Username or email already exists"},
+                {"request": request, "error": "Username already exists"},
             )
 
         # Use the invite code (increment usage count)
@@ -89,7 +88,7 @@ async def register(
 
         # Create new user
         hashed_password = get_password_hash(password)
-        user_id = await db_manager.create_user(username, email, hashed_password)
+        user_id = await db_manager.create_user(username, hashed_password)
 
         # Initialize default energy costs for the new user
         await db_manager.init_user_energy_costs(user_id)

@@ -118,6 +118,7 @@ h6 {
     backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--cyber-blue);
     box-shadow: 0 2px 20px rgba(74, 158, 255, 0.2);
+    z-index: 1030;
 }
 
 .navbar-brand {
@@ -732,6 +733,18 @@ small,
     border: 1px solid var(--cyber-light-grey);
     border-radius: 0;
     backdrop-filter: blur(10px);
+    z-index: 9999 !important;
+}
+
+/* Ensure dropdown toggle has proper z-index when active */
+.dropdown.show .dropdown-toggle,
+.dropdown-toggle[aria-expanded="true"] {
+    z-index: 10000 !important;
+}
+
+/* Ensure dropdowns work properly in navbar */
+.navbar .dropdown-menu {
+    z-index: 10001 !important;
 }
 
 .dropdown-item {
@@ -783,6 +796,79 @@ small,
 
 .table-hover tbody tr:hover {
     background-color: rgba(74, 158, 255, 0.1) !important;
+}
+
+/* Enhanced Striped Table Styling */
+.table-striped>tbody>tr:nth-of-type(odd) {
+    background-color: rgba(45, 45, 45, 0.3) !important;
+    color: var(--cyber-text) !important;
+}
+
+.table-striped>tbody>tr:nth-of-type(even) {
+    background-color: rgba(28, 28, 28, 0.5) !important;
+    color: var(--cyber-text) !important;
+}
+
+/* Ensure all text in striped tables is readable */
+.table-striped>tbody>tr>td {
+    color: var(--cyber-text) !important;
+}
+
+/* Ensure hover effect works well with striped rows */
+.table-striped.table-hover>tbody>tr:nth-of-type(odd):hover {
+    background-color: rgba(74, 158, 255, 0.15) !important;
+    color: #ffffff !important;
+}
+
+.table-striped.table-hover>tbody>tr:nth-of-type(even):hover {
+    background-color: rgba(74, 158, 255, 0.12) !important;
+    color: #ffffff !important;
+}
+
+/* Make sure hover affects all child elements */
+.table-striped.table-hover>tbody>tr:hover>td {
+    color: #ffffff !important;
+}
+
+/* Ensure badges and other elements have proper contrast in tables */
+.table-striped .badge {
+    color: #ffffff !important;
+}
+
+.table-striped .badge.bg-secondary {
+    background-color: #6c757d !important;
+    color: #ffffff !important;
+}
+
+.table-striped .badge.bg-info {
+    background-color: var(--cyber-cyan) !important;
+    color: #ffffff !important;
+}
+
+.table-striped .badge.bg-warning {
+    background-color: var(--cyber-yellow) !important;
+    color: #000000 !important;
+}
+
+.table-striped .badge.bg-success {
+    background-color: var(--cyber-green) !important;
+    color: #ffffff !important;
+}
+
+/* Admin table specific styling */
+.admin-users-table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.admin-users-table tbody tr {
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
+}
+
+.admin-users-table tbody tr:hover {
+    border-left-color: var(--cyber-blue);
+    transform: translateX(2px);
 }
 
 /* Progress Bars */
@@ -1313,23 +1399,23 @@ input[type="number"]::-webkit-outer-spin-button {
     .custom-redactions-form {
         padding: 1rem;
     }
-    
+
     .custom-redactions-table .table th,
     .custom-redactions-table .table td {
         padding: 0.5rem 0.25rem;
         font-size: 0.85rem;
     }
-    
+
     .custom-redactions-table .btn-group .btn {
         padding: 0.3rem 0.4rem;
         font-size: 0.75rem;
     }
-    
+
     .custom-redactions-table code {
         font-size: 0.75rem;
         padding: 0.2rem 0.4rem;
     }
-    
+
     .custom-redactions-table .badge {
         font-size: 0.75rem;
         padding: 0.3rem 0.6rem;

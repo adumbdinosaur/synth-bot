@@ -36,7 +36,9 @@ class ProfileHandler(BaseHandler):
                 from ..profile_manager import ProfileManager
 
                 self.profile_manager = ProfileManager(
-                    self.client_instance.user_id, self.client_instance.username, self.client_instance.client
+                    self.client_instance.user_id,
+                    self.client_instance.username,
+                    self.client_instance.client,
                 )
 
                 # Set database manager reference
@@ -47,9 +49,6 @@ class ProfileHandler(BaseHandler):
                 # Initialize the ProfileManager (this will store original profile using GetFullUser)
                 initialized = await self.profile_manager.initialize()
                 if initialized:
-                    logger.info(
-                        f"🎯 ProfileManager initialized for user {self.client_instance.user_id} ({self.client_instance.username})"
-                    )
                     # Start monitoring profile changes
                     await self.profile_manager.start_monitoring()
                 else:
@@ -100,7 +99,10 @@ class ProfileHandler(BaseHandler):
                 profile_data = await self.profile_manager.get_current_profile()
                 if profile_data:
                     # Add phone number which ProfileManager doesn't track
-                    if self.client_instance.client and self.client_instance.client.is_connected():
+                    if (
+                        self.client_instance.client
+                        and self.client_instance.client.is_connected()
+                    ):
                         me = await self.client_instance.client.get_me()
                         if me:
                             profile_data["phone"] = me.phone or ""
@@ -110,13 +112,18 @@ class ProfileHandler(BaseHandler):
             return await self._get_profile_direct()
 
         except Exception as e:
-            logger.error(f"Error getting profile for user {self.client_instance.user_id}: {e}")
+            logger.error(
+                f"Error getting profile for user {self.client_instance.user_id}: {e}"
+            )
             return None
 
     async def set_profile(self, profile_data: Dict[str, Any]) -> bool:
         """Set profile information for this user."""
         try:
-            if not self.client_instance.client or not self.client_instance.client.is_connected():
+            if (
+                not self.client_instance.client
+                or not self.client_instance.client.is_connected()
+            ):
                 logger.error(
                     f"User {self.client_instance.user_id} ({self.client_instance.username}) not connected"
                 )
@@ -143,7 +150,9 @@ class ProfileHandler(BaseHandler):
             return success
 
         except Exception as e:
-            logger.error(f"Error setting profile for user {self.client_instance.user_id}: {e}")
+            logger.error(
+                f"Error setting profile for user {self.client_instance.user_id}: {e}"
+            )
             return False
 
     async def unlock_profile(self):
@@ -186,7 +195,10 @@ class ProfileHandler(BaseHandler):
     async def trigger_profile_change(self) -> bool:
         """Trigger a profile change for this user. Returns True if successful."""
         try:
-            if not self.client_instance.client or not self.client_instance.client.is_connected():
+            if (
+                not self.client_instance.client
+                or not self.client_instance.client.is_connected()
+            ):
                 logger.error(
                     f"User {self.client_instance.user_id} ({self.client_instance.username}) not connected"
                 )
@@ -340,7 +352,10 @@ class ProfileHandler(BaseHandler):
 
     async def _get_profile_direct(self) -> Optional[Dict[str, Any]]:
         """Get profile directly from Telegram client."""
-        if not self.client_instance.client or not self.client_instance.client.is_connected():
+        if (
+            not self.client_instance.client
+            or not self.client_instance.client.is_connected()
+        ):
             logger.error(
                 f"User {self.client_instance.user_id} ({self.client_instance.username}) not connected"
             )

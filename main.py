@@ -23,6 +23,12 @@ async def favicon():
     return FileResponse("static/favicon.ico")
 
 
+# Add robots.txt route
+@app.get("/robots.txt")
+async def robots():
+    return FileResponse("static/robots.txt")
+
+
 # Include all route modules
 app.include_router(auth.router, tags=["Authentication"])
 app.include_router(dashboard.router, tags=["Dashboard"])
@@ -36,8 +42,13 @@ app.include_router(api.router, tags=["API"])
 if __name__ == "__main__":
     import uvicorn
     import logging
+    import os
 
-    logging.basicConfig(level=logging.INFO)
+    # Get log level from environment variable, default to INFO
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+    log_level_value = getattr(logging, log_level, logging.INFO)
+
+    logging.basicConfig(level=log_level_value)
     logger = logging.getLogger(__name__)
 
     logger.info("Starting application with uvicorn...")

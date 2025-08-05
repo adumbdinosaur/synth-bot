@@ -44,7 +44,6 @@ class AuthenticationHandler(BaseHandler):
             await self._create_telegram_client()
 
             await self.client_instance.client.connect()
-            logger.info(f"Telegram client connected for user {self.client_instance.user_id}")
 
             # Check if already signed in
             if await self.client_instance.client.is_user_authorized():
@@ -106,7 +105,9 @@ class AuthenticationHandler(BaseHandler):
         """Verify SMS code. Returns dict with status and whether 2FA is needed."""
         try:
             if not self.client_instance.client:
-                logger.error(f"No client available for user {self.client_instance.user_id}")
+                logger.error(
+                    f"No client available for user {self.client_instance.user_id}"
+                )
                 return {
                     "success": False,
                     "error": "No client available",
@@ -115,7 +116,9 @@ class AuthenticationHandler(BaseHandler):
 
             try:
                 # Try to sign in with just the code
-                await self.client_instance.client.sign_in(self.client_instance.phone_number, code)
+                await self.client_instance.client.sign_in(
+                    self.client_instance.phone_number, code
+                )
                 logger.info(
                     f"Successfully signed in user {self.client_instance.user_id} "
                     f"({self.client_instance.username}) - no 2FA required"
@@ -153,7 +156,9 @@ class AuthenticationHandler(BaseHandler):
         """Verify 2FA password after code verification."""
         try:
             if not self.client_instance.client:
-                logger.error(f"No client available for user {self.client_instance.user_id}")
+                logger.error(
+                    f"No client available for user {self.client_instance.user_id}"
+                )
                 return False
 
             await self.client_instance.client.sign_in(password=password)
@@ -186,16 +191,9 @@ class AuthenticationHandler(BaseHandler):
             await self._create_telegram_client()
 
             await self.client_instance.client.connect()
-            logger.info(
-                f"Telegram client connected for user {self.client_instance.user_id} using existing session"
-            )
 
             # Check if already signed in
             if await self.client_instance.client.is_user_authorized():
-                logger.info(
-                    f"User {self.client_instance.user_id} ({self.client_instance.username}) "
-                    f"restored from session - already authorized"
-                )
                 self._auth_state = "authenticated"
                 return True
             else:
@@ -280,10 +278,14 @@ class AuthenticationHandler(BaseHandler):
                 )
             elif type_name == "SentCodeTypeSms":
                 delivery_method = "sms"
-                logger.info(f"Code sent via SMS for {self.client_instance.phone_number}")
+                logger.info(
+                    f"Code sent via SMS for {self.client_instance.phone_number}"
+                )
             elif type_name == "SentCodeTypeCall":
                 delivery_method = "phone_call"
-                logger.info(f"Code sent via phone call for {self.client_instance.phone_number}")
+                logger.info(
+                    f"Code sent via phone call for {self.client_instance.phone_number}"
+                )
             else:
                 delivery_method = type_name.lower()
                 logger.info(

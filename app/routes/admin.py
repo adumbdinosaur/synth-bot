@@ -187,7 +187,6 @@ async def admin_create_admin(
     request: Request,
     current_user: dict = Depends(get_current_admin_user),
     username: str = Form(...),
-    email: str = Form(...),
     password: str = Form(...),
 ):
     """Create a new admin user."""
@@ -204,7 +203,7 @@ async def admin_create_admin(
 
         # Hash password and create admin user
         hashed_password = get_password_hash(password)
-        user_id = await db_manager.create_admin_user(username, email, hashed_password)
+        user_id = await db_manager.create_admin_user(username, hashed_password)
 
         # Initialize default settings
         await db_manager.init_user_energy_costs(user_id)

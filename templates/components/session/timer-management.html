@@ -1,0 +1,199 @@
+<!-- Timer Management Section Component -->
+{% if timer_info and timer_info.has_timer and not timer_info.timer_expired %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card collapsible-section">
+            <div class="card-header" data-bs-toggle="collapse" data-bs-target="#timerManagementCollapse"
+                aria-expanded="false" aria-controls="timerManagementCollapse">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4><i class="fas fa-clock"></i> Session Timer Management</h4>
+                        <p class="text-muted mb-0">Active session timer - adjust remaining time</p>
+                    </div>
+                    <i class="fas fa-chevron-down collapse-toggle collapsed"></i>
+                </div>
+            </div>
+            <div class="collapse" id="timerManagementCollapse">
+                <div class="card-body">
+                    <!-- Current Timer Display -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card bulk-actions-card">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">
+                                        <i class="fas fa-hourglass-half text-warning"></i>
+                                        Active Session Timer
+                                    </h5>
+                                    <div class="mb-3">
+                                        <h3 class="text-warning" id="timer-display">
+                                            <span id="countdown-timer">Calculating...</span>
+                                        </h3>
+                                        <p class="text-muted mb-0">
+                                            <i class="fas fa-calendar-alt"></i>
+                                            Ends at: {{ timer_info.timer_end[:16] if timer_info.timer_end else 'Unknown'
+                                            }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Timer Action Buttons -->
+                    <div class="row g-3 mb-4">
+                        <!-- Add Time -->
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card border-success">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="mb-0"><i class="fas fa-plus"></i> Add Time</h6>
+                                </div>
+                                <div class="card-body">
+                                    <form method="POST" action="/public/sessions/{{ session.user_id }}/timer/add">
+                                        <div class="mb-3">
+                                            <label for="add_minutes" class="form-label">Minutes to Add</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" id="add_minutes"
+                                                    name="minutes" min="1" max="1440" value="30" required>
+                                                <span class="input-group-text">min</span>
+                                            </div>
+                                        </div>
+                                        <button type="submit" class="btn btn-success w-100">
+                                            <i class="fas fa-plus"></i> Add Time
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Subtract Time -->
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card border-danger">
+                                <div class="card-header bg-danger text-white">
+                                    <h6 class="mb-0"><i class="fas fa-minus"></i> Subtract Time</h6>
+                                </div>
+                                <div class="card-body">
+                                    <form method="POST" action="/public/sessions/{{ session.user_id }}/timer/subtract">
+                                        <div class="mb-3">
+                                            <label for="subtract_minutes" class="form-label">Minutes to Subtract</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" id="subtract_minutes"
+                                                    name="minutes" min="1" max="1440" value="30" required>
+                                                <span class="input-group-text">min</span>
+                                            </div>
+                                        </div>
+                                        <button type="submit" class="btn btn-danger w-100">
+                                            <i class="fas fa-minus"></i> Subtract Time
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Set Timer -->
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card border-info">
+                                <div class="card-header bg-info text-white">
+                                    <h6 class="mb-0"><i class="fas fa-clock"></i> Set Timer End</h6>
+                                </div>
+                                <div class="card-body">
+                                    <form method="POST" action="/public/sessions/{{ session.user_id }}/timer/set">
+                                        <div class="mb-3">
+                                            <label for="timer_end" class="form-label">New End Time</label>
+                                            <input type="datetime-local" class="form-control" id="timer_end"
+                                                name="timer_end" required
+                                                value="{{ timer_info.timer_end[:16] if timer_info.timer_end else '' }}">
+                                        </div>
+                                        <button type="submit" class="btn btn-info w-100">
+                                            <i class="fas fa-clock"></i> Set Timer
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Timer Management Info -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="alert alert-warning">
+                                <h6><i class="fas fa-info-circle"></i> Timer Management Guide</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <ul class="list-unstyled mb-0">
+                                            <li><i class="fas fa-plus text-success"></i> <strong>Add Time:</strong>
+                                                Extend the session timer by specified minutes</li>
+                                            <li><i class="fas fa-minus text-danger"></i> <strong>Subtract Time:</strong>
+                                                Reduce the session timer by specified minutes</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <ul class="list-unstyled mb-0">
+                                            <li><i class="fas fa-clock text-info"></i> <strong>Set Timer:</strong>
+                                                Set a specific end time for the session</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Timer countdown script -->
+<script type="text/javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        let remainingSeconds = {{ timer_info.remaining_seconds if timer_info.remaining_seconds is not none else 0 }
+    };
+    let countdownInterval;
+
+    function updateTimerDisplay() {
+        const hours = Math.floor(remainingSeconds / 3600);
+        const minutes = Math.floor((remainingSeconds % 3600) / 60);
+        const seconds = remainingSeconds % 60;
+
+        let display = '';
+        if (hours > 0) {
+            display = `${hours}h ${minutes}m ${seconds}s`;
+        } else if (minutes > 0) {
+            display = `${minutes}m ${seconds}s`;
+        } else {
+            display = `${seconds}s`;
+        }
+
+        const timerElement = document.getElementById('countdown-timer');
+        if (timerElement) {
+            timerElement.textContent = display;
+        }
+
+        remainingSeconds--;
+
+        // When timer expires, reload the page to hide the timer management section
+        if (remainingSeconds < 0) {
+            clearInterval(countdownInterval);
+            window.location.reload();
+        }
+    }
+
+    function startCountdown() {
+        updateTimerDisplay();
+        countdownInterval = setInterval(updateTimerDisplay, 1000);
+    }
+
+    // Function to update countdown with new remaining time (called from AJAX updates)
+    window.updateCountdownWithNewTime = function (newRemainingSeconds) {
+        remainingSeconds = newRemainingSeconds;
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+        }
+        startCountdown();
+    };
+
+    // Start initial countdown
+    startCountdown();
+});
+</script>
+
+{% endif %}

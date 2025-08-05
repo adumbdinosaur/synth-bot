@@ -77,7 +77,6 @@ async def get_current_user_from_token(token: str) -> Optional[Dict[str, Any]]:
             return {
                 "id": user_data["id"],
                 "username": user_data["username"],
-                "email": user_data["email"],
                 "is_admin": bool(user_data.get("is_admin", False)),
             }
 

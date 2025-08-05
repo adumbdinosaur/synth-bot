@@ -4,12 +4,15 @@ import os
 import asyncio
 import logging
 import logging.config
+import secrets
+import string
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, RedirectResponse
 from dotenv import load_dotenv
+from typing import Set
 
 from app.database import init_database_manager, get_database_manager
 from app.auth import get_password_hash, get_current_user
@@ -19,7 +22,20 @@ from app.telegram_client import (
     recover_telegram_sessions,
 )
 
+# Global set to track background tasks
+background_tasks: Set[asyncio.Task] = set()
+
+# Shutdown flag
+shutdown_event = asyncio.Event()
+
 logger = logging.getLogger(__name__)
+
+
+def generate_secure_password(length: int = 20) -> str:
+    """Generate a secure random password."""
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    password = "".join(secrets.choice(alphabet) for _ in range(length))
+    return password
 
 
 def configure_logging():
@@ -27,8 +43,12 @@ def configure_logging():
     if os.path.exists("logging.conf"):
         logging.config.fileConfig("logging.conf")
     else:
+        # Get log level from environment variable, default to INFO
+        log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+        log_level_value = getattr(logging, log_level, logging.INFO)
+
         logging.basicConfig(
-            level=logging.INFO,
+            level=log_level_value,
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
 
@@ -75,12 +95,18 @@ async def create_default_admin():
                 logger.info("✅ Promoted existing 'admin' user to admin status")
             else:
                 # Create new admin user
-                admin_password = "Vru3s^C&DUdSUea5NbJK"
-                admin_email = "admin@localhost"
+                admin_password = os.getenv("ADMIN_PASSWORD")
+                if not admin_password:
+                    # Generate a secure random password if none provided
+                    admin_password = generate_secure_password()
+                    logger.warning(
+                        "⚠️  No ADMIN_PASSWORD environment variable found, generated random password"
+                    )
+
                 hashed_password = get_password_hash(admin_password)
 
                 admin_user_id = await db_manager.create_admin_user(
-                    username="admin", email=admin_email, hashed_password=hashed_password
+                    username="admin", hashed_password=hashed_password
                 )
 
                 # Initialize default settings for admin user
@@ -93,7 +119,7 @@ async def create_default_admin():
                     f"✅ Created default admin account: admin (ID: {admin_user_id})"
                 )
                 logger.info(
-                    "🔑 Admin credentials - Username: admin, Password: Vru3s^C&DUdSUea5NbJK"
+                    f"🔑 Admin credentials - Username: admin, Password: {admin_password}"
                 )
         else:
             logger.info(f"✅ Found {len(admin_users)} existing admin account(s)")
@@ -110,19 +136,26 @@ async def start_client_recovery():
 
     async def recover_clients_background():
         """Recover existing Telegram clients from session files in background."""
-        await asyncio.sleep(2)  # Small delay to ensure server is fully started
-        logger.info("🔄 Starting background client recovery...")
         try:
+            await asyncio.sleep(2)  # Small delay to ensure server is fully started
+            logger.info("🔄 Starting background client recovery...")
             await recover_telegram_sessions()
             logger.info("✅ Background client recovery completed successfully")
+        except asyncio.CancelledError:
+            logger.info("🛑 Background client recovery cancelled")
+            raise
         except Exception as e:
             logger.error(f"❌ Error during background client recovery: {e}")
             import traceback
 
             traceback.print_exc()
 
-    # Start recovery task in background
-    asyncio.create_task(recover_clients_background())
+    # Start recovery task in background and track it
+    task = asyncio.create_task(recover_clients_background())
+    background_tasks.add(task)
+
+    # Remove task from set when it completes
+    task.add_done_callback(background_tasks.discard)
 
 
 async def cleanup_telegram():
@@ -134,6 +167,36 @@ async def cleanup_telegram():
         logger.info("All Telegram clients disconnected successfully")
     except Exception as e:
         logger.error(f"Error during cleanup: {e}")
+
+
+async def cleanup_background_tasks():
+    """Cancel and cleanup all background tasks."""
+    if not background_tasks:
+        return
+
+    logger.info(f"Cancelling {len(background_tasks)} background tasks...")
+
+    # Cancel all tasks
+    for task in list(
+        background_tasks
+    ):  # Create a copy to avoid modification during iteration
+        if not task.done():
+            task.cancel()
+
+    # Wait for all tasks to finish cancellation with timeout
+    if background_tasks:
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*background_tasks, return_exceptions=True),
+                timeout=5.0,  # 5 second timeout for cleanup
+            )
+        except asyncio.TimeoutError:
+            logger.warning("Background task cleanup timed out")
+        except Exception as e:
+            logger.error(f"Error during task cleanup: {e}")
+
+    background_tasks.clear()
+    logger.info("Background tasks cleanup completed")
 
 
 async def cleanup_database():
@@ -183,6 +246,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # Cleanup
+    await cleanup_background_tasks()  # Cancel background tasks first
     await cleanup_telegram()
     logger.info("Application shutdown complete")
 

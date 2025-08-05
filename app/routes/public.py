@@ -120,41 +120,78 @@ async def public_session_info(
         db_manager = get_database_manager()
 
         # Get user and session info
-        user = await db_manager.get_user_by_id(user_id)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+        try:
+            user = await db_manager.get_user_by_id(user_id)
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+        except Exception as e:
+            logger.error(f"Error getting user {user_id} from database: {e}")
+            raise HTTPException(status_code=500, detail="Failed to get user data")
 
         # Get user's energy costs
-        energy_costs = await db_manager.get_user_energy_costs(user_id)
+        try:
+            energy_costs = await db_manager.get_user_energy_costs(user_id)
+        except Exception as e:
+            logger.error(f"Error getting energy costs for user {user_id}: {e}")
+            energy_costs = None
 
         # Initialize default energy costs if user doesn't have any
         if not energy_costs:
-            await db_manager.initialize_user_energy_costs(user_id)
-            energy_costs = await db_manager.get_user_energy_costs(user_id)
+            try:
+                await db_manager.initialize_user_energy_costs(user_id)
+                energy_costs = await db_manager.get_user_energy_costs(user_id)
+            except Exception as e:
+                logger.error(f"Error initializing energy costs for user {user_id}: {e}")
+                energy_costs = {}
 
         # Get user's badwords
-        badwords = await db_manager.get_user_badwords(user_id)
+        try:
+            badwords = await db_manager.get_user_badwords(user_id)
+        except Exception as e:
+            logger.error(f"Error getting badwords for user {user_id}: {e}")
+            badwords = []
 
         # Get user's whitelist words
-        whitelist_words = await db_manager.get_user_whitelist_words(user_id)
+        try:
+            whitelist_words = await db_manager.get_user_whitelist_words(user_id)
+        except Exception as e:
+            logger.error(f"Error getting whitelist words for user {user_id}: {e}")
+            whitelist_words = []
 
         # Get user's autocorrect settings
-        autocorrect_settings = await db_manager.get_autocorrect_settings(user_id)
+        try:
+            autocorrect_settings = await db_manager.get_autocorrect_settings(user_id)
+        except Exception as e:
+            logger.error(f"Error getting autocorrect settings for user {user_id}: {e}")
+            autocorrect_settings = {}
 
         # Get user's custom redactions
-        custom_redactions = await db_manager.get_user_custom_redactions(user_id)
+        try:
+            custom_redactions = await db_manager.get_user_custom_redactions(user_id)
+        except Exception as e:
+            logger.error(f"Error getting custom redactions for user {user_id}: {e}")
+            custom_redactions = []
 
         # Get connection status from telegram manager
-        telegram_manager = get_telegram_manager()
-        connected_users_info = await telegram_manager.get_connected_users()
-        is_connected = user_id in {user["user_id"] for user in connected_users_info}
+        try:
+            telegram_manager = get_telegram_manager()
+            connected_users_info = await telegram_manager.get_connected_users()
+            is_connected = user_id in {user["user_id"] for user in connected_users_info}
+        except Exception as e:
+            logger.error(f"Error getting connection status for user {user_id}: {e}")
+            is_connected = False
 
         # Get profile information if user is connected
         current_profile = None
         original_profile = None
         current_profile_photo_url = None
         original_profile_photo_url = None
-        profile_revert_cost = await db_manager.get_profile_revert_cost(user_id)
+
+        try:
+            profile_revert_cost = await db_manager.get_profile_revert_cost(user_id)
+        except Exception as e:
+            logger.error(f"Error getting profile revert cost for user {user_id}: {e}")
+            profile_revert_cost = 10  # Default value
 
         if is_connected:
             client_instance = telegram_manager.clients.get(user_id)
@@ -163,12 +200,39 @@ async def public_session_info(
                 and client_instance.profile_handler
                 and client_instance.profile_handler.profile_manager
             ):
-                current_profile = await client_instance.profile_handler.profile_manager.get_current_profile()
-                original_profile = (
-                    client_instance.profile_handler.profile_manager.original_profile
-                )
-                current_profile_photo_url = client_instance.profile_handler.profile_manager.get_profile_photo_url()
-                original_profile_photo_url = client_instance.profile_handler.profile_manager.get_original_profile_photo_url()
+                try:
+                    current_profile = await client_instance.profile_handler.profile_manager.get_current_profile()
+                except Exception as e:
+                    logger.error(
+                        f"Error getting current profile for user {user_id}: {e}"
+                    )
+                    current_profile = None
+
+                try:
+                    original_profile = (
+                        client_instance.profile_handler.profile_manager.original_profile
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Error getting original profile for user {user_id}: {e}"
+                    )
+                    original_profile = None
+
+                try:
+                    current_profile_photo_url = client_instance.profile_handler.profile_manager.get_profile_photo_url()
+                except Exception as e:
+                    logger.error(
+                        f"Error getting current profile photo URL for user {user_id}: {e}"
+                    )
+                    current_profile_photo_url = None
+
+                try:
+                    original_profile_photo_url = client_instance.profile_handler.profile_manager.get_original_profile_photo_url()
+                except Exception as e:
+                    logger.error(
+                        f"Error getting original profile photo URL for user {user_id}: {e}"
+                    )
+                    original_profile_photo_url = None
 
         # Calculate current energy with recharge
         current_energy = user["energy"] if user["energy"] is not None else 100
@@ -190,6 +254,13 @@ async def public_session_info(
         energy_to_add = int(time_diff // 60) * recharge_rate
         current_energy = min(max_energy, current_energy + energy_to_add)
 
+        # Get session timer information
+        try:
+            timer_info = await db_manager.get_session_timer_info(user_id)
+        except Exception as e:
+            logger.error(f"Error getting session timer info for user {user_id}: {e}")
+            timer_info = {}
+
         session_info = {
             "user_id": user["id"],
             "username": user["username"],
@@ -206,12 +277,20 @@ async def public_session_info(
             "is_connected": is_connected,
         }
 
+        # Log all data being passed to template for debugging
+        logger.debug(f"Session info for user {user_id}: {session_info}")
+        logger.debug(f"Timer info for user {user_id}: {timer_info}")
+        logger.debug(f"Energy costs for user {user_id}: {energy_costs}")
+        logger.debug(f"Current profile for user {user_id}: {current_profile}")
+        logger.debug(f"Original profile for user {user_id}: {original_profile}")
+
         return templates.TemplateResponse(
             "session_info.html",
             {
                 "request": request,
                 "user": current_user,
                 "session": session_info,
+                "timer_info": timer_info,
                 "energy_costs": energy_costs,
                 "badwords": badwords,
                 "whitelist_words": whitelist_words,
@@ -228,4 +307,7 @@ async def public_session_info(
         raise
     except Exception as e:
         logger.error(f"Error loading session info for user {user_id}: {e}")
+        import traceback
+
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Failed to load session info")

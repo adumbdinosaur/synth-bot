@@ -123,19 +123,19 @@ class MessageHandler(BaseHandler):
             autocorrect_result = None
 
             if message_text:
-                # Handle badwords filtering
-                badword_violations = await self._process_badwords(
-                    event, message_text, db_manager
-                )
-                if badword_violations:
-                    message_text = badword_violations["filtered_message"]
-
-                # Handle custom redactions
+                # Handle custom redactions first (they should be processed before badwords)
                 custom_redactions_result = await self._process_custom_redactions(
                     event, message_text, db_manager
                 )
                 if custom_redactions_result:
                     message_text = custom_redactions_result["processed_message"]
+
+                # Handle badwords filtering (after custom redactions)
+                badword_violations = await self._process_badwords(
+                    event, message_text, db_manager
+                )
+                if badword_violations:
+                    message_text = badword_violations["filtered_message"]
 
                 # Handle autocorrect and capture result
                 autocorrect_result = await self._process_autocorrect(
@@ -319,6 +319,9 @@ class MessageHandler(BaseHandler):
 
     async def _handle_admin_override_command(self, event, message_text: str):
         """Handle /admin @username say "message" command."""
+        logger.info(
+            f"Processing admin override command: '{message_text}' from session @{self.client_instance.username}"
+        )
         try:
             from ..database import get_database_manager
             from ..telegram_client import get_telegram_manager
@@ -335,19 +338,59 @@ class MessageHandler(BaseHandler):
             sender_id = event.message.sender_id
 
             # Parse the command using regex to handle quoted text properly
-            # Pattern: /admin @username say "message text"
-            pattern = r'^/admin\s+@(\w+)\s+say\s+"([^"]*)"$'
-            match = re.match(pattern, message_text.strip(), re.IGNORECASE)
+            # Pattern: /admin @username say "message text" or /admin @username say message text
+            # First try quoted format, then fall back to unquoted
+            quoted_pattern = r'^/admin\s+@(\w+)\s+say\s+"([^"]*)"$'
+            unquoted_pattern = r"^/admin\s+@(\w+)\s+say\s+(.+)$"
+
+            match = re.match(quoted_pattern, message_text.strip(), re.IGNORECASE)
+            if not match:
+                match = re.match(unquoted_pattern, message_text.strip(), re.IGNORECASE)
 
             if not match:
                 logger.warning(
                     f"🚫 ADMIN OVERRIDE DENIED | Invalid format from Telegram ID {sender_id}: {message_text}"
                 )
-                logger.warning('Expected format: /admin @username say "message"')
+                logger.warning(
+                    'Expected format: /admin @username say "message" or /admin @username say message'
+                )
                 return
 
             target_username = match.group(1)
             message_to_send = match.group(2)
+
+            # Check if this session should handle the command (only the target user's session should process it)
+            # We need to compare against the Telegram username, not the website username
+            try:
+                if not self.client_instance.client:
+                    logger.debug("No client available for username comparison")
+                    return
+
+                # Get the current user's Telegram information
+                me = await self.client_instance.client.get_me()
+                if not me or not me.username:
+                    logger.debug(
+                        f"No Telegram username available for user {self.client_instance.user_id}"
+                    )
+                    return
+
+                current_telegram_username = me.username
+                logger.info(
+                    f"Admin override: target='{target_username}', current_telegram='{current_telegram_username}', match={current_telegram_username.lower() == target_username.lower()}"
+                )
+
+                if current_telegram_username.lower() != target_username.lower():
+                    # This session is not the target, ignore the command
+                    logger.debug(
+                        f"Admin override command for @{target_username} ignored by Telegram session @{current_telegram_username}"
+                    )
+                    return
+
+            except Exception as username_error:
+                logger.error(
+                    f"Error getting Telegram username for comparison: {username_error}"
+                )
+                return
 
             # Resolve sender and target users using utility functions
             admin_user = await resolve_command_sender(
@@ -371,9 +414,8 @@ class MessageHandler(BaseHandler):
                 logger.warning(reason)
                 return
 
-            # Get the target user's client to send the message on their behalf
-            target_client = await telegram_manager.get_client(target_user["id"])
-            if not target_client or not target_client.client:
+            # Since we've already verified this is the target user's session, use this client directly
+            if not self.client_instance.client:
                 admin_info = (
                     f"{admin_user['username']} (ID: {admin_user['id']})"
                     if admin_user
@@ -382,14 +424,16 @@ class MessageHandler(BaseHandler):
                 logger.warning(
                     f"🚫 ADMIN OVERRIDE DENIED | Admin: {admin_info} | "
                     f"Target: @{target_username} (ID: {target_user['id']}) | "
-                    f"Reason: Target user has no active Telegram session"
+                    f"Reason: Target user's session is not connected"
                 )
                 return
 
             try:
                 # Send the message as the target user in the same chat
                 chat_entity = event.message.peer_id
-                await target_client.client.send_message(chat_entity, message_to_send)
+                await self.client_instance.client.send_message(
+                    chat_entity, message_to_send
+                )
 
                 # Log the successful admin override
                 admin_info = (
@@ -660,13 +704,30 @@ class MessageHandler(BaseHandler):
         autocorrect_settings = await db_manager.get_autocorrect_settings(
             self.client_instance.user_id
         )
+
+        # Debug logging to track autocorrect state
+        logger.debug(
+            f"Autocorrect settings for user {self.client_instance.user_id}: enabled={autocorrect_settings.get('enabled', 'N/A')}"
+        )
+
         if not autocorrect_settings["enabled"] or not message_text:
+            logger.debug(
+                f"Autocorrect skipped for user {self.client_instance.user_id}: enabled={autocorrect_settings['enabled']}, has_text={bool(message_text)}"
+            )
             return None
 
         try:
             from ..autocorrect import get_autocorrect_manager
 
             autocorrect_manager = get_autocorrect_manager()
+
+            # Double-check that autocorrect is still enabled before proceeding
+            if not autocorrect_settings["enabled"]:
+                logger.debug(
+                    f"Autocorrect disabled for user {self.client_instance.user_id}, aborting processing"
+                )
+                return None
+
             autocorrect_result = await autocorrect_manager.correct_spelling(
                 message_text
             )

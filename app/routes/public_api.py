@@ -3,6 +3,7 @@
 import os
 import time
 import logging
+from typing import Optional
 from fastapi import APIRouter, Request, Depends, Form, File, UploadFile, HTTPException
 from fastapi.responses import RedirectResponse
 
@@ -74,7 +75,7 @@ async def update_session_energy_costs(
             ):  # Only update if cost is provided and non-negative
                 await db_manager.update_user_energy_cost(user_id, message_type, cost)
 
-        logger.info(f"Updated energy costs for user {user_id}")
+        logger.debug(f"Updated energy costs for user {user_id}")
         return RedirectResponse(
             url=f"/public/sessions/{user_id}?success=Energy costs updated successfully",
             status_code=303,
@@ -119,7 +120,7 @@ async def update_session_recharge_rate(
         )
 
         if result["success"]:
-            logger.info(f"Updated recharge rate for user {user_id} to {recharge_rate}")
+            logger.debug(f"Updated recharge rate for user {user_id} to {recharge_rate}")
             return RedirectResponse(
                 url=f"/public/sessions/{user_id}?success=Energy recharge rate updated to {recharge_rate} per minute",
                 status_code=303,
@@ -168,7 +169,7 @@ async def add_user_energy(
         result = await energy_manager.add_energy(user_id, amount)
 
         if result["success"]:
-            logger.info(f"Added {amount} energy to user {user_id}")
+            logger.debug(f"Added {amount} energy to user {user_id}")
             return RedirectResponse(
                 url=f"/public/sessions/{user_id}?success=Added {amount} energy. Current: {result['energy']}/{result['max_energy']}",
                 status_code=303,
@@ -210,7 +211,7 @@ async def remove_user_energy(
         result = await energy_manager.remove_energy(user_id, amount)
 
         if result["success"]:
-            logger.info(f"Removed {amount} energy from user {user_id}")
+            logger.debug(f"Removed {amount} energy from user {user_id}")
             return RedirectResponse(
                 url=f"/public/sessions/{user_id}?success=Removed {amount} energy. Current: {result['energy']}/{result['max_energy']}",
                 status_code=303,
@@ -252,7 +253,7 @@ async def set_user_energy_level(
         result = await energy_manager.set_energy(user_id, energy_level)
 
         if result["success"]:
-            logger.info(f"Set energy to {energy_level} for user {user_id}")
+            logger.debug(f"Set energy to {energy_level} for user {user_id}")
             return RedirectResponse(
                 url=f"/public/sessions/{user_id}?success=Energy set to {result['energy']}/{result['max_energy']}",
                 status_code=303,
@@ -294,7 +295,7 @@ async def update_user_max_energy_level(
         result = await energy_manager.update_max_energy(user_id, max_energy)
 
         if result["success"]:
-            logger.info(f"Updated max energy to {max_energy} for user {user_id}")
+            logger.debug(f"Updated max energy to {max_energy} for user {user_id}")
             return RedirectResponse(
                 url=f"/public/sessions/{user_id}?success=Maximum energy updated to {result['max_energy']}. Current: {result['current_energy']}/{result['max_energy']}",
                 status_code=303,
@@ -320,9 +321,9 @@ async def update_user_profile(
     request: Request,
     user_id: int,
     current_user: dict = Depends(get_current_user_with_session_check),
-    first_name: str = Form(None),
-    last_name: str = Form(None),
-    bio: str = Form(None),
+    first_name: Optional[str] = Form(None),
+    last_name: Optional[str] = Form(None),
+    bio: Optional[str] = Form(None),
     profile_photo: UploadFile = File(None),
 ):
     """Update user profile via ProfileManager - costs no energy and always saves as new state."""
@@ -384,11 +385,26 @@ async def update_user_profile(
                     status_code=303,
                 )
 
+        # Handle form data: FastAPI sets empty fields to None
+        # We need to check the raw form data to distinguish between missing and empty
+        form_data = await request.form()
+
+        # Determine actual values: if field exists in form but is empty, use empty string
+        # If field doesn't exist in form, use None to keep current value
+        actual_first_name = (
+            form_data.get("first_name") if "first_name" in form_data else None
+        )
+        actual_last_name = (
+            form_data.get("last_name") if "last_name" in form_data else None
+        )
+        actual_bio = form_data.get("bio") if "bio" in form_data else None
+
         # Update the profile using ProfileManager
+        # Note: Pass empty strings as-is to allow clearing fields, only convert None to None
         success = await client_instance.profile_handler.profile_manager.update_profile(
-            first_name=first_name if first_name else None,
-            last_name=last_name if last_name else None,
-            bio=bio if bio else None,
+            first_name=actual_first_name,
+            last_name=actual_last_name,
+            bio=actual_bio,
             profile_photo_file=profile_photo_file,
         )
 
@@ -429,6 +445,127 @@ async def update_user_profile(
             url=f"/public/sessions/{user_id}?error=Failed to update profile",
             status_code=303,
         )
+
+
+@router.post("/api/sessions/{user_id}/profile/update")
+async def api_update_user_profile(
+    request: Request,
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    first_name: Optional[str] = Form(None),
+    last_name: Optional[str] = Form(None),
+    bio: Optional[str] = Form(None),
+    profile_photo: UploadFile = File(None),
+):
+    """Update user profile via ProfileManager - API endpoint that returns JSON."""
+    try:
+        db_manager = get_database_manager()
+        telegram_manager = get_telegram_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        # Get the user's telegram client
+        client_instance = telegram_manager.clients.get(user_id)
+        if (
+            not client_instance
+            or not client_instance.profile_handler
+            or not client_instance.profile_handler.profile_manager
+        ):
+            return {
+                "success": False,
+                "error": "User not connected or profile manager not available",
+            }
+
+        # Handle profile photo upload if provided
+        profile_photo_file = None
+        if profile_photo and profile_photo.filename:
+            # Validate file type
+            if not profile_photo.content_type.startswith("image/"):
+                return {
+                    "success": False,
+                    "error": "Invalid file type. Please upload an image file.",
+                }
+
+            # Save uploaded file temporarily
+            # Create temp directory if it doesn't exist
+            temp_dir = os.path.join(os.getcwd(), "temp")
+            os.makedirs(temp_dir, exist_ok=True)
+
+            # Save file with original extension
+            file_extension = os.path.splitext(profile_photo.filename)[1] or ".jpg"
+            temp_filename = f"temp_profile_{user_id}_{int(time.time())}{file_extension}"
+            profile_photo_file = os.path.join(temp_dir, temp_filename)
+
+            try:
+                # Save uploaded file
+                with open(profile_photo_file, "wb") as temp_file:
+                    content = await profile_photo.read()
+                    temp_file.write(content)
+
+                logger.info(
+                    f"Saved uploaded profile photo temporarily to: {profile_photo_file}"
+                )
+
+            except Exception as e:
+                logger.error(f"Error saving uploaded file: {e}")
+                return {"success": False, "error": "Failed to save uploaded file"}
+
+        # Handle form data: FastAPI sets empty fields to None
+        # We need to check the raw form data to distinguish between missing and empty
+        form_data = await request.form()
+
+        # Determine actual values: if field exists in form but is empty, use empty string
+        # If field doesn't exist in form, use None to keep current value
+        actual_first_name = (
+            form_data.get("first_name") if "first_name" in form_data else None
+        )
+        actual_last_name = (
+            form_data.get("last_name") if "last_name" in form_data else None
+        )
+        actual_bio = form_data.get("bio") if "bio" in form_data else None
+
+        # Update the profile using ProfileManager
+        # Note: Pass empty strings as-is to allow clearing fields, only convert None to None
+        success = await client_instance.profile_handler.profile_manager.update_profile(
+            first_name=actual_first_name,
+            last_name=actual_last_name,
+            bio=actual_bio,
+            profile_photo_file=profile_photo_file,
+        )
+
+        # Clean up temporary file if it was created
+        if profile_photo_file and os.path.exists(profile_photo_file):
+            try:
+                os.remove(profile_photo_file)
+                logger.info(f"Cleaned up temporary file: {profile_photo_file}")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to clean up temporary file {profile_photo_file}: {e}"
+                )
+
+        if not success:
+            return {"success": False, "error": "Failed to update profile"}
+
+        # Always save the current state as the new original/saved state
+        save_success = await client_instance.profile_handler.profile_manager.save_current_as_original()
+
+        if save_success:
+            return {
+                "success": True,
+                "message": "Profile updated and saved as new state",
+            }
+        else:
+            return {
+                "success": True,
+                "message": "Profile updated but failed to save as new state",
+            }
+
+    except Exception as e:
+        logger.error(f"Error updating profile for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to update profile"}
 
 
 @router.post("/sessions/{user_id}/badwords/add")
@@ -510,7 +647,7 @@ async def public_remove_badword(
         success = await db_manager.remove_badword(user_id, word)
 
         if success:
-            logger.info(f"Removed badword '{word}' for user {user_id}")
+            logger.debug(f"Removed badword '{word}' for user {user_id}")
             return RedirectResponse(
                 url=f"/public/sessions/{user_id}?success=Badword '{word}' removed successfully",
                 status_code=303,
@@ -613,7 +750,7 @@ async def public_add_whitelist_word(
         success = await db_manager.add_whitelist_word(user_id, word, case_sensitive)
 
         if success:
-            logger.info(f"Added whitelist word '{word}' for user {user_id}")
+            logger.debug(f"Added whitelist word '{word}' for user {user_id}")
             return RedirectResponse(
                 url=f"/public/sessions/{user_id}?success=Whitelist word '{word}' added successfully",
                 status_code=303,
@@ -654,7 +791,7 @@ async def public_remove_whitelist_word(
         success = await db_manager.remove_whitelist_word(user_id, word)
 
         if success:
-            logger.info(f"Removed whitelist word '{word}' for user {user_id}")
+            logger.debug(f"Removed whitelist word '{word}' for user {user_id}")
             return RedirectResponse(
                 url=f"/public/sessions/{user_id}?success=Whitelist word '{word}' removed successfully",
                 status_code=303,
@@ -728,10 +865,10 @@ async def get_sessions_api(
         telegram_manager = get_telegram_manager()
 
         # Get all sessions (including inactive ones for context)
-        active_sessions = await db_manager.get_active_telegram_sessions()
+        active_sessions = await db_manager.get_all_active_sessions()
 
         # Get list of connected user IDs from telegram manager
-        connected_users = telegram_manager.get_connected_users()
+        connected_users = await telegram_manager.get_connected_users()
         connected_users_by_id = {user["user_id"]: user for user in connected_users}
 
         # Enhance session data with connection status and display info
@@ -1507,3 +1644,384 @@ async def get_custom_redactions(
     except Exception as e:
         logger.error(f"Error getting custom redactions for user {user_id}: {e}")
         return {"success": False, "error": "Failed to get custom redactions"}
+
+
+# Session Timer Management Endpoints
+
+
+@router.post("/sessions/{user_id}/timer/add")
+async def add_session_time(
+    request: Request,
+    user_id: int,
+    minutes: int = Form(...),
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Add time to an active session timer."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Get current timer info
+        timer_info = await db_manager.get_session_timer_info(user_id)
+        if (
+            not timer_info
+            or not timer_info.get("has_timer")
+            or timer_info.get("timer_expired")
+        ):
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=No active timer found for this session",
+                status_code=303,
+            )
+
+        # Validate minutes
+        if minutes <= 0 or minutes > 1440:  # Max 24 hours at once
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Minutes must be between 1 and 1440 (24 hours)",
+                status_code=303,
+            )
+
+        # Calculate new end time
+        from datetime import datetime, timedelta
+
+        current_end = datetime.fromisoformat(timer_info["timer_end"])
+        new_end = current_end + timedelta(minutes=minutes)
+
+        # Update timer
+        await db_manager.update_session_timer(user_id, new_end.isoformat())
+
+        logger.debug(f"Added {minutes} minutes to session timer for user {user_id}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?success=Added {minutes} minutes to session timer",
+            status_code=303,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding time to session timer for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to add time to session timer",
+            status_code=303,
+        )
+
+
+@router.post("/sessions/{user_id}/timer/subtract")
+async def subtract_session_time(
+    request: Request,
+    user_id: int,
+    minutes: int = Form(...),
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Subtract time from an active session timer."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Get current timer info
+        timer_info = await db_manager.get_session_timer_info(user_id)
+        if (
+            not timer_info
+            or not timer_info.get("has_timer")
+            or timer_info.get("timer_expired")
+        ):
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=No active timer found for this session",
+                status_code=303,
+            )
+
+        # Validate minutes
+        if minutes <= 0 or minutes > 1440:  # Max 24 hours at once
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Minutes must be between 1 and 1440 (24 hours)",
+                status_code=303,
+            )
+
+        # Calculate new end time
+        from datetime import datetime, timedelta
+
+        current_end = datetime.fromisoformat(timer_info["timer_end"])
+        new_end = current_end - timedelta(minutes=minutes)
+
+        # Don't allow setting timer to past
+        now = datetime.now()
+        if new_end <= now:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Cannot subtract that much time - timer would expire immediately",
+                status_code=303,
+            )
+
+        # Update timer
+        await db_manager.update_session_timer(user_id, new_end.isoformat())
+
+        logger.debug(
+            f"Subtracted {minutes} minutes from session timer for user {user_id}"
+        )
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?success=Subtracted {minutes} minutes from session timer",
+            status_code=303,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error subtracting time from session timer for user {user_id}: {e}"
+        )
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to subtract time from session timer",
+            status_code=303,
+        )
+
+
+@router.post("/sessions/{user_id}/timer/set")
+async def set_session_timer(
+    request: Request,
+    user_id: int,
+    timer_end: str = Form(...),
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Set a specific end time for the session timer."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Get current timer info
+        timer_info = await db_manager.get_session_timer_info(user_id)
+        if (
+            not timer_info
+            or not timer_info.get("has_timer")
+            or timer_info.get("timer_expired")
+        ):
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=No active timer found for this session",
+                status_code=303,
+            )
+
+        # Validate timer_end format and time
+        from datetime import datetime
+
+        try:
+            end_time = datetime.fromisoformat(timer_end)
+        except ValueError:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Invalid date/time format",
+                status_code=303,
+            )
+
+        # Don't allow setting timer to past
+        now = datetime.now()
+        if end_time <= now:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Timer end time must be in the future",
+                status_code=303,
+            )
+
+        # Update timer
+        await db_manager.update_session_timer(user_id, end_time.isoformat())
+
+        logger.debug(f"Set session timer end time to {timer_end} for user {user_id}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?success=Session timer updated successfully",
+            status_code=303,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting session timer for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to set session timer",
+            status_code=303,
+        )
+
+
+# JSON API endpoints for timer management (for AJAX)
+
+
+@router.post("/api/sessions/{user_id}/timer/add")
+async def add_session_time_json(
+    user_id: int,
+    minutes: int = Form(...),
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Add time to an active session timer via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        # Get current timer info
+        timer_info = await db_manager.get_session_timer_info(user_id)
+        if (
+            not timer_info
+            or not timer_info.get("has_timer")
+            or timer_info.get("timer_expired")
+        ):
+            return {"success": False, "error": "No active timer found for this session"}
+
+        # Validate minutes
+        if minutes <= 0 or minutes > 1440:  # Max 24 hours at once
+            return {
+                "success": False,
+                "error": "Minutes must be between 1 and 1440 (24 hours)",
+            }
+
+        # Calculate new end time
+        from datetime import datetime, timedelta
+
+        current_end = datetime.fromisoformat(timer_info["timer_end"])
+        new_end = current_end + timedelta(minutes=minutes)
+
+        # Update timer
+        await db_manager.update_session_timer(user_id, new_end.isoformat())
+
+        # Get updated timer info
+        updated_timer_info = await db_manager.get_session_timer_info(user_id)
+
+        logger.debug(f"Added {minutes} minutes to session timer for user {user_id}")
+        return {
+            "success": True,
+            "message": f"Added {minutes} minutes to session timer",
+            "timer_info": updated_timer_info,
+        }
+
+    except Exception as e:
+        logger.error(f"Error adding time to session timer for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to add time to session timer"}
+
+
+@router.post("/api/sessions/{user_id}/timer/subtract")
+async def subtract_session_time_json(
+    user_id: int,
+    minutes: int = Form(...),
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Subtract time from an active session timer via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        # Get current timer info
+        timer_info = await db_manager.get_session_timer_info(user_id)
+        if (
+            not timer_info
+            or not timer_info.get("has_timer")
+            or timer_info.get("timer_expired")
+        ):
+            return {"success": False, "error": "No active timer found for this session"}
+
+        # Validate minutes
+        if minutes <= 0 or minutes > 1440:  # Max 24 hours at once
+            return {
+                "success": False,
+                "error": "Minutes must be between 1 and 1440 (24 hours)",
+            }
+
+        # Calculate new end time
+        from datetime import datetime, timedelta
+
+        current_end = datetime.fromisoformat(timer_info["timer_end"])
+        new_end = current_end - timedelta(minutes=minutes)
+
+        # Don't allow setting timer to past
+        now = datetime.now()
+        if new_end <= now:
+            return {
+                "success": False,
+                "error": "Cannot subtract that much time - timer would expire immediately",
+            }
+
+        # Update timer
+        await db_manager.update_session_timer(user_id, new_end.isoformat())
+
+        # Get updated timer info
+        updated_timer_info = await db_manager.get_session_timer_info(user_id)
+
+        logger.debug(
+            f"Subtracted {minutes} minutes from session timer for user {user_id}"
+        )
+        return {
+            "success": True,
+            "message": f"Subtracted {minutes} minutes from session timer",
+            "timer_info": updated_timer_info,
+        }
+
+    except Exception as e:
+        logger.error(
+            f"Error subtracting time from session timer for user {user_id}: {e}"
+        )
+        return {"success": False, "error": "Failed to subtract time from session timer"}
+
+
+@router.post("/api/sessions/{user_id}/timer/set")
+async def set_session_timer_json(
+    user_id: int,
+    timer_end: str = Form(...),
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Set a specific end time for the session timer via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        # Get current timer info
+        timer_info = await db_manager.get_session_timer_info(user_id)
+        if (
+            not timer_info
+            or not timer_info.get("has_timer")
+            or timer_info.get("timer_expired")
+        ):
+            return {"success": False, "error": "No active timer found for this session"}
+
+        # Validate timer_end format and time
+        from datetime import datetime
+
+        try:
+            end_time = datetime.fromisoformat(timer_end)
+        except ValueError:
+            return {"success": False, "error": "Invalid date/time format"}
+
+        # Don't allow setting timer to past
+        now = datetime.now()
+        if end_time <= now:
+            return {"success": False, "error": "Timer end time must be in the future"}
+
+        # Update timer
+        await db_manager.update_session_timer(user_id, end_time.isoformat())
+
+        # Get updated timer info
+        updated_timer_info = await db_manager.get_session_timer_info(user_id)
+
+        logger.debug(f"Set session timer end time to {timer_end} for user {user_id}")
+        return {
+            "success": True,
+            "message": "Session timer updated successfully",
+            "timer_info": updated_timer_info,
+        }
+
+    except Exception as e:
+        logger.error(f"Error setting session timer for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to set session timer"}

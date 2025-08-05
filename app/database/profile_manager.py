@@ -129,7 +129,6 @@ class ProfileManager(BaseDatabaseManager):
                     (user_id, user_id, first_name, last_name, bio, profile_photo_id),
                 )
                 await db.commit()
-                logger.info(f"Stored original profile for user {user_id}")
                 return True
         except Exception as e:
             logger.error(f"Error storing original profile for user {user_id}: {e}")

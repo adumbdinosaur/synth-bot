@@ -64,7 +64,7 @@ class SessionManager(BaseDatabaseManager):
         try:
             async with self.get_connection() as db:
                 cursor = await db.execute(
-                    """SELECT u.id, u.username, u.email, u.energy, u.max_energy, 
+                    """SELECT u.id, u.username, u.energy, u.max_energy, 
                               u.energy_recharge_rate, u.last_energy_update, u.telegram_connected,
                               ts.session_data, ts.updated_at as session_updated_at
                        FROM users u
@@ -77,10 +77,10 @@ class SessionManager(BaseDatabaseManager):
                 sessions = []
                 for row in rows:
                     # Calculate current energy with recharge
-                    current_energy = row[3] if row[3] is not None else 100
-                    max_energy = row[4] if row[4] is not None else 100
-                    recharge_rate = row[5] if row[5] is not None else 1
-                    last_update = row[6]
+                    current_energy = row[2] if row[2] is not None else 100
+                    max_energy = row[3] if row[3] is not None else 100
+                    recharge_rate = row[4] if row[4] is not None else 1
+                    last_update = row[5]
 
                     if last_update:
                         try:
@@ -100,7 +100,6 @@ class SessionManager(BaseDatabaseManager):
                         {
                             "user_id": row[0],
                             "username": row[1],
-                            "email": row[2],
                             "energy": current_energy,
                             "max_energy": max_energy,
                             "energy_percentage": int(
@@ -110,10 +109,10 @@ class SessionManager(BaseDatabaseManager):
                             else 0,
                             "energy_recharge_rate": recharge_rate,
                             "last_energy_update": last_update,
-                            "telegram_connected": bool(row[7]),
-                            "has_session_data": row[8] is not None,
-                            "session_updated_at": row[9],
-                            "is_connected": bool(row[7]) and row[8] is not None,
+                            "telegram_connected": bool(row[6]),
+                            "has_session_data": row[7] is not None,
+                            "session_updated_at": row[8],
+                            "is_connected": bool(row[6]) and row[7] is not None,
                         }
                     )
 
@@ -125,87 +124,86 @@ class SessionManager(BaseDatabaseManager):
     async def has_active_telegram_session(self, user_id: int) -> bool:
         """Check if a user has an active Telegram session."""
         try:
-            # First check if user is marked as telegram_connected
+            # Check database state first
             async with self.get_connection() as db:
                 cursor = await db.execute(
-                    "SELECT telegram_connected FROM users WHERE id = ?",
+                    """SELECT u.telegram_connected, ts.session_data 
+                       FROM users u 
+                       LEFT JOIN telegram_sessions ts ON u.id = ts.user_id 
+                       WHERE u.id = ?""",
                     (user_id,),
                 )
                 row = await cursor.fetchone()
 
-                logger.info(
-                    f"User {user_id} telegram_connected flag: {row[0] if row else None}"
-                )
-
-                if not row or not row[0]:
-                    logger.info(
-                        f"User {user_id} not marked as telegram_connected, returning False"
-                    )
+                if not row:
+                    logger.info(f"User {user_id} not found in database")
                     return False
 
-            # Also check real-time state from Telegram manager
-            try:
-                from app.telegram_client import get_telegram_manager
+                telegram_connected_flag = row[0]
+                has_session_data = row[1] is not None
 
-                telegram_manager = get_telegram_manager()
+                # If both flag and session data indicate no connection, check real-time state
+                if not telegram_connected_flag and not has_session_data:
+                    # Check real-time state from Telegram manager
+                    try:
+                        from app.telegram_client import get_telegram_manager
 
-                if telegram_manager:
-                    # Check if user has an active client
-                    client = await telegram_manager.get_client(user_id)
-                    logger.info(f"User {user_id} has client: {client is not None}")
-                    if client:
-                        logger.info(
-                            f"User {user_id} client is_connected: {client.is_connected}"
+                        telegram_manager = get_telegram_manager()
+
+                        if telegram_manager:
+                            # Check if user has an active client
+                            client = await telegram_manager.get_client(user_id)
+                            if client:
+                                if client.is_connected:
+                                    # If client is connected but flag is false, update it
+                                    if not telegram_connected_flag:
+                                        await db.execute(
+                                            "UPDATE users SET telegram_connected = TRUE WHERE id = ?",
+                                            (user_id,),
+                                        )
+                                        await db.commit()
+                                    return True
+
+                            # Also check connected users list
+                            connected_users = (
+                                await telegram_manager.get_connected_users()
+                            )
+                            user_is_connected = any(
+                                user["user_id"] == user_id for user in connected_users
+                            )
+                            if user_is_connected:
+                                # If user is in connected list but flag is false, update it
+                                if not telegram_connected_flag:
+                                    await db.execute(
+                                        "UPDATE users SET telegram_connected = TRUE WHERE id = ?",
+                                        (user_id,),
+                                    )
+                                    await db.commit()
+                                return True
+
+                    except Exception as telegram_error:
+                        logger.warning(
+                            f"Could not check Telegram manager state for user {user_id}: {telegram_error}"
                         )
-                    if client and client.is_connected:
-                        return True
 
-                    # Also check connected users list
-                    connected_users = await telegram_manager.get_connected_users()
-                    user_is_connected = any(
-                        user["user_id"] == user_id for user in connected_users
-                    )
-                    logger.info(
-                        f"User {user_id} in connected users list: {user_is_connected}"
-                    )
-                    if user_is_connected:
-                        return True
+            # Final decision based on database state
+            # If user has session data, they should be considered as having an active session
+            if has_session_data:
+                logger.info(f"User {user_id} has session data, considering as active")
+                return True
 
-            except Exception as telegram_error:
-                logger.warning(
-                    f"Could not check Telegram manager state for user {user_id}: {telegram_error}"
+            # If user flag says connected but no session data and no real connection, update flag
+            if telegram_connected_flag and not has_session_data:
+                logger.info(
+                    f"User {user_id} marked as connected but has no session data, updating to disconnected"
                 )
-                # Fall back to database check only
-                pass
-
-            # Fallback: check telegram_sessions table
-            async with self.get_connection() as db:
-                cursor = await db.execute(
-                    "SELECT session_data FROM telegram_sessions WHERE user_id = ?",
+                await db.execute(
+                    "UPDATE users SET telegram_connected = FALSE WHERE id = ?",
                     (user_id,),
                 )
-                session_row = await cursor.fetchone()
-                has_session_data = (
-                    session_row is not None and session_row[0] is not None
-                )
-                logger.info(
-                    f"User {user_id} has session data in database: {has_session_data}"
-                )
+                await db.commit()
 
-                # If the user is marked as connected but has no real connection and no session data,
-                # we should update their status to disconnected
-                if not has_session_data:
-                    logger.info(
-                        f"User {user_id} marked as connected but has no session data, updating to disconnected"
-                    )
-                    await db.execute(
-                        "UPDATE users SET telegram_connected = FALSE WHERE id = ?",
-                        (user_id,),
-                    )
-                    await db.commit()
-                    return False
-
-                return has_session_data
+            return False
 
         except Exception as e:
             logger.error(f"Error checking active session for user {user_id}: {e}")

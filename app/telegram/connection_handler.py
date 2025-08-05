@@ -49,11 +49,7 @@ class ConnectionHandler(BaseHandler):
             profile_initialized = (
                 await self.client_instance.profile_handler.initialize()
             )
-            if profile_initialized:
-                logger.info(
-                    f"🎯 Profile handler initialized for user {self.client_instance.user_id} ({self.client_instance.username})"
-                )
-            else:
+            if not profile_initialized:
                 logger.error(
                     f"❌ Failed to initialize profile handler for user {self.client_instance.user_id}"
                 )
@@ -76,7 +72,7 @@ class ConnectionHandler(BaseHandler):
             self._listener_task = asyncio.create_task(self._run_listener())
             self._is_running = True
             logger.info(
-                f"Started message listener for user {self.client_instance.user_id} ({self.client_instance.username})"
+                f"🎯 Client initialized and message listener started for user {self.client_instance.user_id} ({self.client_instance.username})"
             )
             return True
 
@@ -220,9 +216,6 @@ class ConnectionHandler(BaseHandler):
     async def _run_listener(self):
         """Run the message listener loop."""
         try:
-            logger.info(
-                f"Message listener started for user {self.client_instance.user_id} ({self.client_instance.username})"
-            )
             await self.client_instance.client.run_until_disconnected()
         except asyncio.CancelledError:
             logger.info(

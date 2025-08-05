@@ -18,13 +18,16 @@ async def get_system_stats(current_user: dict = Depends(get_current_user)):
     """Get system statistics for connected users."""
     telegram_manager = get_telegram_manager()
     connected_users = await telegram_manager.get_connected_users()
-    total_clients = await telegram_manager.get_client_count()
+    total_clients = telegram_manager.get_client_count()
 
     return {
         "total_active_clients": total_clients,
         "connected_user_count": len(connected_users),
-        "current_user_connected": current_user["id"] in connected_users,
-        "connected_users": list(connected_users),  # Only return IDs for privacy
+        "current_user_connected": current_user["id"]
+        in {user["user_id"] for user in connected_users},
+        "connected_users": [
+            user["user_id"] for user in connected_users
+        ],  # Only return IDs for privacy
     }
 
 

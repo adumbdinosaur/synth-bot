@@ -265,6 +265,11 @@
         } else if (action.includes('/profile/revert-cost')) {
             // Update profile revert cost display
             updateProfileRevertCostDisplay(responseData.revert_cost);
+        } else if (action.includes('/timer/')) {
+            // Update timer displays
+            if (responseData.timer_info) {
+                updateTimerDisplays(responseData.timer_info);
+            }
         }
     }
 
@@ -518,6 +523,24 @@
         revertCostDisplays.forEach(el => {
             el.textContent = revertCost;
         });
+    }
+
+    function updateTimerDisplays(timerInfo) {
+        // Update timer end time display
+        const timerEndDisplay = document.querySelector('input[name="timer_end"]');
+        if (timerEndDisplay && timerInfo.timer_end) {
+            timerEndDisplay.value = timerInfo.timer_end.substring(0, 16);
+        }
+
+        // Update countdown display if it exists
+        const countdownElement = document.getElementById('countdown-timer');
+        if (countdownElement && timerInfo.remaining_seconds !== undefined) {
+            // The timer countdown script will handle the update automatically
+            // We might need to restart the countdown with new remaining time
+            if (window.updateCountdownWithNewTime) {
+                window.updateCountdownWithNewTime(timerInfo.remaining_seconds);
+            }
+        }
     }
 
     // Custom Redactions Management Functions
