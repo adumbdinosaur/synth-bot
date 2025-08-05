@@ -143,11 +143,10 @@
 </div>
 
 <!-- Timer countdown script -->
-<script>
+<script type="text/javascript">
     document.addEventListener('DOMContentLoaded', function () {
         let remainingSeconds = {{ timer_info.remaining_seconds if timer_info.remaining_seconds is not none else 0 }
     };
-
     let countdownInterval;
 
     function updateTimerDisplay() {
@@ -196,4 +195,5 @@
     startCountdown();
 });
 </script>
+
 {% endif %}
