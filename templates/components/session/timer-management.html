@@ -145,7 +145,8 @@
 <!-- Timer countdown script -->
 <script type="text/javascript">
     document.addEventListener('DOMContentLoaded', function () {
-        let remainingSeconds = {{ timer_info.remaining_seconds if timer_info.remaining_seconds is not none else 0 }
+        let remainingSeconds = {{ timer_info.remaining_seconds | default (0) | int
+    }};
     };
     let countdownInterval;
 

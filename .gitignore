@@ -71,3 +71,4 @@ new_cookies.txt
 *.temp
 temp/
 tmp/
+shell.nix
