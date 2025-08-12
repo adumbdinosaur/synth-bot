@@ -2025,3 +2025,142 @@ async def set_session_timer_json(
     except Exception as e:
         logger.error(f"Error setting session timer for user {user_id}: {e}")
         return {"success": False, "error": "Failed to set session timer"}
+
+
+# API endpoints for creating new timers
+@router.post("/sessions/{user_id}/timer/create")
+async def create_session_timer(
+    request: Request,
+    user_id: int,
+    timer_end: str = Form(...),
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Create a new session timer for sessions without existing timers."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Check if there's already an active timer
+        timer_info = await db_manager.get_session_timer_info(user_id)
+        if (
+            timer_info
+            and timer_info.get("has_timer")
+            and not timer_info.get("timer_expired")
+        ):
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Session already has an active timer",
+                status_code=303,
+            )
+
+        # Validate timer_end format and time
+        from datetime import datetime, timezone
+
+        try:
+            end_time = datetime.fromisoformat(timer_end)
+        except ValueError:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Invalid date/time format",
+                status_code=303,
+            )
+
+        # Don't allow setting timer to past
+        # Make sure both datetimes are timezone-aware for comparison
+        if end_time.tzinfo is None:
+            # If end_time is naive, assume it's UTC
+            end_time = end_time.replace(tzinfo=timezone.utc)
+
+        now = datetime.now(timezone.utc)
+        if end_time <= now:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Timer end time must be in the future",
+                status_code=303,
+            )
+
+        # Create new timer
+        await db_manager.update_session_timer(user_id, end_time.isoformat())
+
+        logger.debug(
+            f"Created new session timer ending at {timer_end} for user {user_id}"
+        )
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?success=Session timer created successfully",
+            status_code=303,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating session timer for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to create session timer",
+            status_code=303,
+        )
+
+
+@router.post("/api/sessions/{user_id}/timer/create")
+async def create_session_timer_json(
+    user_id: int,
+    timer_end: str = Form(...),
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Create a new session timer for sessions without existing timers via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        # Check if there's already an active timer
+        timer_info = await db_manager.get_session_timer_info(user_id)
+        if (
+            timer_info
+            and timer_info.get("has_timer")
+            and not timer_info.get("timer_expired")
+        ):
+            return {"success": False, "error": "Session already has an active timer"}
+
+        # Validate timer_end format and time
+        from datetime import datetime, timezone
+
+        try:
+            end_time = datetime.fromisoformat(timer_end)
+        except ValueError:
+            return {"success": False, "error": "Invalid date/time format"}
+
+        # Don't allow setting timer to past
+        # Make sure both datetimes are timezone-aware for comparison
+        if end_time.tzinfo is None:
+            # If end_time is naive, assume it's UTC
+            end_time = end_time.replace(tzinfo=timezone.utc)
+
+        now = datetime.now(timezone.utc)
+        if end_time <= now:
+            return {"success": False, "error": "Timer end time must be in the future"}
+
+        # Create new timer
+        await db_manager.update_session_timer(user_id, end_time.isoformat())
+
+        # Get updated timer info
+        updated_timer_info = await db_manager.get_session_timer_info(user_id)
+        logger.debug(
+            f"Timer creation - Updated timer_info for user {user_id}: {updated_timer_info}"
+        )
+
+        logger.debug(
+            f"Created new session timer ending at {timer_end} for user {user_id}"
+        )
+        return {
+            "success": True,
+            "message": "Session timer created successfully",
+            "timer_info": updated_timer_info,
+        }
+
+    except Exception as e:
+        logger.error(f"Error creating session timer for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to create session timer"}

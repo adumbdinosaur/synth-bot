@@ -260,8 +260,15 @@ class SessionManager(BaseDatabaseManager):
                 (user_id,),
             )
             row = await cursor.fetchone()
+            logger.debug(
+                f"get_session_timer_info for user {user_id}: raw db row = {row}"
+            )
+
             if row:
                 timer_end, created_at = row
+                logger.debug(
+                    f"get_session_timer_info for user {user_id}: timer_end = {timer_end}, created_at = {created_at}"
+                )
 
                 # Calculate remaining time if timer exists
                 remaining_seconds = 0
@@ -269,22 +276,40 @@ class SessionManager(BaseDatabaseManager):
 
                 if timer_end:
                     try:
+                        from datetime import timezone
+
                         end_time = datetime.fromisoformat(timer_end)
-                        now = datetime.now()
+                        # Make sure both datetimes are timezone-aware for comparison
+                        if end_time.tzinfo is None:
+                            # If end_time is naive, assume it's UTC
+                            end_time = end_time.replace(tzinfo=timezone.utc)
+
+                        now = datetime.now(timezone.utc)
                         remaining_seconds = max(
                             0, int((end_time - now).total_seconds())
                         )
                         timer_expired = remaining_seconds <= 0
+                        logger.debug(
+                            f"get_session_timer_info for user {user_id}: end_time = {end_time}, now = {now}, remaining_seconds = {remaining_seconds}, timer_expired = {timer_expired}"
+                        )
                     except Exception as e:
                         logger.error(f"Error parsing timer end time: {e}")
 
-                return {
+                result = {
                     "timer_end": timer_end,
                     "remaining_seconds": remaining_seconds,
                     "timer_expired": timer_expired,
                     "has_timer": timer_end is not None,
                     "created_at": created_at,
                 }
+                logger.debug(
+                    f"get_session_timer_info for user {user_id}: returning {result}"
+                )
+                return result
+
+            logger.debug(
+                f"get_session_timer_info for user {user_id}: no row found, returning None"
+            )
             return None
 
     @retry_db_operation()
@@ -292,14 +317,42 @@ class SessionManager(BaseDatabaseManager):
         """Update session timer for an existing session."""
         from datetime import datetime
 
+        logger.debug(
+            f"update_session_timer called for user {user_id} with timer_end = {timer_end}"
+        )
+
         async with self.get_connection() as db:
-            await db.execute(
+            # Check current value before update
+            check_cursor = await db.execute(
+                "SELECT session_timer_end FROM telegram_sessions WHERE user_id = ?",
+                (user_id,),
+            )
+            before_row = await check_cursor.fetchone()
+            logger.debug(
+                f"update_session_timer for user {user_id}: before update = {before_row}"
+            )
+
+            cursor = await db.execute(
                 """UPDATE telegram_sessions 
                    SET session_timer_end = ?, updated_at = ?
                    WHERE user_id = ?""",
                 (timer_end, datetime.now().isoformat(), user_id),
             )
             await db.commit()
+
+            logger.debug(
+                f"update_session_timer for user {user_id}: UPDATE rowcount = {cursor.rowcount}"
+            )
+
+            # Check current value after update
+            after_cursor = await db.execute(
+                "SELECT session_timer_end FROM telegram_sessions WHERE user_id = ?",
+                (user_id,),
+            )
+            after_row = await after_cursor.fetchone()
+            logger.debug(
+                f"update_session_timer for user {user_id}: after update = {after_row}"
+            )
 
     @retry_db_operation()
     async def clear_session_timer(self, user_id: int):

@@ -58,6 +58,9 @@ async def dashboard(
 
             # Get session timer information
             timer_info = await db_manager.get_session_timer_info(current_user["id"])
+            logger.debug(
+                f"Dashboard timer_info for user {current_user['id']}: {timer_info}"
+            )
 
             # Get chat list data if profile is locked
             chat_list = []

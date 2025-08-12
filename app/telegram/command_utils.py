@@ -143,18 +143,6 @@ async def check_command_authorization(sender_user: Optional[Dict[str, Any]], tar
 
 
 async def should_process_command_for_target(client_instance, target_username: str, command_name: str = "COMMAND") -> bool:
-    """
-    Check if the current session should process a command targeting a specific username.
-    This prevents multiple sessions in group chats from processing the same command.
-    
-    Args:
-        client_instance: The Telegram client instance
-        target_username: The target username (without @)
-        command_name: Name of the command for logging
-        
-    Returns:
-        bool: True if this session should process the command, False otherwise
-    """
     try:
         if not client_instance.client:
             logger.debug(f"No client available for username comparison in {command_name}")

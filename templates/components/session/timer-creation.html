@@ -1,0 +1,209 @@
+<!-- Timer Creation Section Component -->
+{% if not timer_info or not timer_info.has_timer or timer_info.timer_expired %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card collapsible-section">
+            <div class="card-header" data-bs-toggle="collapse" data-bs-target="#timerCreationCollapse"
+                aria-expanded="false" aria-controls="timerCreationCollapse">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4><i class="fas fa-clock"></i> Start Session Timer</h4>
+                        <p class="text-muted mb-0">Create a new timer for this session</p>
+                    </div>
+                    <i class="fas fa-chevron-down collapse-toggle collapsed"></i>
+                </div>
+            </div>
+            <div class="collapse" id="timerCreationCollapse">
+                <div class="card-body">
+                    <!-- Timer Creation Form -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card bulk-actions-card">
+                                <div class="card-body">
+                                    <h5 class="card-title text-center mb-4">
+                                        <i class="fas fa-plus-circle text-primary"></i>
+                                        Start New Session Timer
+                                    </h5>
+                                    <form method="POST" action="/public/sessions/{{ session.user_id }}/timer/create">
+                                        <div class="row">
+                                            <div class="col-md-8">
+                                                <div class="mb-3">
+                                                    <label for="create_timer_end" class="form-label">Timer End Date &
+                                                        Time</label>
+                                                    <input type="datetime-local" class="form-control"
+                                                        id="create_timer_end" name="timer_end" required>
+                                                    <div class="form-text">
+                                                        Set when the session should allow disconnection.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4 d-flex align-items-end">
+                                                <button type="submit" class="btn btn-primary w-100 mb-3">
+                                                    <i class="fas fa-clock"></i> Start Timer
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Timer Presets -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-12">
+                            <h6 class="text-muted mb-3">
+                                <i class="fas fa-bolt"></i> Quick Timer Presets
+                            </h6>
+                        </div>
+
+                        <!-- 30 minutes -->
+                        <div class="col-md-3 col-sm-6">
+                            <div class="card border-primary">
+                                <div class="card-body text-center p-3">
+                                    <h6 class="card-title mb-2">
+                                        <i class="fas fa-clock text-primary"></i>
+                                        30 Minutes
+                                    </h6>
+                                    <button type="button" class="btn btn-outline-primary btn-sm w-100"
+                                        onclick="setQuickTimer(30)">
+                                        <i class="fas fa-plus"></i> Set 30min
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 1 hour -->
+                        <div class="col-md-3 col-sm-6">
+                            <div class="card border-success">
+                                <div class="card-body text-center p-3">
+                                    <h6 class="card-title mb-2">
+                                        <i class="fas fa-clock text-success"></i>
+                                        1 Hour
+                                    </h6>
+                                    <button type="button" class="btn btn-outline-success btn-sm w-100"
+                                        onclick="setQuickTimer(60)">
+                                        <i class="fas fa-plus"></i> Set 1hr
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2 hours -->
+                        <div class="col-md-3 col-sm-6">
+                            <div class="card border-warning">
+                                <div class="card-body text-center p-3">
+                                    <h6 class="card-title mb-2">
+                                        <i class="fas fa-clock text-warning"></i>
+                                        2 Hours
+                                    </h6>
+                                    <button type="button" class="btn btn-outline-warning btn-sm w-100"
+                                        onclick="setQuickTimer(120)">
+                                        <i class="fas fa-plus"></i> Set 2hrs
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4 hours -->
+                        <div class="col-md-3 col-sm-6">
+                            <div class="card border-info">
+                                <div class="card-body text-center p-3">
+                                    <h6 class="card-title mb-2">
+                                        <i class="fas fa-clock text-info"></i>
+                                        4 Hours
+                                    </h6>
+                                    <button type="button" class="btn btn-outline-info btn-sm w-100"
+                                        onclick="setQuickTimer(240)">
+                                        <i class="fas fa-plus"></i> Set 4hrs
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Timer Creation Guide -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <h6><i class="fas fa-info-circle"></i> Session Timer Guide</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <ul class="list-unstyled mb-0">
+                                            <li><i class="fas fa-clock text-primary"></i> <strong>Timer
+                                                    Purpose:</strong>
+                                                Controls when users can disconnect from their session</li>
+                                            <li><i class="fas fa-shield-alt text-success"></i> <strong>Session
+                                                    Control:</strong>
+                                                Prevents premature disconnection</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <ul class="list-unstyled mb-0">
+                                            <li><i class="fas fa-calendar-plus text-warning"></i>
+                                                <strong>Flexible:</strong>
+                                                Can be modified or extended anytime</li>
+                                            <li><i class="fas fa-user-lock text-info"></i> <strong>User
+                                                    Friendly:</strong>
+                                                Clear countdown display for users</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+    function setQuickTimer(minutes) {
+        const now = new Date();
+        const endTime = new Date(now.getTime() + (minutes * 60 * 1000));
+
+        // Format datetime-local input value (YYYY-MM-DDTHH:MM)
+        const year = endTime.getFullYear();
+        const month = String(endTime.getMonth() + 1).padStart(2, '0');
+        const day = String(endTime.getDate()).padStart(2, '0');
+        const hours = String(endTime.getHours()).padStart(2, '0');
+        const mins = String(endTime.getMinutes()).padStart(2, '0');
+
+        const formattedDateTime = `${year}-${month}-${day}T${hours}:${mins}`;
+
+        // Set the datetime input value
+        const datetimeInput = document.getElementById('create_timer_end');
+        if (datetimeInput) {
+            datetimeInput.value = formattedDateTime;
+
+            // Show success feedback
+            showAlert(`Timer preset to ${minutes} minutes from now`, 'info');
+
+            // Optionally expand the form section if it's collapsed
+            const collapse = document.getElementById('timerCreationCollapse');
+            if (collapse && !collapse.classList.contains('show')) {
+                const bsCollapse = new bootstrap.Collapse(collapse);
+                bsCollapse.show();
+            }
+        }
+    }
+
+    // Set minimum datetime to current time when page loads
+    document.addEventListener('DOMContentLoaded', function () {
+        const datetimeInput = document.getElementById('create_timer_end');
+        if (datetimeInput) {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const mins = String(now.getMinutes()).padStart(2, '0');
+
+            const minDateTime = `${year}-${month}-${day}T${hours}:${mins}`;
+            datetimeInput.min = minDateTime;
+        }
+    });
+</script>
+
+{% endif %}
