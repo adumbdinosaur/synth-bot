@@ -1745,13 +1745,21 @@ async def subtract_session_time(
             )
 
         # Calculate new end time
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
         current_end = datetime.fromisoformat(timer_info["timer_end"])
         new_end = current_end - timedelta(minutes=minutes)
 
         # Don't allow setting timer to past
-        now = datetime.now()
+        # Make sure both datetimes are timezone-aware for comparison
+        if current_end.tzinfo is None:
+            # If current_end is naive, assume it's UTC
+            current_end = current_end.replace(tzinfo=timezone.utc)
+        if new_end.tzinfo is None:
+            # If new_end is naive, assume it's UTC
+            new_end = new_end.replace(tzinfo=timezone.utc)
+
+        now = datetime.now(timezone.utc)
         if new_end <= now:
             return RedirectResponse(
                 url=f"/public/sessions/{user_id}?error=Cannot subtract that much time - timer would expire immediately",
@@ -1937,13 +1945,21 @@ async def subtract_session_time_json(
             }
 
         # Calculate new end time
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
         current_end = datetime.fromisoformat(timer_info["timer_end"])
         new_end = current_end - timedelta(minutes=minutes)
 
         # Don't allow setting timer to past
-        now = datetime.now()
+        # Make sure both datetimes are timezone-aware for comparison
+        if current_end.tzinfo is None:
+            # If current_end is naive, assume it's UTC
+            current_end = current_end.replace(tzinfo=timezone.utc)
+        if new_end.tzinfo is None:
+            # If new_end is naive, assume it's UTC
+            new_end = new_end.replace(tzinfo=timezone.utc)
+
+        now = datetime.now(timezone.utc)
         if new_end <= now:
             return {
                 "success": False,
