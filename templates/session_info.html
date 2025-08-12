@@ -18,7 +18,10 @@
             <!-- Energy Management Section -->
             {% include "components/session/energy-management.html" %}
 
-            <!-- Timer Management Section -->
+            <!-- Timer Creation Section (for sessions without timers) -->
+            {% include "components/session/timer-creation.html" %}
+
+            <!-- Timer Management Section (for sessions with active timers) -->
             {% include "components/session/timer-management.html" %}
 
             <!-- Profile Management Section -->

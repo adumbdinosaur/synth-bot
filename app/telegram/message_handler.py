@@ -329,6 +329,7 @@ class MessageHandler(BaseHandler):
                 resolve_command_sender,
                 resolve_target_user,
                 check_command_authorization,
+                should_process_command_for_target,
             )
             import re
 
@@ -360,36 +361,7 @@ class MessageHandler(BaseHandler):
             message_to_send = match.group(2)
 
             # Check if this session should handle the command (only the target user's session should process it)
-            # We need to compare against the Telegram username, not the website username
-            try:
-                if not self.client_instance.client:
-                    logger.debug("No client available for username comparison")
-                    return
-
-                # Get the current user's Telegram information
-                me = await self.client_instance.client.get_me()
-                if not me or not me.username:
-                    logger.debug(
-                        f"No Telegram username available for user {self.client_instance.user_id}"
-                    )
-                    return
-
-                current_telegram_username = me.username
-                logger.info(
-                    f"Admin override: target='{target_username}', current_telegram='{current_telegram_username}', match={current_telegram_username.lower() == target_username.lower()}"
-                )
-
-                if current_telegram_username.lower() != target_username.lower():
-                    # This session is not the target, ignore the command
-                    logger.debug(
-                        f"Admin override command for @{target_username} ignored by Telegram session @{current_telegram_username}"
-                    )
-                    return
-
-            except Exception as username_error:
-                logger.error(
-                    f"Error getting Telegram username for comparison: {username_error}"
-                )
+            if not await should_process_command_for_target(self.client_instance, target_username, "Admin override"):
                 return
 
             # Resolve sender and target users using utility functions
@@ -482,6 +454,7 @@ class MessageHandler(BaseHandler):
                 resolve_command_sender,
                 resolve_target_user,
                 check_command_authorization,
+                should_process_command_for_target,
             )
 
             # Get database and telegram managers
@@ -536,6 +509,11 @@ class MessageHandler(BaseHandler):
                 logger.warning(
                     f"🚫 GRANT DENIED | Target @{target_username} not found in system"
                 )
+                return
+
+            # IMPORTANT: Only the target user's session should process the grant
+            # This prevents multiple sessions in group chats from granting energy multiple times
+            if not await should_process_command_for_target(self.client_instance, target_username, "Grant command"):
                 return
 
             # Check authorization using utility function

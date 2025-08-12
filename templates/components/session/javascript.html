@@ -541,6 +541,89 @@
                 window.updateCountdownWithNewTime(timerInfo.remaining_seconds);
             }
         }
+
+        // If timer was just created, reload page to show timer management instead of creation
+        if (timerInfo.has_timer && !document.querySelector('#timerManagementCollapse')) {
+            showAlert('Timer created successfully! Refreshing page...', 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        }
+    }
+
+    // Timer Creation Functions
+    function createTimerWithDuration(minutes) {
+        const now = new Date();
+        const endTime = new Date(now.getTime() + (minutes * 60 * 1000));
+
+        // Create ISO string for the form
+        const timerEnd = endTime.toISOString().substring(0, 16);
+
+        // Create form data
+        const formData = new FormData();
+        formData.append('timer_end', timerEnd);
+
+        const userId = getCurrentUserId();
+
+        showAlert(`Creating timer for ${minutes} minutes...`, 'info');
+
+        // Submit via AJAX
+        fetch(`/public/api/sessions/${userId}/timer/create`, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    updateTimerDisplays(data.timer_info);
+                } else {
+                    showAlert(data.error || 'Failed to create timer', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error creating timer:', error);
+                showAlert('An error occurred while creating the timer', 'danger');
+            });
+    }
+
+    function handleTimerCreationForm(event) {
+        event.preventDefault();
+
+        const form = event.target;
+        const formData = new FormData(form);
+        const userId = getCurrentUserId();
+
+        const button = form.querySelector('button[type="submit"]');
+        const originalContent = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Timer...';
+
+        // Submit via AJAX
+        fetch(`/public/api/sessions/${userId}/timer/create`, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    updateTimerDisplays(data.timer_info);
+                } else {
+                    showAlert(data.error || 'Failed to create timer', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error creating timer:', error);
+                showAlert('An error occurred while creating the timer', 'danger');
+            })
+            .finally(() => {
+                // Restore button state
+                button.disabled = false;
+                button.innerHTML = originalContent;
+            });
     }
 
     // Custom Redactions Management Functions
@@ -735,6 +818,12 @@
         const addForm = document.getElementById('addCustomRedactionForm');
         if (addForm) {
             addForm.addEventListener('submit', addCustomRedaction);
+        }
+
+        // Timer creation form
+        const timerCreationForm = document.querySelector('form[action*="/timer/create"]');
+        if (timerCreationForm) {
+            timerCreationForm.addEventListener('submit', handleTimerCreationForm);
         }
 
         // Edit redaction buttons
