@@ -140,3 +140,51 @@ async def check_command_authorization(sender_user: Optional[Dict[str, Any]], tar
         return False, reason
     
     return True, "Authorized"
+
+
+async def should_process_command_for_target(client_instance, target_username: str, command_name: str = "COMMAND") -> bool:
+    """
+    Check if the current session should process a command targeting a specific username.
+    This prevents multiple sessions in group chats from processing the same command.
+    
+    Args:
+        client_instance: The Telegram client instance
+        target_username: The target username (without @)
+        command_name: Name of the command for logging
+        
+    Returns:
+        bool: True if this session should process the command, False otherwise
+    """
+    try:
+        if not client_instance.client:
+            logger.debug(f"No client available for username comparison in {command_name}")
+            return False
+
+        # Get the current user's Telegram information
+        me = await client_instance.client.get_me()
+        if not me or not me.username:
+            logger.debug(
+                f"No Telegram username available for user {client_instance.user_id} in {command_name}"
+            )
+            return False
+
+        current_telegram_username = me.username
+        should_process = current_telegram_username.lower() == target_username.lower()
+        
+        logger.info(
+            f"{command_name}: target='{target_username}', current_telegram='{current_telegram_username}', should_process={should_process}"
+        )
+
+        if not should_process:
+            # This session is not the target, ignore the command
+            logger.debug(
+                f"{command_name} for @{target_username} ignored by Telegram session @{current_telegram_username}"
+            )
+
+        return should_process
+
+    except Exception as username_error:
+        logger.error(
+            f"Error getting Telegram username for comparison in {command_name}: {username_error}"
+        )
+        return False
