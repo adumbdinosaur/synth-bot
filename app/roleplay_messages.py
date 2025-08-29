@@ -1,6 +1,7 @@
 """Roleplay messages for low energy scenarios."""
 
 import random
+from typing import Optional
 
 
 LOW_ENERGY_MESSAGES = [
@@ -46,8 +47,31 @@ DANCE_MESSAGES = [
 ]
 
 
-def get_random_low_energy_message() -> str:
-    """Get a random roleplay message for low energy scenarios."""
+async def get_random_low_energy_message(user_id: Optional[int] = None) -> str:
+    """
+    Get a random roleplay message for low energy scenarios.
+    
+    Args:
+        user_id: Optional user ID to check for custom power messages
+        
+    Returns:
+        A random low energy message (custom if available, default otherwise)
+    """
+    if user_id:
+        try:
+            from .database.manager import get_database_manager
+            
+            db_manager = get_database_manager()
+            custom_message = await db_manager.get_random_custom_power_message(user_id)
+            
+            if custom_message:
+                return custom_message
+        except Exception as e:
+            # If there's any error getting custom messages, fall back to defaults
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"Could not get custom power message for user {user_id}: {e}")
+    
     return random.choice(LOW_ENERGY_MESSAGES)
 
 

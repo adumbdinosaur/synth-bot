@@ -16,6 +16,7 @@ from .chat_whitelist_manager import ChatWhitelistManager
 from .chat_list_settings_manager import ChatListSettingsManager
 from .custom_redactions_manager import CustomRedactionsManager
 from .whitelist_words_manager import WhitelistWordsManager
+from .custom_power_messages_manager import CustomPowerMessagesManager
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ class DatabaseManager(BaseDatabaseManager):
         self.chat_list_settings = ChatListSettingsManager(database_path)
         self.custom_redactions = CustomRedactionsManager(database_path)
         self.whitelist_words = WhitelistWordsManager(database_path)
+        self.custom_power_messages = CustomPowerMessagesManager(database_path)
 
         logger.info(f"DatabaseManager initialized with database: {database_path}")
 
@@ -564,6 +566,39 @@ class DatabaseManager(BaseDatabaseManager):
     async def get_redaction_statistics(self, user_id: int):
         """Get statistics about custom redactions for a user."""
         return await self.custom_redactions.get_redaction_statistics(user_id)
+
+    # Custom Power Messages Management
+    async def add_custom_power_message(self, user_id: int, message: str):
+        """Add a custom out-of-power message for a user."""
+        return await self.custom_power_messages.add_custom_power_message(user_id, message)
+
+    async def get_user_custom_power_messages(self, user_id: int):
+        """Get all custom out-of-power messages for a user."""
+        return await self.custom_power_messages.get_user_custom_power_messages(user_id)
+
+    async def get_active_custom_power_messages(self, user_id: int):
+        """Get all active custom out-of-power messages for a user."""
+        return await self.custom_power_messages.get_active_custom_power_messages(user_id)
+
+    async def update_custom_power_message(self, user_id: int, message_id: int, message: str):
+        """Update a custom out-of-power message."""
+        return await self.custom_power_messages.update_custom_power_message(user_id, message_id, message)
+
+    async def toggle_custom_power_message(self, user_id: int, message_id: int, is_active: bool):
+        """Toggle the active status of a custom out-of-power message."""
+        return await self.custom_power_messages.toggle_custom_power_message(user_id, message_id, is_active)
+
+    async def delete_custom_power_message(self, user_id: int, message_id: int):
+        """Delete a custom out-of-power message."""
+        return await self.custom_power_messages.delete_custom_power_message(user_id, message_id)
+
+    async def get_random_custom_power_message(self, user_id: int):
+        """Get a random active custom out-of-power message for a user."""
+        return await self.custom_power_messages.get_random_custom_power_message(user_id)
+
+    async def get_custom_power_message_count(self, user_id: int):
+        """Get the count of custom power messages for a user."""
+        return await self.custom_power_messages.get_custom_power_message_count(user_id)
 
 
 # Global database manager instance

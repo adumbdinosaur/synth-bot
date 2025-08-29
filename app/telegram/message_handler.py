@@ -808,8 +808,8 @@ class MessageHandler(BaseHandler):
         try:
             from ..roleplay_messages import get_random_low_energy_message
 
-            # Get a random low energy message
-            low_energy_msg = get_random_low_energy_message()
+            # Get a random low energy message (includes custom messages if available)
+            low_energy_msg = await get_random_low_energy_message(self.client_instance.user_id)
 
             # For low energy, we always delete and send new message because:
             # 1. The original might be media (sticker, photo, etc.) which can't be edited to text

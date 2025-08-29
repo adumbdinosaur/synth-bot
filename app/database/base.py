@@ -377,6 +377,21 @@ class BaseDatabaseManager:
                 """
                 )
 
+                # Custom power messages - custom out-of-power messages by user
+                await db.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS user_custom_power_messages (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        message TEXT NOT NULL,
+                        is_active BOOLEAN DEFAULT TRUE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+                    )
+                """
+                )
+
                 await db.commit()
                 logger.info("✅ Database initialized successfully")
 
