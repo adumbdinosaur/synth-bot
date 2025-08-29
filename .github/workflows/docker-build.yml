@@ -4,11 +4,6 @@ on:
   push:
     branches:
       - main
-      - develop
-      - updates2
-  pull_request:
-    branches:
-      - main
 
 env:
   REGISTRY: registry.rptr.dev

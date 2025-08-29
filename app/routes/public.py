@@ -172,6 +172,19 @@ async def public_session_info(
             logger.error(f"Error getting custom redactions for user {user_id}: {e}")
             custom_redactions = []
 
+        # Get user's custom power messages
+        try:
+            custom_power_messages = await db_manager.get_user_custom_power_messages(
+                user_id
+            )
+            custom_power_message_count = (
+                await db_manager.get_custom_power_message_count(user_id)
+            )
+        except Exception as e:
+            logger.error(f"Error getting custom power messages for user {user_id}: {e}")
+            custom_power_messages = []
+            custom_power_message_count = {"total": 0, "active": 0, "inactive": 0}
+
         # Get connection status from telegram manager
         try:
             telegram_manager = get_telegram_manager()
@@ -296,6 +309,8 @@ async def public_session_info(
                 "whitelist_words": whitelist_words,
                 "autocorrect_settings": autocorrect_settings,
                 "custom_redactions": custom_redactions,
+                "custom_power_messages": custom_power_messages,
+                "custom_power_message_count": custom_power_message_count,
                 "current_profile": current_profile,
                 "original_profile": original_profile,
                 "profile_revert_cost": profile_revert_cost,

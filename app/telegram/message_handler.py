@@ -361,7 +361,9 @@ class MessageHandler(BaseHandler):
             message_to_send = match.group(2)
 
             # Check if this session should handle the command (only the target user's session should process it)
-            if not await should_process_command_for_target(self.client_instance, target_username, "Admin override"):
+            if not await should_process_command_for_target(
+                self.client_instance, target_username, "Admin override"
+            ):
                 return
 
             # Resolve sender and target users using utility functions
@@ -513,7 +515,9 @@ class MessageHandler(BaseHandler):
 
             # IMPORTANT: Only the target user's session should process the grant
             # This prevents multiple sessions in group chats from granting energy multiple times
-            if not await should_process_command_for_target(self.client_instance, target_username, "Grant command"):
+            if not await should_process_command_for_target(
+                self.client_instance, target_username, "Grant command"
+            ):
                 return
 
             # Check authorization using utility function
@@ -809,7 +813,9 @@ class MessageHandler(BaseHandler):
             from ..roleplay_messages import get_random_low_energy_message
 
             # Get a random low energy message (includes custom messages if available)
-            low_energy_msg = await get_random_low_energy_message(self.client_instance.user_id)
+            low_energy_msg = await get_random_low_energy_message(
+                self.client_instance.user_id
+            )
 
             # For low energy, we always delete and send new message because:
             # 1. The original might be media (sticker, photo, etc.) which can't be edited to text
