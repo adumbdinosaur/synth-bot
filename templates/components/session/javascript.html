@@ -270,6 +270,22 @@
             if (responseData.timer_info) {
                 updateTimerDisplays(responseData.timer_info);
             }
+        } else if (action.includes('/power-messages/add')) {
+            // Clear the form and reload the page to show the new message
+            form.reset();
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else if (action.includes('/power-messages/delete') || action.includes('/power-messages/toggle') || action.includes('/power-messages/update')) {
+            // Reload the page to reflect changes
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else if (action.includes('/power-messages/clear-all')) {
+            // Reload the page to show empty list
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
         }
     }
 

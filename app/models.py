@@ -117,3 +117,28 @@ class ChatListSettings(ChatListSettingsBase):
 
     class Config:
         from_attributes = True
+
+
+# Custom Power Messages Models
+class CustomPowerMessageBase(BaseModel):
+    message: str
+
+
+class CustomPowerMessageCreate(CustomPowerMessageBase):
+    pass
+
+
+class CustomPowerMessageUpdate(BaseModel):
+    message: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class CustomPowerMessage(CustomPowerMessageBase):
+    id: int
+    user_id: int
+    is_active: bool = True
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

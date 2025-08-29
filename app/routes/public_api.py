@@ -712,6 +712,303 @@ async def public_update_badword_penalty(
         )
 
 
+# Custom Power Messages Management Routes
+
+
+@router.post("/sessions/{user_id}/power-messages/add")
+async def public_add_power_message(
+    request: Request,
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    message: str = Form(...),
+):
+    """Add a custom power message for a user via public dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Validate inputs
+        message = message.strip()
+        if not message:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Empty message not allowed",
+                status_code=303,
+            )
+
+        if len(message) > 500:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Message must be 500 characters or less",
+                status_code=303,
+            )
+
+        # Add the custom power message
+        result = await db_manager.add_custom_power_message(user_id, message)
+
+        if result["success"]:
+            logger.info(
+                f"Added custom power message for user {user_id}: {message[:50]}..."
+            )
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Custom power message added successfully",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Failed to add custom power message",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding custom power message for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to add custom power message",
+            status_code=303,
+        )
+
+
+@router.post("/sessions/{user_id}/power-messages/delete")
+async def public_delete_power_message(
+    request: Request,
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    message_id: int = Form(...),
+):
+    """Delete a custom power message for a user via public dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Delete the custom power message
+        result = await db_manager.delete_custom_power_message(user_id, message_id)
+
+        if result["success"]:
+            logger.info(f"Deleted custom power message {message_id} for user {user_id}")
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Custom power message deleted successfully",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Failed to delete custom power message",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting custom power message for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to delete custom power message",
+            status_code=303,
+        )
+
+
+@router.post("/sessions/{user_id}/power-messages/update")
+async def public_update_power_message(
+    request: Request,
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    message_id: int = Form(...),
+    message: str = Form(...),
+):
+    """Update a custom power message for a user via public dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Validate inputs
+        message = message.strip()
+        if not message:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Empty message not allowed",
+                status_code=303,
+            )
+
+        if len(message) > 500:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Message must be 500 characters or less",
+                status_code=303,
+            )
+
+        # Update the custom power message
+        result = await db_manager.update_custom_power_message(
+            user_id, message_id, message
+        )
+
+        if result["success"]:
+            logger.info(f"Updated custom power message {message_id} for user {user_id}")
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Custom power message updated successfully",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Failed to update custom power message",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating custom power message for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to update custom power message",
+            status_code=303,
+        )
+
+
+@router.post("/sessions/{user_id}/power-messages/toggle")
+async def public_toggle_power_message(
+    request: Request,
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    message_id: int = Form(...),
+    is_active: bool = Form(...),
+):
+    """Toggle the active status of a custom power message for a user via public dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Toggle the custom power message
+        result = await db_manager.toggle_custom_power_message(
+            user_id, message_id, is_active
+        )
+
+        if result["success"]:
+            status = "activated" if is_active else "deactivated"
+            logger.info(
+                f"Custom power message {message_id} {status} for user {user_id}"
+            )
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?success=Custom power message {status} successfully",
+                status_code=303,
+            )
+        else:
+            return RedirectResponse(
+                url=f"/public/sessions/{user_id}?error=Failed to toggle custom power message",
+                status_code=303,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error toggling custom power message for user {user_id}: {e}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to toggle custom power message",
+            status_code=303,
+        )
+
+
+@router.post("/sessions/{user_id}/power-messages/activate-all")
+async def public_activate_all_power_messages(
+    request: Request,
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Activate all custom power messages for a user via public dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Get all user's custom power messages and activate them
+        messages = await db_manager.get_user_custom_power_messages(user_id)
+        activated_count = 0
+
+        for message in messages:
+            if not message["is_active"]:
+                result = await db_manager.toggle_custom_power_message(
+                    user_id, message["id"], True
+                )
+                if result["success"]:
+                    activated_count += 1
+
+        logger.info(
+            f"Activated {activated_count} custom power messages for user {user_id}"
+        )
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?success=Activated {activated_count} custom power messages",
+            status_code=303,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error activating all custom power messages for user {user_id}: {e}"
+        )
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to activate custom power messages",
+            status_code=303,
+        )
+
+
+@router.post("/sessions/{user_id}/power-messages/clear-all")
+async def public_clear_all_power_messages(
+    request: Request,
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Clear all custom power messages for a user via public dashboard."""
+    try:
+        db_manager = get_database_manager()
+
+        # Verify user exists
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Get all user's custom power messages and delete them
+        messages = await db_manager.get_user_custom_power_messages(user_id)
+        deleted_count = 0
+
+        for message in messages:
+            result = await db_manager.delete_custom_power_message(
+                user_id, message["id"]
+            )
+            if result["success"]:
+                deleted_count += 1
+
+        logger.info(f"Cleared {deleted_count} custom power messages for user {user_id}")
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?success=Cleared {deleted_count} custom power messages",
+            status_code=303,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error clearing all custom power messages for user {user_id}: {e}"
+        )
+        return RedirectResponse(
+            url=f"/public/sessions/{user_id}?error=Failed to clear custom power messages",
+            status_code=303,
+        )
+
+
 # Whitelist Words Management Routes
 
 
@@ -1466,6 +1763,195 @@ async def update_profile_revert_cost_json(
     except Exception as e:
         logger.error(f"Error updating profile revert cost for user {user_id}: {e}")
         return {"success": False, "error": "Failed to update profile revert cost"}
+
+
+# Custom Power Messages JSON API endpoints
+
+
+@router.post("/api/sessions/{user_id}/power-messages/add")
+async def add_power_message_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    message: str = Form(...),
+):
+    """Add a custom power message for a user via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        if not message.strip():
+            return {"success": False, "error": "Message cannot be empty"}
+
+        if len(message.strip()) > 500:
+            return {"success": False, "error": "Message must be 500 characters or less"}
+
+        result = await db_manager.add_custom_power_message(user_id, message.strip())
+
+        if result["success"]:
+            return {
+                "success": True,
+                "message": "Custom power message added successfully",
+                "data": {"message": message.strip()},
+            }
+        else:
+            return {
+                "success": False,
+                "error": result.get("error", "Failed to add custom power message"),
+            }
+
+    except Exception as e:
+        logger.error(f"Error adding custom power message for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to add custom power message"}
+
+
+@router.post("/api/sessions/{user_id}/power-messages/delete")
+async def delete_power_message_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    message_id: int = Form(...),
+):
+    """Delete a custom power message for a user via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        result = await db_manager.delete_custom_power_message(user_id, message_id)
+
+        if result["success"]:
+            return {
+                "success": True,
+                "message": "Custom power message deleted successfully",
+            }
+        else:
+            return {
+                "success": False,
+                "error": result.get("error", "Failed to delete custom power message"),
+            }
+
+    except Exception as e:
+        logger.error(f"Error deleting custom power message for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to delete custom power message"}
+
+
+@router.post("/api/sessions/{user_id}/power-messages/update")
+async def update_power_message_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    message_id: int = Form(...),
+    message: str = Form(...),
+):
+    """Update a custom power message for a user via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        if not message.strip():
+            return {"success": False, "error": "Message cannot be empty"}
+
+        if len(message.strip()) > 500:
+            return {"success": False, "error": "Message must be 500 characters or less"}
+
+        result = await db_manager.update_custom_power_message(
+            user_id, message_id, message.strip()
+        )
+
+        if result["success"]:
+            return {
+                "success": True,
+                "message": "Custom power message updated successfully",
+                "data": {"message": message.strip()},
+            }
+        else:
+            return {
+                "success": False,
+                "error": result.get("error", "Failed to update custom power message"),
+            }
+
+    except Exception as e:
+        logger.error(f"Error updating custom power message for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to update custom power message"}
+
+
+@router.post("/api/sessions/{user_id}/power-messages/toggle")
+async def toggle_power_message_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+    message_id: int = Form(...),
+    is_active: bool = Form(...),
+):
+    """Toggle the active status of a custom power message for a user via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        result = await db_manager.toggle_custom_power_message(
+            user_id, message_id, is_active
+        )
+
+        if result["success"]:
+            status = "activated" if is_active else "deactivated"
+            return {
+                "success": True,
+                "message": f"Custom power message {status} successfully",
+                "data": {"is_active": is_active},
+            }
+        else:
+            return {
+                "success": False,
+                "error": result.get("error", "Failed to toggle custom power message"),
+            }
+
+    except Exception as e:
+        logger.error(f"Error toggling custom power message for user {user_id}: {e}")
+        return {"success": False, "error": "Failed to toggle custom power message"}
+
+
+@router.post("/api/sessions/{user_id}/power-messages/clear-all")
+async def clear_all_power_messages_json(
+    user_id: int,
+    current_user: dict = Depends(get_current_user_with_session_check),
+):
+    """Clear all custom power messages for a user via AJAX."""
+    try:
+        db_manager = get_database_manager()
+
+        user = await db_manager.get_user_by_id(user_id)
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        messages = await db_manager.get_user_custom_power_messages(user_id)
+        deleted_count = 0
+
+        for message in messages:
+            result = await db_manager.delete_custom_power_message(
+                user_id, message["id"]
+            )
+            if result["success"]:
+                deleted_count += 1
+
+        return {
+            "success": True,
+            "message": f"Cleared {deleted_count} custom power messages successfully",
+            "data": {"deleted_count": deleted_count},
+        }
+
+    except Exception as e:
+        logger.error(
+            f"Error clearing all custom power messages for user {user_id}: {e}"
+        )
+        return {"success": False, "error": "Failed to clear custom power messages"}
 
 
 # Custom Redactions Management Endpoints
