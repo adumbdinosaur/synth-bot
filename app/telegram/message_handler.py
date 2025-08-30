@@ -53,6 +53,10 @@ class MessageHandler(BaseHandler):
             # Skip processing if this is a low energy replacement message
             if self._low_energy_replacement_in_progress:
                 self._low_energy_replacement_in_progress = False
+                logger.debug(
+                    f"🔄 BYPASSING LOW ENERGY REPLACEMENT | User: {self.client_instance.username} "
+                    f"(ID: {self.client_instance.user_id}) | Skipping processing of low energy replacement message"
+                )
                 return
 
             from ..database import get_database_manager
