@@ -18,6 +18,7 @@ class MessageHandler(BaseHandler):
     def __init__(self, client_instance):
         super().__init__(client_instance)
         self._message_handler_registered = False
+        self._low_energy_replacement_in_progress = False
 
     async def register_handlers(self):
         """Register message event handlers."""
@@ -49,6 +50,11 @@ class MessageHandler(BaseHandler):
     async def _handle_outgoing_message(self, event):
         """Handle outgoing message event."""
         try:
+            # Skip processing if this is a low energy replacement message
+            if self._low_energy_replacement_in_progress:
+                self._low_energy_replacement_in_progress = False
+                return
+
             from ..database import get_database_manager
 
             db_manager = get_database_manager()
@@ -827,6 +833,10 @@ class MessageHandler(BaseHandler):
                 await self.client_instance.client.delete_messages(
                     chat_entity, event.message.id
                 )
+
+                # Set flag to prevent infinite loop - the next outgoing message will be skipped
+                self._low_energy_replacement_in_progress = True
+
                 await self.client_instance.client.send_message(
                     chat_entity, f"*{low_energy_msg}*"
                 )
@@ -836,6 +846,8 @@ class MessageHandler(BaseHandler):
                     f"Original deleted, sent: {low_energy_msg[:50]}..."
                 )
             except Exception as e:
+                # Reset flag on error
+                self._low_energy_replacement_in_progress = False
                 logger.error(
                     f"Error with delete+send for low energy message (user {self.client_instance.user_id}): {e}"
                 )
@@ -852,6 +864,8 @@ class MessageHandler(BaseHandler):
                     )
 
         except Exception as e:
+            # Reset flag on error
+            self._low_energy_replacement_in_progress = False
             logger.error(
                 f"Error replacing message with low energy version for user {self.client_instance.user_id}: {e}"
             )
