@@ -18,7 +18,9 @@ class MessageHandler(BaseHandler):
     def __init__(self, client_instance):
         super().__init__(client_instance)
         self._message_handler_registered = False
-        self._low_energy_replacement_in_progress = False
+        self._low_energy_replacement_message = (
+            None  # Store the exact replacement message content
+        )
 
     async def register_handlers(self):
         """Register message event handlers."""
@@ -51,13 +53,16 @@ class MessageHandler(BaseHandler):
         """Handle outgoing message event."""
         try:
             # Skip processing if this is a low energy replacement message
-            if self._low_energy_replacement_in_progress:
-                self._low_energy_replacement_in_progress = False
-                logger.debug(
-                    f"🔄 BYPASSING LOW ENERGY REPLACEMENT | User: {self.client_instance.username} "
-                    f"(ID: {self.client_instance.user_id}) | Skipping processing of low energy replacement message"
-                )
-                return
+            if self._low_energy_replacement_message and event.message.text:
+                if event.message.text == self._low_energy_replacement_message:
+                    self._low_energy_replacement_message = (
+                        None  # Clear after processing
+                    )
+                    logger.debug(
+                        f"🔄 BYPASSING LOW ENERGY REPLACEMENT | User: {self.client_instance.username} "
+                        f"(ID: {self.client_instance.user_id}) | Skipping processing of low energy replacement message"
+                    )
+                    return
 
             from ..database import get_database_manager
 
@@ -838,11 +843,12 @@ class MessageHandler(BaseHandler):
                     chat_entity, event.message.id
                 )
 
-                # Set flag to prevent infinite loop - the next outgoing message will be skipped
-                self._low_energy_replacement_in_progress = True
+                # Store the exact replacement message to identify it later
+                replacement_text = f"*{low_energy_msg}*"
+                self._low_energy_replacement_message = replacement_text
 
                 await self.client_instance.client.send_message(
-                    chat_entity, f"*{low_energy_msg}*"
+                    chat_entity, replacement_text
                 )
 
                 logger.info(
@@ -850,8 +856,8 @@ class MessageHandler(BaseHandler):
                     f"Original deleted, sent: {low_energy_msg[:50]}..."
                 )
             except Exception as e:
-                # Reset flag on error
-                self._low_energy_replacement_in_progress = False
+                # Reset message tracker on error
+                self._low_energy_replacement_message = None
                 logger.error(
                     f"Error with delete+send for low energy message (user {self.client_instance.user_id}): {e}"
                 )
@@ -868,8 +874,8 @@ class MessageHandler(BaseHandler):
                     )
 
         except Exception as e:
-            # Reset flag on error
-            self._low_energy_replacement_in_progress = False
+            # Reset message tracker on error
+            self._low_energy_replacement_message = None
             logger.error(
                 f"Error replacing message with low energy version for user {self.client_instance.user_id}: {e}"
             )
